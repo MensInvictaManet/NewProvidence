@@ -1,0 +1,26 @@
+This project uses Arcadia Engine, build 181004
+
+Prototype v1 breakdown:
+
+- The server connection should be automatic when starting the application, and the connection status and any form of warning message or news alerts should be sent down and displayed on the login screen (sent encrypted)
+- Login screen where the password is properly hidden, and both the username and password are encrypted before being sent up to the server.
+- Logging in will bring the user to the home screen.
+- Messages are stored on the server in a database, and re-loaded to the client when they open the messaging menu
+- Notifications are saved on the server, and re-loaded to the client when they open the nofications menu
+- New messages and alerts should show a notification symbol on the menu option, which should always be visible. Left-side menu that juts out when selected, maybe?
+- The home screen allows you to view "new additions" or "browse by user"
+- Allow one-click downloading of a file, showing a status bar on the bottom of the screen for whatever is currently downloading
+- A few example files uploaded manually
+
+
+----------------------------------------
+
+
+Prototype v2 breakdown:
+
+- Add "browse all", in addition to searching by keyword
+- Add queuing of multiple files
+- Allow users to recommend files to others
+- Allow users to put up a "bounty" request (request that someone find a certain movie or album?)
+- Add the bounty menu to the left-hand sidebar (with "new" notification marker)
+- Allow user uploading of new files. User should be able to select the file, name it, tag it, recommend it, etc.
