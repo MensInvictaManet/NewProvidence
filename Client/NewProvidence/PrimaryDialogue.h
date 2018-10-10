@@ -8,6 +8,9 @@
 #include "Engine/TimeSlice.h"
 #include <math.h>
 
+const auto SideBarWidth = 300;
+bool SideBarOpen = false;
+
 GUIObjectNode* StatusBarBG = nullptr;
 GUILabel* StatusBarTextLabel = nullptr;
 GUIObjectNode* LoginMenuNode = nullptr;
@@ -16,8 +19,43 @@ GUIEditBox* PasswordEditBox = nullptr;
 GUIObjectNode* MainProgramUINode = nullptr;
 GUIButton* InboxSideTabButton = nullptr;
 GUIObjectNode* InboxIconNode = nullptr;
+GUIButton* NotificationsSideTabButton = nullptr;
+GUIObjectNode* NotificationsIconNode = nullptr;
+GUIObjectNode* SideBarBox = nullptr;
 Client ClientControl;
 
+
+void SetInboxOpen(GUIObjectNode* button)
+{
+	SideBarOpen = !SideBarOpen;
+
+	SideBarBox->SetVisible(SideBarOpen);
+	InboxSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+}
+
+void SetInboxMessageCount(int messageCount)
+{
+	auto empty = (messageCount <= 0);
+	InboxIconNode->SetTextureID(textureManager.LoadTextureGetID(empty ? "./Assets/Textures/MainProgramUI/InboxEmpty.png" : "./Assets/Textures/MainProgramUI/InboxMailReceived.png"));
+	if (empty)		InboxIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
+	else			InboxIconNode->SetColor(1.0f, 0.2f, 0.2f, 1.0f);
+}
+
+void SetNotificationsOpen(GUIObjectNode* button)
+{
+	SideBarOpen = !SideBarOpen;
+
+	SideBarBox->SetVisible(SideBarOpen);
+	NotificationsSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+}
+
+void SetNotificationCount(int notificationCount)
+{
+	auto empty = (notificationCount <= 0);
+	NotificationsIconNode->SetTextureID(textureManager.LoadTextureGetID(empty ? "./Assets/Textures/MainProgramUI/NotificationsEmpty.png" : "./Assets/Textures/MainProgramUI/NotificationsReceived.png"));
+	if (empty)		NotificationsIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
+	else			NotificationsIconNode->SetColor(1.0f, 0.2f, 0.2f, 1.0f);
+}
 
 void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 {
@@ -29,27 +67,27 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 	else StatusBarBG->SetColor(0.1f, 0.4f, 0.7f, 1.0f);
 }
 
-void LoginRequestResponseCallback(bool success)
+void LoginRequestResponseCallback(bool success, int inboxCount, int notificationCount)
 {
 	LoginMenuNode->SetVisible(!success);
 	MainProgramUINode->SetVisible(success);
 
 	SetStatusBarMessage(success ? "Successfully logged in to server!" : "Failed to log in to server. Try again.", !success);
+	SetInboxMessageCount(inboxCount);
+	SetNotificationCount(notificationCount);
+}
+
+void InboxAndNotificationsCountCallback(int inboxCount, int notificationCount)
+{
+	SetInboxMessageCount(inboxCount);
+	SetNotificationCount(notificationCount);
 }
 
 void LoginButtonLeftClickCallback(GUIObjectNode* button)
 {
-	//  Encrypt the username
-	unsigned char encryptedUsername[256];
-	std::vector<unsigned char> encryptedUsernameVector;
-	auto usernameSize = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), encryptedUsername, int(UsernameEditBox->GetText().length()), rand() % 256);
-	for (auto i = 0; i < usernameSize; ++i) encryptedUsernameVector.push_back(encryptedUsername[i]);
-
-	//  Encrypt the password
-	unsigned char encryptedPassword[256];
-	std::vector<unsigned char> encryptedPasswordVector;
-	auto passwordSize = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), encryptedPassword, int(PasswordEditBox->GetText().length()), rand() % 256);
-	for (auto i = 0; i < passwordSize; ++i) encryptedPasswordVector.push_back(encryptedPassword[i]);
+	//  Encrypt the username and password
+	std::vector<unsigned char> encryptedUsernameVector = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), int(UsernameEditBox->GetText().length()), rand() % 256);
+	std::vector<unsigned char> encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
 
 	ClientControl.SetLoginResponseCallback(LoginRequestResponseCallback);
 	SendMessage_UserLoginRequest(encryptedUsernameVector, encryptedPasswordVector, ClientControl.GetServerSocket());
@@ -223,6 +261,8 @@ void PrimaryDialogue::LoadLoginMenu()
 	PasswordEditBox->SetEmptyText("Password");
 	PasswordEditBox->SetEmptyTextColor(Color(1.0f, 1.0f, 1.0f, 0.15f));
 	PasswordEditBox->SetMaxStringLength(18);
+	PasswordEditBox->SetTextHidden(true);
+	PasswordEditBox->SetHiddenCharacter('*');
 	LoginMenuNode->AddChild(PasswordEditBox);
 
 	//  Load the login screen login icon
@@ -245,32 +285,43 @@ void PrimaryDialogue::LoadMainProgramUI()
 	MainProgramUINode = GUIObjectNode::CreateObjectNode("");
 	AddChild(MainProgramUINode);
 
+	//  Load the background strip behind the status bar
+	SideBarBox = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
+	SideBarBox->SetColor(0.25f, 0.25f, 0.25f, 1.0f);
+	SideBarBox->SetDimensions(SideBarWidth, int(ScreenHeight) - StatusBarBG->GetHeight());
+	SideBarBox->SetPosition(0, 0);
+	SideBarBox->SetVisible(false);
+	MainProgramUINode->AddChild(SideBarBox);
+
 	//  Load the side-bar inbox tab
 	InboxSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 60, 40, 40);
-	//InboxSideTabButton->SetLeftClickCallback(TODO);
+	InboxSideTabButton->SetPressedSizeRatio(1.0f);
+	InboxSideTabButton->SetLeftClickCallback(SetInboxOpen);
 	MainProgramUINode->AddChild(InboxSideTabButton);
 
 	//  Load the side-bar inbox icon
-	InboxIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/InboxEmpty.png");
+	InboxIconNode = GUIObjectNode::CreateObjectNode("");
 	InboxIconNode->SetDimensions(24, 24);
-	InboxIconNode->SetColor(1.0f, 1.0f, 1.0f, 0.6f);
 	InboxIconNode->SetPosition((InboxSideTabButton->GetWidth() / 2) - (InboxIconNode->GetWidth() / 2), (InboxSideTabButton->GetHeight() / 2) - (InboxIconNode->GetHeight() / 2));
 	InboxSideTabButton->AddChild(InboxIconNode);
+	SetInboxMessageCount(0);
 
-	/*
-	//  Load the side-bar inbox tab
-	auto debugTab = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 170, 40, 40);
-	MainProgramUINode->AddChild(debugTab);
+	//  Load the side-bar notifications tab
+	NotificationsSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 110, 40, 40);
+	NotificationsSideTabButton->SetPressedSizeRatio(1.0f);
+	NotificationsSideTabButton->SetLeftClickCallback(SetNotificationsOpen);
+	MainProgramUINode->AddChild(NotificationsSideTabButton);
 
 	//  Load the side-bar inbox icon
-	auto debugIcon = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/InboxMailReceived.png");
-	debugIcon->SetDimensions(24, 24);
-	debugIcon->SetColor(1.0f, 0.1f, 0.1f, 1.0f);
-	debugIcon->SetPosition((debugTab->GetWidth() / 2) - (debugIcon->GetWidth() / 2), (debugTab->GetHeight() / 2) - (debugIcon->GetHeight() / 2));
-	debugTab->AddChild(debugIcon);
-	*/
+	NotificationsIconNode = GUIObjectNode::CreateObjectNode("");
+	NotificationsIconNode->SetDimensions(24, 24);
+	NotificationsIconNode->SetPosition((NotificationsSideTabButton->GetWidth() / 2) - (NotificationsIconNode->GetWidth() / 2), (NotificationsSideTabButton->GetHeight() / 2) - (NotificationsIconNode->GetHeight() / 2));
+	NotificationsSideTabButton->AddChild(NotificationsIconNode);
+	SetNotificationCount(0);
 
-	MainProgramUINode->SetVisible(true);
+	ClientControl.SetInboxAndNotificationCountCallback(InboxAndNotificationsCountCallback);
+
+	MainProgramUINode->SetVisible(false);
 }
 
 

@@ -14,13 +14,14 @@ enum MessageIDs
 	MESSAGE_ID_ENCRYPTED_CHAT_STRING			= 2,	// Chat String [encrypted] (two-way)
 	MESSAGE_ID_USER_LOGIN_REQUEST				= 3,	// User Login Request (client to server)
 	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
-	MESSAGE_ID_FILE_REQUEST						= 5,	// File Request (client to server)
-	MESSAGE_ID_FILE_SEND_INIT					= 6,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 7,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 8,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 9,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 10,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 11,	// File Portion Complete Confirm (two-way)
+	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
+	MESSAGE_ID_FILE_REQUEST						= 6,	// File Request (client to server)
+	MESSAGE_ID_FILE_SEND_INIT					= 7,	// File Send Initializer (two-way)
+	MESSAGE_ID_FILE_RECEIVE_READY				= 8,	// File Receive Ready (two-way)
+	MESSAGE_ID_FILE_PORTION						= 9,	// File Portion Send (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE			= 10,	// File Portion Complete Check (two-way)
+	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 11,	// File Chunks Remaining (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 12,	// File Portion Complete Confirm (two-way)
 };
 
 
@@ -203,17 +204,18 @@ private:
 	std::string			UserName;
 	FileReceiveTask*	FileReceive = NULL;
 
-	std::function<void(bool)> LoginResponseCallback = nullptr;
+	std::function<void(bool, int, int)> LoginResponseCallback = nullptr;
+	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
 
 public:
 	Client()	{}
 	~Client()	{}
 
 	inline int GetServerSocket(void) const { return ServerSocket; }
-	inline void SetLoginResponseCallback(const std::function<void(bool)>& callback) { LoginResponseCallback = callback; }
+	inline void SetLoginResponseCallback(const std::function<void(bool, int, int)>& callback) { LoginResponseCallback = callback; }
+	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
 
 	bool Connect();
-	void SendLoginData();
 
 	void Initialize();
 	bool MainProcess();
@@ -227,12 +229,6 @@ bool Client::Connect()
 	// Connect to the New Providence server
 	ServerSocket = winsockWrapper.TCPConnect(NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 1);
 	return (ServerSocket >= 0);
-}
-
-void Client::SendLoginData()
-{
-	//  Send file request to the server
-	SendMessage_FileRequest("fileToTransfer.jpeg", ServerSocket, NEW_PROVIDENCE_IP);
 }
 
 void Client::Initialize()
@@ -279,19 +275,41 @@ bool Client::ReadMessages(void)
 	{
 		int messageSize = winsockWrapper.ReadInt(0);
 
-		//  Decrypt using Groundfish and post to the chat
-		unsigned char encrypted[256];
-		memcpy(encrypted, winsockWrapper.ReadChars(0, messageSize), messageSize);
-		char decrypted[256];
-		Groundfish::Decrypt(encrypted, decrypted);
-		//NewLine(decrypted);
+		//  Decrypt using Groundfish
+		unsigned char encryptedChatString[256];
+		memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
+		std::vector<unsigned char> descryptedChatString = Groundfish::Decrypt(encryptedChatString);
+		std::string decryptedString((char*)descryptedChatString.data(), descryptedChatString.size());
+		//NewLine(decryptedString);
 	}
 	break;
 
 	case MESSAGE_ID_USER_LOGIN_RESPONSE:
 	{
 		auto success = bool(winsockWrapper.ReadChar(0));
-		if (LoginResponseCallback != nullptr) LoginResponseCallback(success);
+		auto inboxCount = success ? winsockWrapper.ReadInt(0) : 0;
+		auto notificationCount = success ? winsockWrapper.ReadInt(0) : 0;
+		if (LoginResponseCallback != nullptr) LoginResponseCallback(success, inboxCount, notificationCount);
+	}
+	break;
+
+	case MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS:
+	{
+		auto inboxCount = winsockWrapper.ReadInt(0);
+		for (auto i = 0; i < inboxCount; ++i)
+		{
+			//  TODO: Read inbox item data
+		}
+
+		char* notification;
+		auto notificationsCount = winsockWrapper.ReadInt(0);
+		for (auto i = 0; i < notificationsCount; ++i)
+		{
+			auto notificationLength = winsockWrapper.ReadInt(0);
+			notification = (char*)winsockWrapper.ReadChars(0, notificationLength);
+		}
+
+		if (InboxAndNotificationCountCallback != nullptr) InboxAndNotificationCountCallback(0, notificationsCount);
 	}
 	break;
 
@@ -303,8 +321,8 @@ bool Client::ReadMessages(void)
 		//  Decrypt using Groundfish and save as the filename
 		unsigned char encryptedFileName[256];
 		memcpy(encryptedFileName, winsockWrapper.ReadChars(0, fileNameSize), fileNameSize);
-		char decryptedFileName[256];
-		Groundfish::Decrypt(encryptedFileName, decryptedFileName);
+		std::vector<unsigned char> decryptedFileName = Groundfish::Decrypt(encryptedFileName);
+		std::string decryptedFileNameString = std::string((char*)decryptedFileName.data(), decryptedFileName.size());
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadInt(0);
@@ -312,10 +330,10 @@ bool Client::ReadMessages(void)
 		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
 
 		//  Create a new file receive task
-		FileReceive = new FileReceiveTask(decryptedFileName, fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP);
+		FileReceive = new FileReceiveTask(decryptedFileNameString.c_str(), fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP);
 
 		//  Output the file name
-		std::string newString = "Downloading file: " + std::string(decryptedFileName) + " (size: " + std::to_string(fileSize) + ")";
+		std::string newString = "Downloading file: " + decryptedFileNameString + " (size: " + std::to_string(fileSize) + ")";
 		//NewLine(newString.c_str());
 	}
 	break;

@@ -14,6 +14,7 @@
 #define MAXIMUM_PACKET_COUNT			10
 #define PORTION_COMPLETE_REMIND_TIME	0.5
 
+
 //  Incoming message type IDs (enum list syncronous with both client and server)
 enum MessageIDs
 {
@@ -22,43 +23,91 @@ enum MessageIDs
 	MESSAGE_ID_ENCRYPTED_CHAT_STRING			= 2,	// Chat String [encrypted] (two-way)
 	MESSAGE_ID_USER_LOGIN_REQUEST				= 3,	// User Login Request (client to server)
 	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
-	MESSAGE_ID_FILE_REQUEST						= 5,	// File Request (client to server)
-	MESSAGE_ID_FILE_SEND_INIT					= 6,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 7,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 8,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 9,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 10,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 11,	// File Portion Complete Confirm (two-way)
+	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
+	MESSAGE_ID_FILE_REQUEST						= 6,	// File Request (client to server)
+	MESSAGE_ID_FILE_SEND_INIT					= 7,	// File Send Initializer (two-way)
+	MESSAGE_ID_FILE_RECEIVE_READY				= 8,	// File Receive Ready (two-way)
+	MESSAGE_ID_FILE_PORTION						= 9,	// File Portion Send (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE			= 10,	// File Portion Complete Check (two-way)
+	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 11,	// File Chunks Remaining (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 12,	// File Portion Complete Confirm (two-way)
+};
+
+struct HostedFileData
+{
+	std::string FileNameMD5;
+	std::vector<unsigned char> EncryptedFileName;
+	std::vector<unsigned char> EncryptedFileTitle;
+	std::vector<unsigned char> EncryptedFileDescription;
+};
+
+struct UserConnection
+{
+	int				SocketID;
+	std::string		IPAddress;
+	int				PingCount;
+
+	int				InboxCount;
+
+	std::string		UserIdentifier;
+
+	std::vector<std::string> NotificationsList;
 };
 
 
 //  Outgoing message send functions
-void SendMessage_LoginResponse(bool success, int socket, const char* ip)
+void SendMessage_LoginResponse(bool success, UserConnection* user)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_USER_LOGIN_RESPONSE, 0);
 	winsockWrapper.WriteChar((unsigned char)success, 0);
 
-	winsockWrapper.SendMessagePacket(socket, ip, SERVER_PORT, 0);
+	if (success)
+	{
+		winsockWrapper.WriteInt(user->InboxCount, 0);
+		winsockWrapper.WriteInt(int(user->NotificationsList.size()), 0);
+	}
+
+	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), SERVER_PORT, 0);
+}
+
+
+void SendMessage_InboxAndNotifications(UserConnection* user)
+{
+	winsockWrapper.ClearBuffer(0);
+	winsockWrapper.WriteChar(MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS, 0);
+	winsockWrapper.WriteInt(user->InboxCount, 0);
+	for (auto i = 0; i < user->InboxCount; ++i)
+	{
+		//  TODO: Write inbox item data
+	}
+	winsockWrapper.WriteInt(int(user->NotificationsList.size()), 0);
+	for (auto notificationIter = user->NotificationsList.begin(); notificationIter != user->NotificationsList.end(); ++notificationIter)
+	{
+		winsockWrapper.WriteInt(int((*notificationIter).length()), 0);
+		winsockWrapper.WriteChars((unsigned char*)(*notificationIter).c_str(), int((*notificationIter).length()), 0);
+	}
+
+	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), SERVER_PORT, 0);
 }
 
 
 void SendMessage_FileSendInitializer(std::string fileName, int fileSize, int socket, const char* ip)
 {
 	//  Encrypt the file name string using Groundfish
-	unsigned char encrypted[256];
-	int messageSize = Groundfish::Encrypt(fileName.c_str(), encrypted, int(fileName.length()) + 1, 0, rand() % 256);
+	std::vector<unsigned char> encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()) + 1, 0, rand() % 256);
 
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_SEND_INIT, 0);
-	winsockWrapper.WriteInt(messageSize, 0);
-	winsockWrapper.WriteChars(encrypted, messageSize, 0);
+	winsockWrapper.WriteInt(int(encryptedFilename.size()), 0);
+	winsockWrapper.WriteChars(encryptedFilename.data(), int(encryptedFilename.size()), 0);
 	winsockWrapper.WriteInt(fileSize, 0);
 	winsockWrapper.WriteInt(FILE_CHUNK_SIZE, 0);
 	winsockWrapper.WriteInt(FILE_CHUNK_BUFFER_COUNT, 0);
 
 	winsockWrapper.SendMessagePacket(socket, ip, SERVER_PORT, 0);
 }
+
 
 void SendMessage_FileSendChunk(int chunkBufferIndex, int chunkIndex, int chunkSize, unsigned char* buffer, int socket, const char* ip)
 {
@@ -71,12 +120,71 @@ void SendMessage_FileSendChunk(int chunkBufferIndex, int chunkIndex, int chunkSi
 	winsockWrapper.SendMessagePacket(socket, ip, SERVER_PORT, 0);
 }
 
+
 void SendMessage_FileTransferPortionComplete(int portionIndex, int socket, const char* ip)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE, 0);
 	winsockWrapper.WriteInt(portionIndex, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, SERVER_PORT, 0);
+}
+
+
+void AddUserInboxMessage(std::string userID, std::string inboxMessage)
+{
+}
+
+
+void AddUserNotification(std::string userID, std::string notification)
+{
+	std::string notificationsFilename = "./_UserNotifications/" + userID + ".notifications";
+	std::ofstream notificationsFile(notificationsFilename, std::ios_base::binary);
+	assert(notificationsFile.good() && !notificationsFile.bad());
+
+	auto notificationSize = int(notification.length());
+	notificationsFile.write((char*)&notificationSize, sizeof(notificationSize));
+	notificationsFile.write(notification.c_str(), notificationSize);
+
+	notificationsFile.close();
+}
+
+
+void ReadUserInbox(UserConnection* user)
+{
+	return;
+	std::string inboxFilename = "./_UserInbox/" + user->UserIdentifier + ".inbox";
+	std::ifstream inboxFile(inboxFilename, std::ios_base::binary);
+	assert(inboxFile.good() && !inboxFile.bad());
+
+	inboxFile.close();
+}
+
+
+void ReadUserNotifications(UserConnection* user)
+{
+	std::string notificationsFilename = "./_UserNotifications/" + user->UserIdentifier + ".notifications";
+	std::ifstream notificationsFile(notificationsFilename, std::ios_base::binary);
+	assert(notificationsFile.good() && !notificationsFile.bad());
+
+	//  Get the file size by reading the beginning and end memory positions
+	auto fileSize = int(notificationsFile.tellg());
+	notificationsFile.seekg(0, std::ios::end);
+	fileSize = int(notificationsFile.tellg()) - fileSize;
+	notificationsFile.seekg(0, std::ios::beg);
+
+	char notification[256];
+	while ((fileSize != 0) && !notificationsFile.eof())
+	{
+		int notificationSize = 0;
+		memset(notification, 0, 256);
+		notificationsFile.read((char*)&notificationSize, sizeof(notificationSize));
+		if (notificationsFile.eof()) break;
+		notificationsFile.read(notification, notificationSize);
+		notification[notificationSize] = 0;
+		user->NotificationsList.push_back(std::string(notification));
+	}
+
+	notificationsFile.close();
 }
 
 //  FileSendTask class
@@ -235,17 +343,9 @@ class Server
 private:
 	int		ServerSocketHandle;
 
-	struct UserConnection
-	{
-		int				SocketID;
-		std::string		IPAddress;
-		int				PingCount;
-
-		std::string		UserIdentifier;
-	};
-
 	typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char>> UserLoginDetails;
 	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
+	std::unordered_map<std::string, HostedFileData> HostedFileDataList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
 	std::unordered_map<UserConnection*, FileSendTask*> FileSendTaskList; // NOTE: Key is the client ID, so we should limit them to one transfer in the future
 
@@ -267,6 +367,10 @@ private:
 	void LoadUserLoginDetails(void);
 	void SaveUserLoginDetails(void);
 	void AddUserLoginDetails(std::string username, std::string password);
+
+	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
+	void LoadHostedFilesData(void);
+
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(const char* fileName, UserConnection* user);
 	void SendChatString(const char* chatString);
@@ -280,6 +384,8 @@ bool Server::Initialize(void)
 	//  Seed the random number generator
 	srand((unsigned int)(time(NULL)));
 
+	//Groundfish::CreateWordList(Groundfish::CurrentWordList);
+
 	//  Load the current Groundfish word list
 	Groundfish::LoadCurrentWordList();
 
@@ -291,10 +397,20 @@ bool Server::Initialize(void)
 	if (ServerSocketHandle == -1) return false;
 	winsockWrapper.SetNagle(ServerSocketHandle, true);
 
+	//  ensure there is an Inbox, Notifications, and Files folder
+	_wmkdir(L"_UserInbox");
+	_wmkdir(L"_UserNotifications");
+	_wmkdir(L"_HostedFiles");
+
 	//  Load all user login details into an accessible list
 	LoadUserLoginDetails();
 	AddUserLoginDetails("Drew", "password");
 	AddUserLoginDetails("Charlie", "testpass");
+
+	//  Load the hosted files list
+	LoadHostedFilesData();
+	//AddHostedFileFromUnencrypted("fileToTransfer.jpeg", "Test file", "This is a test image file");
+	//Groundfish::DecryptAndMoveFile("./_HostedFiles/" + md5("Test file") + ".hostedfile", "./_HostedFiles/fileToTransfer.jpeg");
 
 	return true;
 }
@@ -330,6 +446,8 @@ void Server::AddClient(int socketID, std::string ipAddress)
 	newConnection->SocketID = socketID;
 	newConnection->IPAddress = ipAddress;
 	newConnection->PingCount = 0;
+	newConnection->UserIdentifier = "";
+	newConnection->InboxCount = 0;
 	UserConnectionsList[newConnection] = true;
 }
 
@@ -391,14 +509,13 @@ void Server::ReceiveMessages(void)
 			int messageSize = winsockWrapper.ReadInt(0);
 
 			//  Decrypt using Groundfish
-			unsigned char encrypted[256];
-			memcpy(encrypted, winsockWrapper.ReadChars(0, messageSize), messageSize);
-			char decrypted[256];
-			Groundfish::Decrypt(encrypted, decrypted);
+			unsigned char encryptedChatString[256];
+			memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
+			std::vector<unsigned char> descryptedChatString = Groundfish::Decrypt(encryptedChatString);
+			std::string decryptedString((char*)descryptedChatString.data(), descryptedChatString.size());
 
-			std::string decryptedString(decrypted);
 			if (decryptedString.find("download") != std::string::npos) BeginFileTransfer("fileToTransfer.jpeg", user);
-			else SendChatString(decrypted);
+			else SendChatString(decryptedString.c_str());
 		}
 		break;
 
@@ -409,21 +526,21 @@ void Server::ReceiveMessages(void)
 			//  (int) Length of encrypted password (n2)
 			//  (n2-size chars array) Encrypted password
 
-			//  Grab the username size and then the encrypted username, and decrypt it
+			//  Grab the username size and then the encrypted username
 			int usernameSize = winsockWrapper.ReadInt(0);
-			std::vector<unsigned char> decryptedUsername;
 			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
-			Groundfish::Decrypt(encryptedUsername, decryptedUsername);
-			std::string username;
-			for (auto i = 0; i < int(decryptedUsername.size()); ++i) username += (char)(decryptedUsername[i]);
 
-			//  Grab the password size and then the encrypted password, and decrypt it
+			//  Decrypt the username
+			std::vector<unsigned char> decryptedUsername = Groundfish::Decrypt(encryptedUsername);
+			std::string username = std::string((char*)decryptedUsername.data(), decryptedUsername.size());
+
+			//  Grab the password size and then the encrypted password
 			int passwordSize = winsockWrapper.ReadInt(0);
-			std::vector<unsigned char> decryptedPassword;
 			auto encryptedPassword = winsockWrapper.ReadChars(0, passwordSize);
-			Groundfish::Decrypt(encryptedPassword, decryptedPassword);
-			std::string password;
-			for (auto i = 0; i < int(decryptedPassword.size()); ++i) password += (char)(decryptedPassword[i]);
+
+			//  Decrypt the password
+			std::vector<unsigned char> decryptedPassword = Groundfish::Decrypt(encryptedPassword);
+			std::string password = std::string((char*)decryptedPassword.data(), decryptedPassword.size());
 
 			AttemptUserLogin(user, username, password);
 		}
@@ -431,9 +548,21 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_REQUEST:
 		{
-			char* fileName = winsockWrapper.ReadString(0);
+			char* fileTitle = winsockWrapper.ReadString(0);
+			auto hostedFileIdentifier = md5(fileTitle);
+			auto hostedFileIter = HostedFileDataList.find(hostedFileIdentifier);
 
-			BeginFileTransfer(fileName, user);
+			if (hostedFileIter == HostedFileDataList.end())
+			{
+				//  TODO: Send back a failed file retrieval message, then break out
+			}
+			else
+			{
+				auto hostedFileData = (*hostedFileIter).second;
+
+				std::vector<unsigned char> decryptedFileName = Groundfish::Decrypt(hostedFileData.EncryptedFileName.data());
+				BeginFileTransfer((char*)decryptedFileName.data(), user);
+			}
 		}
 		break;
 
@@ -482,22 +611,23 @@ void Server::ReceiveMessages(void)
 void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::string& password)
 {
 	//  Locate the user entry in the login details list, if possible
-	std::vector<unsigned char> userLoginComboVector;
-	for (auto i = 0; i < int(username.length()); ++i) userLoginComboVector.push_back(username[i]);
-	for (auto i = 0; i < int(password.length()); ++i) userLoginComboVector.push_back(password[i]);
-	std::string userLoginCombo = username + password;
-	auto userLoginMD5 = md5(userLoginComboVector);
-	auto userIter = UserLoginDetailsList.find(userLoginMD5);
+	auto userMD5 = md5(username);
+	auto userIter = UserLoginDetailsList.find(userMD5);
 
 	//  if the user does not exist
 	if (userIter == UserLoginDetailsList.end())
 	{
-		SendMessage_LoginResponse(false, user->SocketID, user->IPAddress.c_str());
+		SendMessage_LoginResponse(false, user);
+		return;
 	}
-	else
-	{
-		SendMessage_LoginResponse(true, user->SocketID, user->IPAddress.c_str());
-	}
+
+	SendMessage_LoginResponse(true, user);
+
+	//  Set the user identifier, and read the Inbox and Notifications data for the user
+	user->UserIdentifier = userMD5;
+	ReadUserInbox(user);
+	ReadUserNotifications(user);
+	SendMessage_InboxAndNotifications(user);
 }
 
 ////////////////////////////////////////
@@ -510,13 +640,12 @@ void Server::LoadUserLoginDetails(void)
 
 	int usernameLength = 0;
 	int passwordLength = 0;
-	unsigned char encryptedUsername[32];
-	unsigned char encryptedPassword[32];
+	unsigned char encryptedUsername[64];
+	unsigned char encryptedPassword[64];
 	std::vector<unsigned char> encryptedUsernameVector;
 	std::vector<unsigned char> encryptedPasswordVector;
-	std::vector<unsigned char> unencryptedUsername;
-	std::vector<unsigned char> unencryptedPassword;
-	std::vector<unsigned char> loginDataCombo;
+	std::vector<unsigned char> decryptedUsername;
+	std::vector<unsigned char> decryptedPassword;
 
 	auto fileSize = int(uldFile.tellg());
 	uldFile.seekg(0, std::ios::end);
@@ -525,28 +654,23 @@ void Server::LoadUserLoginDetails(void)
 
 	while ((fileSize != 0) && (!uldFile.eof()))
 	{
-		int usernameLength = 0;
-		int passwordLength = 0;
+		usernameLength = 0;
+		passwordLength = 0;
+
 		uldFile.read((char*)(&usernameLength), sizeof(usernameLength));
 		if (usernameLength == 0) break;
 		uldFile.read((char*)(encryptedUsername), usernameLength);
 		uldFile.read((char*)(&passwordLength), sizeof(passwordLength));
 		uldFile.read((char*)(encryptedPassword), passwordLength);
 
+		//  Get the MD5 of the decrypted username and password
+		decryptedUsername = Groundfish::Decrypt(encryptedUsername);
+		decryptedPassword = Groundfish::Decrypt(encryptedPassword);
+		auto loginDataMD5 = md5(std::string((const char*)decryptedUsername.data(), decryptedUsername.size()));
+
 		for (auto i = 0; i < usernameLength; ++i) encryptedUsernameVector.push_back(encryptedUsername[i]);
 		for (auto i = 0; i < passwordLength; ++i) encryptedPasswordVector.push_back(encryptedPassword[i]);
-
-		//  Get the MD5 of the decrypted username and password
-		char decryptedUsername[256];
-		Groundfish::Decrypt(encryptedUsername, decryptedUsername);
-		char decryptedPassword[256];
-		Groundfish::Decrypt(encryptedPassword, decryptedPassword);
-		loginDataCombo.clear();
-		for (auto i = 0; i < int(strlen(decryptedUsername)); ++i) loginDataCombo.push_back(decryptedUsername[i]);
-		for (auto i = 0; i < int(strlen(decryptedPassword)); ++i) loginDataCombo.push_back(decryptedPassword[i]);
-		std::string MD5String = md5(loginDataCombo);
-
-		UserLoginDetailsList[MD5String] = UserLoginDetails(encryptedUsernameVector, encryptedPasswordVector);
+		UserLoginDetailsList[loginDataMD5] = UserLoginDetails(encryptedUsernameVector, encryptedPasswordVector);
 	}
 
 	uldFile.close();
@@ -561,19 +685,15 @@ void Server::SaveUserLoginDetails(void)
 	{
 		auto encryptedUsername = (*userIter).second.first;
 		auto encryptedPassword = (*userIter).second.second;
-
-		//  Write the size of the encrypted username
 		auto encryptedUsernameSize = int(encryptedUsername.size());
-		uldFile.write((const char*)&encryptedUsernameSize, sizeof(encryptedUsernameSize));
+		auto encryptedPasswordSize = int(encryptedPassword.size());
 
-		//  Write the encrypted username
+		//  Write the size of the encrypted username, then the encrypted username itself
+		uldFile.write((const char*)&encryptedUsernameSize, sizeof(encryptedUsernameSize));
 		uldFile.write((const char*)(encryptedUsername.data()), encryptedUsername.size());
 
-		//  Write the size of the encrypted password
-		auto encryptedPasswordSize = int(encryptedPassword.size());
+		//  Write the size of the encrypted password, then the encrypted password itself
 		uldFile.write((const char*)&encryptedPasswordSize, sizeof(encryptedPasswordSize));
-
-		//  Write the encrypted password
 		uldFile.write((const char*)(encryptedPassword.data()), encryptedPassword.size());
 	}
 
@@ -582,28 +702,132 @@ void Server::SaveUserLoginDetails(void)
 
 void Server::AddUserLoginDetails(std::string username, std::string password)
 {
-	//  Grab the MD5 of the combination of the unencrypted username and unencrypted password
-	std::vector<unsigned char> loginDetailsVector;
-	for (auto i = 0; i < int(username.size()); ++i) loginDetailsVector.push_back((unsigned char)(username[i]));
-	for (auto i = 0; i < int(password.size()); ++i) loginDetailsVector.push_back((unsigned char)(password[i]));
-	auto loginMD5 = md5(loginDetailsVector);
-
-	//  Check if the MD5 already links to a user login data entry, and if so exit out
+	//  Check if the MD5 of the unencrypted login details already links to a user login data entry, and if so exit out
+	auto loginMD5 = md5(username);
 	if (UserLoginDetailsList.find(loginMD5) != UserLoginDetailsList.end()) return;
 
 	//  If it's a new entry, encrypt the username and password, place both encrypted arrays in a vector of unsigned chars
-	unsigned char encryptedUsername[256];
-	unsigned char encryptedPassword[256];
-	std::vector<unsigned char> usernameVector;
-	std::vector<unsigned char> passwordVector;
-	auto usernameSize = Groundfish::Encrypt(username.c_str(), encryptedUsername, int(username.length()), 0, rand() % 256);
-	auto passwordSize = Groundfish::Encrypt(password.c_str(), encryptedPassword, int(password.length()), 0, rand() % 256);
-	for (auto i = 0; i < usernameSize; ++i) usernameVector.push_back((unsigned char)(encryptedUsername[i]));
-	for (auto i = 0; i < passwordSize; ++i) passwordVector.push_back((unsigned char)(encryptedPassword[i]));
+	std::vector<unsigned char> usernameVector = Groundfish::Encrypt(username.c_str(), int(username.length()), 0, rand() % 256);
+	std::vector<unsigned char> passwordVector = Groundfish::Encrypt(password.c_str(), int(password.length()), 0, rand() % 256);
+
+	//  Open and close the Inbox and Notifications file for this user, to create them
+	std::ofstream userInboxFile("./_UserInbox/" + loginMD5 + ".inbox");
+	assert(userInboxFile.good() && !userInboxFile.bad());
+	userInboxFile.close();
+	std::ofstream userNotificationFile("./_UserNotifications/" + loginMD5 + ".notifications");
+	assert(userNotificationFile.good() && !userNotificationFile.bad());
+	userNotificationFile.close();
+
+	//  Add a new notification for a welcoming message
+	AddUserNotification(loginMD5, "Welcome to New Providence");
 	
 	//  Add the user data to the login details list, then save off the new user login details list
 	UserLoginDetailsList[loginMD5] = UserLoginDetails(usernameVector, passwordVector);
 	SaveUserLoginDetails();
+}
+
+/*
+struct HostedFileData
+{
+	std::string FileNameMD5;
+	std::vector<unsigned char> EncryptedFileName;
+	std::vector<unsigned char> EncryptedFileTitle;
+	std::vector<unsigned char> EncryptedFileDescription;
+};
+
+std::unordered_map<std::string, HostedFileData> HostedFileDataList;
+*/
+
+void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
+{
+	//  Find the file's primary name (no directories)
+	std::string pureFileName = fileToAdd;
+	if (fileToAdd.find_last_of('/') != -1) pureFileName = fileToAdd.substr(fileToAdd.find_last_of('/') + 1, fileToAdd.length() - fileToAdd.find_last_of('/') - 1);
+
+	//  If the file already exists in the Hosted File Data List, return out
+	auto fileTitleMD5 = md5(fileTitle);
+	if (HostedFileDataList.find(fileTitleMD5) != HostedFileDataList.end()) return;
+
+	//  Add the hosted file data to the hosted file data list
+	HostedFileData newFile;
+	newFile.FileNameMD5 = md5(pureFileName);
+	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
+	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
+	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
+	HostedFileDataList[fileTitleMD5] = newFile;
+
+	//  Add the hosted file data to the HostedFiles.data file and move to the end of it
+	std::ofstream hfFile("HostedFiles.data");
+	assert(!hfFile.bad() && hfFile.good());
+
+	int md5Length = int(newFile.FileNameMD5.length());
+	int encryptedFileNameLength = int(newFile.EncryptedFileName.size());
+	int encryptedFileTitleLength = int(newFile.EncryptedFileTitle.size());
+	int encryptedFileDescLength = int(newFile.EncryptedFileDescription.size());
+
+	//  Write the hosted file data into the file, then close it
+	hfFile.write((const char*)&md5Length, sizeof(md5Length));
+	hfFile.write((const char*)newFile.FileNameMD5.c_str(), md5Length);
+	hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
+	hfFile.write((const char*)newFile.EncryptedFileName.data(), encryptedFileNameLength);
+	hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
+	hfFile.write((const char*)newFile.EncryptedFileTitle.data(), encryptedFileTitleLength);
+	hfFile.write((const char*)&encryptedFileDescLength, sizeof(encryptedFileDescLength));
+	hfFile.write((const char*)newFile.EncryptedFileDescription.data(), encryptedFileDescLength);
+	hfFile.close();
+
+	Groundfish::EncryptAndMoveFile(fileToAdd, "./_HostedFiles/" + fileTitleMD5 + ".hostedfile");
+}
+
+void Server::LoadHostedFilesData(void)
+{
+	std::ifstream hfFile("HostedFiles.data");
+	assert(!hfFile.bad() && hfFile.good());
+
+	int md5Length = 0;
+	int fileNameLength = 0;
+	int fileTitleLength = 0;
+	int fileDescLength = 0;
+	unsigned char fileNameMD5[128];
+	unsigned char encryptedFileName[128];
+	unsigned char encryptedFileTitle[128];
+	unsigned char encryptedFileDesc[256];
+
+	auto fileSize = int(hfFile.tellg());
+	hfFile.seekg(0, std::ios::end);
+	fileSize = int(hfFile.tellg()) - fileSize;
+	hfFile.seekg(0, std::ios::beg);
+
+	while ((fileSize != 0) && (!hfFile.eof()))
+	{
+		md5Length = 0;
+		fileNameLength = 0;
+		fileTitleLength = 0;
+		fileDescLength = 0;
+
+		//  Read in the hosted file data
+		hfFile.read((char*)(&md5Length), sizeof(md5Length)); if (md5Length == 0) break;
+		hfFile.read((char*)(fileNameMD5), md5Length);
+		hfFile.read((char*)(&fileNameLength), sizeof(fileNameLength));
+		hfFile.read((char*)(encryptedFileName), fileNameLength);
+		hfFile.read((char*)(&fileTitleLength), sizeof(fileTitleLength));
+		hfFile.read((char*)(encryptedFileTitle), fileTitleLength);
+		hfFile.read((char*)(&fileDescLength), sizeof(fileDescLength));
+		hfFile.read((char*)(encryptedFileDesc), fileDescLength);
+
+		//  Create a Hosted File Data struct and store it off in memory
+		auto decryptedFileTitle = Groundfish::Decrypt(encryptedFileTitle);
+		auto decryptedFileTitleString = std::string((char*)decryptedFileTitle.data(), decryptedFileTitle.size());
+
+		HostedFileData newFile;
+		newFile.FileNameMD5 = std::string((char*)fileNameMD5);
+		for (auto i = 0; i < fileNameLength; ++i) newFile.EncryptedFileName.push_back(encryptedFileName[i]);
+		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
+		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
+		HostedFileDataList[md5(decryptedFileTitleString)] = newFile;
+	}
+
+	hfFile.close();
 }
 
 void Server::ContinueFileTransfers(void)
@@ -630,7 +854,7 @@ void Server::ContinueFileTransfers(void)
 void Server::BeginFileTransfer(const char* fileName, UserConnection* user)
 {
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSendTask* newTask = new FileSendTask(std::string(fileName), user->SocketID, std::string(user->IPAddress));
+	FileSendTask* newTask = new FileSendTask("./_HostedFiles/" + std::string(fileName), user->SocketID, std::string(user->IPAddress));
 	FileSendTaskList[user] = newTask;
 }
 
@@ -641,13 +865,12 @@ void Server::SendChatString(const char* chatString)
 		auto user = (*userIter).first;
 
 		//  Encrypt the string using Groundfish
-		unsigned char encrypted[256];
-		int messageSize = Groundfish::Encrypt(chatString, encrypted, int(strlen(chatString)) + 1, 0, rand() % 256);
+		std::vector<unsigned char> encryptedChatString = Groundfish::Encrypt(chatString, int(strlen(chatString)) + 1, 0, rand() % 256);
 
 		winsockWrapper.ClearBuffer(0);
 		winsockWrapper.WriteChar(MESSAGE_ID_ENCRYPTED_CHAT_STRING, 0);
-		winsockWrapper.WriteInt(messageSize, 0);
-		winsockWrapper.WriteChars(encrypted, messageSize, 0);
+		winsockWrapper.WriteInt(int(encryptedChatString.size()), 0);
+		winsockWrapper.WriteChars(encryptedChatString.data(), int(encryptedChatString.size()), 0);
 		winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), SERVER_PORT, 0);
 	}
 }
