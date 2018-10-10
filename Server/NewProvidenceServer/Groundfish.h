@@ -10,40 +10,85 @@
 
 namespace Groundfish
 {
-
 	struct GroundfishWordlist
 	{
 		unsigned long int ListVersion;
 		unsigned char WordList[256][256];
+		unsigned char ReverseWordList[256][256];
 	};
 
 	GroundfishWordlist CurrentWordList;
 	unsigned int CurrentVersion = 0;
 
-	int Encrypt(const char* data, unsigned char* encrypted, const int dataLength, const int wordListVersion = 0, unsigned char wordIndex = 0)
+	std::vector<unsigned char> Encrypt(const char* data, const int dataLength, const int wordListVersion = 0, unsigned char wordIndex = 0)
 	{
+		std::vector<unsigned char> encryptedData;
+
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
 		unsigned int encryptionIndex = 0;
 
 		//  Input the word list version number
-		memcpy(&encrypted[encryptionIndex], (const void*)&wordListVersion, 4);
+		encryptedData.push_back(((unsigned char*)&wordListVersion)[0]);
+		encryptedData.push_back(((unsigned char*)&wordListVersion)[1]);
+		encryptedData.push_back(((unsigned char*)&wordListVersion)[2]);
+		encryptedData.push_back(((unsigned char*)&wordListVersion)[3]);
 		encryptionIndex += 4;
 
-		memcpy(&encrypted[encryptionIndex], (const void*)&dataLength, 4);
+		encryptedData.push_back(((unsigned char*)&dataLength)[0]);
+		encryptedData.push_back(((unsigned char*)&dataLength)[1]);
+		encryptedData.push_back(((unsigned char*)&dataLength)[2]);
+		encryptedData.push_back(((unsigned char*)&dataLength)[3]);
 		encryptionIndex += 4;
 
 		//  Encrypt and input the word index to start decryption at
-		memcpy(&encrypted[encryptionIndex], (const void*)&wordList.WordList[0][wordIndex], sizeof(wordList.WordList[0][wordIndex]));
+		encryptedData.push_back(wordList.WordList[0][wordIndex]);
 		encryptionIndex += 1;
 
 		for (int i = 0; i < dataLength; ++i)
-			encrypted[encryptionIndex + i] = wordList.WordList[wordIndex++][(unsigned char)data[i]];
+			encryptedData.push_back(wordList.WordList[wordIndex++][(unsigned char)data[i]]);
 
-		return encryptionIndex + dataLength;
+		return encryptedData;
 	}
 
-	void Decrypt(const unsigned char* encrypted, char* decrypted)
+	bool EncryptAndMoveFile(std::string targetFileName, std::string newFileName, const int wordListVersion = 0, unsigned char wordIndex = 0)
 	{
+		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
+		unsigned int encryptionIndex = 0;
+
+		std::ifstream targetFile(targetFileName, std::ios_base::binary);
+		assert(targetFile.good() && !targetFile.bad());
+
+		std::ofstream newFile(newFileName, std::ios_base::binary);
+		assert(newFile.good() && !newFile.bad());
+
+		auto fileSize = int(targetFile.tellg());
+		targetFile.seekg(0, std::ios::end);
+		fileSize = int(targetFile.tellg()) - fileSize;
+		targetFile.seekg(0, std::ios::beg);
+
+		newFile.write((char*)&wordListVersion, sizeof(wordListVersion));
+		newFile.write((char*)&fileSize, sizeof(fileSize));
+		newFile.write((char*)&wordIndex, sizeof(wordIndex));
+
+		char readByte = 0;
+		while (targetFile.eof() == false)
+		{
+			targetFile.read(&readByte, 1);
+			if (targetFile.eof()) break;
+			readByte = (char)wordList.WordList[wordIndex++][(unsigned char)readByte];
+			newFile.write(&readByte, 1);
+		}
+
+		targetFile.close();
+		newFile.close();
+
+		return true;
+	}
+
+	std::vector<unsigned char> Decrypt(const unsigned char* encrypted)
+	{
+		std::vector<unsigned char> decryptedData;
+
 		unsigned int encryptionIndex = 0;
 		unsigned int wordListVersion = 0;
 		unsigned int messageLength = 0;
@@ -67,37 +112,46 @@ namespace Groundfish
 			for (int j = 0; j < 256; ++j) characterMap[wordList.WordList[wordIndex][j]] = j;
 			wordIndex++;
 
-			decrypted[i] = characterMap[(unsigned char)encrypted[encryptionIndex + i]];
+			decryptedData.push_back(characterMap[(unsigned char)encrypted[encryptionIndex + i]]);
 		}
+
+		return decryptedData;
 	}
 
-	void Decrypt(const unsigned char* encrypted, std::vector<unsigned char>& decrypted)
+	void DecryptAndMoveFile(std::string targetFileName, std::string newFileName)
 	{
-		unsigned int encryptionIndex = 0;
-		unsigned int wordListVersion = 0;
-		unsigned int messageLength = 0;
+		std::ifstream targetFile(targetFileName, std::ios_base::binary);
+		assert(targetFile.good() && !targetFile.bad());
 
-		memcpy((void*)&wordListVersion, (const void*)&encrypted[encryptionIndex], 4);
-		encryptionIndex += 4;
+		std::ofstream newFile(newFileName, std::ios_base::binary);
+		assert(newFile.good() && !newFile.bad());
 
-		memcpy((void*)&messageLength, (const void*)&encrypted[encryptionIndex], 4);
-		encryptionIndex += 4;
+		int wordListVersion = 0;
+		int newFileSize = 0;
+		unsigned char wordIndex = 0;
+
+		auto fileSize = int(targetFile.tellg());
+		targetFile.seekg(0, std::ios::end);
+		fileSize = int(targetFile.tellg()) - fileSize;
+		targetFile.seekg(0, std::ios::beg);
+
+		targetFile.read((char*)&wordListVersion, sizeof(wordListVersion));
+		targetFile.read((char*)&newFileSize, sizeof(newFileSize));
+		targetFile.read((char*)&wordIndex, sizeof(wordIndex));
 
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
 
-		std::unordered_map<unsigned char, unsigned char> characterMap;
-		for (int i = 0; i < 256; ++i) characterMap[wordList.WordList[0][i]] = i;
-
-		unsigned char wordIndex = characterMap[encrypted[encryptionIndex]];
-		encryptionIndex += 1;
-
-		for (unsigned int i = 0; i < messageLength; ++i)
+		char readByte = 0;
+		while (targetFile.eof() == false)
 		{
-			for (int j = 0; j < 256; ++j) characterMap[wordList.WordList[wordIndex][j]] = j;
-			wordIndex++;
-
-			decrypted.push_back(characterMap[(unsigned char)encrypted[encryptionIndex + i]]);
+			targetFile.read(&readByte, 1);
+			if (targetFile.eof()) break;
+			readByte = (char)wordList.ReverseWordList[wordIndex++][(unsigned char)readByte];
+			newFile.write((char*)&readByte, 1);
 		}
+
+		targetFile.close();
+		newFile.close();
 	}
 
 	void SaveWordList(GroundfishWordlist& savedList, std::string filename)
@@ -105,7 +159,7 @@ namespace Groundfish
 		std::ofstream wordlistOutput(filename.c_str(), std::ofstream::out | std::ifstream::binary);
 		assert(!wordlistOutput.bad() && wordlistOutput.good());
 
-		wordlistOutput.write((char*)(&CurrentWordList), sizeof(GroundfishWordlist));
+		wordlistOutput.write((char*)(&savedList), sizeof(GroundfishWordlist));
 
 		wordlistOutput.close();
 	}
@@ -157,7 +211,7 @@ namespace Groundfish
 			}
 		}
 
-		//  For each word, confirm that we have every character
+		//  For each word, confirm that we have every character, and fill in the reverse word list
 		for (int i = 0; i < 256; ++i)
 		{
 			for (int j = 0; j < 256; ++j)
@@ -167,6 +221,7 @@ namespace Groundfish
 				{
 					if (newList.WordList[i][k] == j)
 					{
+						newList.ReverseWordList[i][j] = k;
 						characterFound = true;
 						break;
 					}
