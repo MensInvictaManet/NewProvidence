@@ -22,6 +22,7 @@ public:
 	void SetRightClickCallback(const GUIButtonCallback& callback) { m_RightClickCallback = callback; }
 	void SetFont(const Font* font) { m_Font = font; }
 	void SetText(const std::string text) { m_Text = text; }
+	void SetPressedSizeRatio(float ratio) { m_PressedSizeRatio = ratio; }
 
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -33,6 +34,7 @@ private:
 	bool m_Pressed;
 	const Font* m_Font;
 	std::string m_Text;
+	float m_PressedSizeRatio;
 
 	bool m_Templated;
 	TextureManager::ManagedTexture* TextureTopLeftCorner[2];
@@ -102,6 +104,7 @@ inline GUIButton::GUIButton(bool templated) :
 	m_Pressed(false),
 	m_Font(nullptr),
 	m_Text(""),
+	m_PressedSizeRatio(0.95f),
 	m_Templated(templated)
 {
 	TextureTopLeftCorner[0] = TextureTopLeftCorner[1] = nullptr;
@@ -156,7 +159,7 @@ inline void GUIButton::Render(int xOffset, int yOffset)
 	{
 		auto x = m_X + xOffset;
 		auto y = m_Y + yOffset;
-		auto pressedSqueeze = 0.95f;
+		auto pressedSqueeze = m_PressedSizeRatio;
 
 		if (m_Templated)
 		{
