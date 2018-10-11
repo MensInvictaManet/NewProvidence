@@ -4,26 +4,61 @@
 #include "Engine/GUIObjectNode.h"
 #include "Engine/GUIEditBox.h"
 #include "Engine/GUILabel.h"
+#include "Engine/GUIListBox.h"
 #include "Engine/FontManager.h"
 #include "Engine/TimeSlice.h"
 #include <math.h>
 
 const auto SideBarWidth = 300;
 bool SideBarOpen = false;
+const auto LatestUploadsWidth = 300;
+const auto LatestUploadsHeight = 300;
 
+//  Global UI objects
 GUIObjectNode* StatusBarBG = nullptr;
 GUILabel* StatusBarTextLabel = nullptr;
+
 GUIObjectNode* LoginMenuNode = nullptr;
 GUIEditBox* UsernameEditBox = nullptr;
 GUIEditBox* PasswordEditBox = nullptr;
+
 GUIObjectNode* MainProgramUINode = nullptr;
+GUIButton* UserSideTabButton = nullptr;
+GUIObjectNode* UserIconNode = nullptr;
 GUIButton* InboxSideTabButton = nullptr;
 GUIObjectNode* InboxIconNode = nullptr;
 GUIButton* NotificationsSideTabButton = nullptr;
 GUIObjectNode* NotificationsIconNode = nullptr;
 GUIObjectNode* SideBarBox = nullptr;
+
+GUIListBox* LatestUploadsListBox = nullptr;
+
 Client ClientControl;
 
+
+void SetLatestUploads(std::vector<std::string> latestUploadsList)
+{
+	if (LatestUploadsListBox == nullptr) return;
+
+	for (auto iter = latestUploadsList.begin(); iter != latestUploadsList.end(); ++iter)
+	{
+		auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), (*iter).c_str(), 6, 7, 100, 20);
+		LatestUploadsListBox->AddItem(label);
+	}
+}
+
+void SetUserMenuOpen(GUIObjectNode*)
+{
+	SideBarOpen = !SideBarOpen;
+
+	SideBarBox->SetVisible(SideBarOpen);
+	UserSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+
+	InboxSideTabButton->SetVisible(!SideBarOpen);
+	NotificationsSideTabButton->SetVisible(!SideBarOpen);
+
+	//  TODO: Show User Menu in SideBar
+}
 
 void SetInboxOpen(GUIObjectNode* button)
 {
@@ -31,6 +66,11 @@ void SetInboxOpen(GUIObjectNode* button)
 
 	SideBarBox->SetVisible(SideBarOpen);
 	InboxSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+
+	UserSideTabButton->SetVisible(!SideBarOpen);
+	NotificationsSideTabButton->SetVisible(!SideBarOpen);
+
+	//  TODO: Show Inbox Menu in SideBar
 }
 
 void SetInboxMessageCount(int messageCount)
@@ -47,6 +87,11 @@ void SetNotificationsOpen(GUIObjectNode* button)
 
 	SideBarBox->SetVisible(SideBarOpen);
 	NotificationsSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+
+	UserSideTabButton->SetVisible(!SideBarOpen);
+	InboxSideTabButton->SetVisible(!SideBarOpen);
+
+	//  TODO: Show Notifications Menu in SideBar
 }
 
 void SetNotificationCount(int notificationCount)
@@ -89,7 +134,6 @@ void LoginButtonLeftClickCallback(GUIObjectNode* button)
 	std::vector<unsigned char> encryptedUsernameVector = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), int(UsernameEditBox->GetText().length()), rand() % 256);
 	std::vector<unsigned char> encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
 
-	ClientControl.SetLoginResponseCallback(LoginRequestResponseCallback);
 	SendMessage_UserLoginRequest(encryptedUsernameVector, encryptedPasswordVector, ClientControl.GetServerSocket());
 }
 
@@ -108,6 +152,8 @@ private:
 	void LoadStatusBar();
 	void LoadLoginMenu();
 	void LoadMainProgramUI();
+	void LoadSideBarUI();
+	void LoadLatestUploadsUI();
 
 	void UpdateUI();
 
@@ -285,6 +331,20 @@ void PrimaryDialogue::LoadMainProgramUI()
 	MainProgramUINode = GUIObjectNode::CreateObjectNode("");
 	AddChild(MainProgramUINode);
 
+	//  Create the individual UI pieces
+	LoadLatestUploadsUI();
+	LoadSideBarUI();
+
+	//  Set the Client control callbacks
+	ClientControl.SetLoginResponseCallback(LoginRequestResponseCallback);
+	ClientControl.SetInboxAndNotificationCountCallback(InboxAndNotificationsCountCallback);
+	ClientControl.SetLatestUploadsCallback(SetLatestUploads);
+
+	MainProgramUINode->SetVisible(false);
+}
+
+void PrimaryDialogue::LoadSideBarUI()
+{
 	//  Load the background strip behind the status bar
 	SideBarBox = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
 	SideBarBox->SetColor(0.25f, 0.25f, 0.25f, 1.0f);
@@ -293,8 +353,21 @@ void PrimaryDialogue::LoadMainProgramUI()
 	SideBarBox->SetVisible(false);
 	MainProgramUINode->AddChild(SideBarBox);
 
+	//  Load the side-bar user tab
+	UserSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 60, 40, 40);
+	UserSideTabButton->SetPressedSizeRatio(1.0f);
+	UserSideTabButton->SetLeftClickCallback(SetUserMenuOpen);
+	MainProgramUINode->AddChild(UserSideTabButton);
+
+	//  Load the side-bar user icon
+	UserIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/UserIcon.png");
+	UserIconNode->SetDimensions(24, 24);
+	UserIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
+	UserIconNode->SetPosition((UserSideTabButton->GetWidth() / 2) - (UserIconNode->GetWidth() / 2), (UserSideTabButton->GetHeight() / 2) - (UserIconNode->GetHeight() / 2));
+	UserSideTabButton->AddChild(UserIconNode);
+
 	//  Load the side-bar inbox tab
-	InboxSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 60, 40, 40);
+	InboxSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 110, 40, 40);
 	InboxSideTabButton->SetPressedSizeRatio(1.0f);
 	InboxSideTabButton->SetLeftClickCallback(SetInboxOpen);
 	MainProgramUINode->AddChild(InboxSideTabButton);
@@ -307,7 +380,7 @@ void PrimaryDialogue::LoadMainProgramUI()
 	SetInboxMessageCount(0);
 
 	//  Load the side-bar notifications tab
-	NotificationsSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 110, 40, 40);
+	NotificationsSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 160, 40, 40);
 	NotificationsSideTabButton->SetPressedSizeRatio(1.0f);
 	NotificationsSideTabButton->SetLeftClickCallback(SetNotificationsOpen);
 	MainProgramUINode->AddChild(NotificationsSideTabButton);
@@ -318,10 +391,24 @@ void PrimaryDialogue::LoadMainProgramUI()
 	NotificationsIconNode->SetPosition((NotificationsSideTabButton->GetWidth() / 2) - (NotificationsIconNode->GetWidth() / 2), (NotificationsSideTabButton->GetHeight() / 2) - (NotificationsIconNode->GetHeight() / 2));
 	NotificationsSideTabButton->AddChild(NotificationsIconNode);
 	SetNotificationCount(0);
+}
 
-	ClientControl.SetInboxAndNotificationCountCallback(InboxAndNotificationsCountCallback);
 
-	MainProgramUINode->SetVisible(false);
+void PrimaryDialogue::LoadLatestUploadsUI()
+{
+	//  Load the background strip behind the status bar
+	auto latestUploadsContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
+	latestUploadsContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
+	latestUploadsContainer->SetDimensions(LatestUploadsWidth, LatestUploadsHeight);
+	latestUploadsContainer->SetPosition(80, 40);
+	MainProgramUINode->AddChild(latestUploadsContainer);
+
+	auto latestUploadsTitle = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "Latest Uploaded Files:", 10, 10, LatestUploadsWidth - 20, 30);
+	latestUploadsTitle->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
+	latestUploadsContainer->AddChild(latestUploadsTitle);
+
+	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 60, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 20, 2);
+	latestUploadsContainer->AddChild(LatestUploadsListBox);
 }
 
 

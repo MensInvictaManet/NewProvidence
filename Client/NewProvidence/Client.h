@@ -15,13 +15,14 @@ enum MessageIDs
 	MESSAGE_ID_USER_LOGIN_REQUEST				= 3,	// User Login Request (client to server)
 	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
 	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
-	MESSAGE_ID_FILE_REQUEST						= 6,	// File Request (client to server)
-	MESSAGE_ID_FILE_SEND_INIT					= 7,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 8,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 9,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 10,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 11,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 12,	// File Portion Complete Confirm (two-way)
+	MESSAGE_ID_LATEST_UPLOADS_LIST				= 6,	// The list of the latest uploads on the server (server to client)
+	MESSAGE_ID_FILE_REQUEST						= 7,	// File Request (client to server)
+	MESSAGE_ID_FILE_SEND_INIT					= 8,	// File Send Initializer (two-way)
+	MESSAGE_ID_FILE_RECEIVE_READY				= 9,	// File Receive Ready (two-way)
+	MESSAGE_ID_FILE_PORTION						= 10,	// File Portion Send (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE			= 11,	// File Portion Complete Check (two-way)
+	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 12,	// File Chunks Remaining (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 13,	// File Portion Complete Confirm (two-way)
 };
 
 
@@ -206,6 +207,8 @@ private:
 
 	std::function<void(bool, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
+	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
+	std::vector<std::string> LatestUploadsList;
 
 public:
 	Client()	{}
@@ -214,6 +217,7 @@ public:
 	inline int GetServerSocket(void) const { return ServerSocket; }
 	inline void SetLoginResponseCallback(const std::function<void(bool, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
+	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 
 	bool Connect();
 
@@ -310,6 +314,21 @@ bool Client::ReadMessages(void)
 		}
 
 		if (InboxAndNotificationCountCallback != nullptr) InboxAndNotificationCountCallback(0, notificationsCount);
+	}
+	break;
+
+	case MESSAGE_ID_LATEST_UPLOADS_LIST:
+	{
+		auto latestUploadCount = winsockWrapper.ReadInt(0);
+		for (auto i = 0; i < latestUploadCount; ++i)
+		{
+			auto size = winsockWrapper.ReadInt(0);
+			unsigned char* data = winsockWrapper.ReadChars(0, size);
+			auto decryptedTitle = Groundfish::Decrypt(data);
+			LatestUploadsList.push_back(std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size())));
+		}
+
+		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(LatestUploadsList);
 	}
 	break;
 

@@ -13,6 +13,7 @@
 #define FILE_SEND_BUFFER_SIZE			(FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT)
 #define MAXIMUM_PACKET_COUNT			10
 #define PORTION_COMPLETE_REMIND_TIME	0.5
+#define MAX_LATEST_UPLOADS_COUNT		3
 
 
 //  Incoming message type IDs (enum list syncronous with both client and server)
@@ -24,13 +25,14 @@ enum MessageIDs
 	MESSAGE_ID_USER_LOGIN_REQUEST				= 3,	// User Login Request (client to server)
 	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
 	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
-	MESSAGE_ID_FILE_REQUEST						= 6,	// File Request (client to server)
-	MESSAGE_ID_FILE_SEND_INIT					= 7,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 8,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 9,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 10,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 11,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 12,	// File Portion Complete Confirm (two-way)
+	MESSAGE_ID_LATEST_UPLOADS_LIST				= 6,	// The list of the latest uploads on the server (server to client)
+	MESSAGE_ID_FILE_REQUEST						= 7,	// File Request (client to server)
+	MESSAGE_ID_FILE_SEND_INIT					= 8,	// File Send Initializer (two-way)
+	MESSAGE_ID_FILE_RECEIVE_READY				= 9,	// File Receive Ready (two-way)
+	MESSAGE_ID_FILE_PORTION						= 10,	// File Portion Send (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE			= 11,	// File Portion Complete Check (two-way)
+	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 12,	// File Chunks Remaining (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 13,	// File Portion Complete Confirm (two-way)
 };
 
 struct HostedFileData
@@ -86,6 +88,21 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 	{
 		winsockWrapper.WriteInt(int((*notificationIter).length()), 0);
 		winsockWrapper.WriteChars((unsigned char*)(*notificationIter).c_str(), int((*notificationIter).length()), 0);
+	}
+
+	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), SERVER_PORT, 0);
+}
+
+void SendMessage_LatestUploads(std::vector< std::vector<unsigned char> > latestUploads, UserConnection* user)
+{
+	winsockWrapper.ClearBuffer(0);
+	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
+	winsockWrapper.WriteInt(int(latestUploads.size()), 0);
+
+	for (auto iter = latestUploads.begin(); iter != latestUploads.end(); ++iter)
+	{
+		winsockWrapper.WriteInt(int((*iter).size()), 0);
+		winsockWrapper.WriteChars((*iter).data(), int((*iter).size()), 0);
 	}
 
 	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), SERVER_PORT, 0);
@@ -348,6 +365,7 @@ private:
 	std::unordered_map<std::string, HostedFileData> HostedFileDataList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
 	std::unordered_map<UserConnection*, FileSendTask*> FileSendTaskList; // NOTE: Key is the client ID, so we should limit them to one transfer in the future
+	std::vector< std::vector<unsigned char> > LatestUploadsList;
 
 public:
 	Server() {}
@@ -370,6 +388,9 @@ private:
 
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void LoadHostedFilesData(void);
+	void AddLatestUpload(std::vector<unsigned char> newUpload);
+	void LoadLatestUploadsList(void);
+	void SaveLatestUploadsList(void);
 
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(const char* fileName, UserConnection* user);
@@ -402,6 +423,9 @@ bool Server::Initialize(void)
 	_wmkdir(L"_UserNotifications");
 	_wmkdir(L"_HostedFiles");
 
+	//  Load the list of latest uploads to the server
+	LoadLatestUploadsList();
+
 	//  Load all user login details into an accessible list
 	LoadUserLoginDetails();
 	AddUserLoginDetails("Drew", "password");
@@ -409,7 +433,7 @@ bool Server::Initialize(void)
 
 	//  Load the hosted files list
 	LoadHostedFilesData();
-	//AddHostedFileFromUnencrypted("fileToTransfer.jpeg", "Test file", "This is a test image file");
+	//AddHostedFileFromUnencrypted("fileToTransfer.png", "Test file", "This is a test image file");
 	//Groundfish::DecryptAndMoveFile("./_HostedFiles/" + md5("Test file") + ".hostedfile", "./_HostedFiles/fileToTransfer.jpeg");
 
 	return true;
@@ -628,6 +652,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	ReadUserInbox(user);
 	ReadUserNotifications(user);
 	SendMessage_InboxAndNotifications(user);
+	SendMessage_LatestUploads(LatestUploadsList, user);
 }
 
 ////////////////////////////////////////
@@ -777,6 +802,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	hfFile.close();
 
 	Groundfish::EncryptAndMoveFile(fileToAdd, "./_HostedFiles/" + fileTitleMD5 + ".hostedfile");
+	AddLatestUpload(newFile.EncryptedFileTitle);
 }
 
 void Server::LoadHostedFilesData(void)
@@ -828,6 +854,50 @@ void Server::LoadHostedFilesData(void)
 	}
 
 	hfFile.close();
+}
+
+void Server::AddLatestUpload(std::vector<unsigned char> newUpload)
+{
+	LatestUploadsList.push_back(newUpload);
+	while (LatestUploadsList.size() > MAX_LATEST_UPLOADS_COUNT) LatestUploadsList.erase(LatestUploadsList.begin());
+	SaveLatestUploadsList();
+}
+
+void Server::LoadLatestUploadsList()
+{
+	std::ifstream lulFile("LatestUploads.data", std::ios_base::binary);
+	assert(lulFile.good() && !lulFile.bad());
+
+	unsigned char upload[256];
+	int size = 0;
+	while (!lulFile.eof())
+	{
+		size = 0;
+		memset(upload, 0, 256);
+		lulFile.read((char*)&size, sizeof(size)); if (lulFile.eof()) break;
+		lulFile.read((char*)&upload, size);
+
+		std::vector<unsigned char> newUpload;
+		for (auto i = 0; i < size; ++i) newUpload.push_back(upload[i]);
+		LatestUploadsList.push_back(newUpload);
+	}
+	
+	lulFile.close();
+}
+
+void Server::SaveLatestUploadsList(void)
+{
+	std::ofstream lulFile("LatestUploads.data", std::ios_base::binary | std::ios_base::trunc);
+	assert(lulFile.good() && !lulFile.bad());
+
+	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
+	{
+		int size = (*iter).size();
+		lulFile.write((char*)&size, sizeof(size));
+		lulFile.write((char*)((*iter).data()), size);
+	}
+
+	lulFile.close();
 }
 
 void Server::ContinueFileTransfers(void)
