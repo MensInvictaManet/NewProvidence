@@ -342,10 +342,10 @@ public:
 
 		if (surfaceSquare.m_SplitTriangles == nullptr)
 		{
-			vertexArray[memoryIndex + 0] = std::get<0>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 1] = std::get<1>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 2] = std::get<2>(std::get<0>(surfaceSquare.m_Triangle));
-			vertexArray[memoryIndex + 3] = std::get<3>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 4] = std::get<4>(std::get<0>(surfaceSquare.m_Triangle));
-			vertexArray[memoryIndex + 5] = std::get<0>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 6] = std::get<1>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 7] = std::get<2>(std::get<1>(surfaceSquare.m_Triangle));
-			vertexArray[memoryIndex + 8] = std::get<3>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 9] = std::get<4>(std::get<1>(surfaceSquare.m_Triangle));
+			vertexArray[memoryIndex +  0] = std::get<0>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  1] = std::get<1>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  2] = std::get<2>(std::get<0>(surfaceSquare.m_Triangle));
+			vertexArray[memoryIndex +  3] = std::get<3>(std::get<0>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  4] = std::get<4>(std::get<0>(surfaceSquare.m_Triangle));
+			vertexArray[memoryIndex +  5] = std::get<0>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  6] = std::get<1>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  7] = std::get<2>(std::get<1>(surfaceSquare.m_Triangle));
+			vertexArray[memoryIndex +  8] = std::get<3>(std::get<1>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex +  9] = std::get<4>(std::get<1>(surfaceSquare.m_Triangle));
 			vertexArray[memoryIndex + 10] = std::get<0>(std::get<2>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 11] = std::get<1>(std::get<2>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 12] = std::get<2>(std::get<2>(surfaceSquare.m_Triangle));
 			vertexArray[memoryIndex + 13] = std::get<3>(std::get<2>(surfaceSquare.m_Triangle));	vertexArray[memoryIndex + 14] = std::get<4>(std::get<2>(surfaceSquare.m_Triangle));
 		}

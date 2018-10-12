@@ -265,10 +265,10 @@ public:
 
 		if (surfaceSquare.m_SplitSquares == nullptr)
 		{
-			vertexArray[memoryIndex + 0] = std::get<0>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 1] = std::get<1>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 2] = std::get<2>(std::get<0>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 3] = std::get<3>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 4] = std::get<4>(std::get<0>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 5] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 6] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 7] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 8] = std::get<3>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 9] = std::get<4>(std::get<1>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  0] = std::get<0>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  1] = std::get<1>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  2] = std::get<2>(std::get<0>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  3] = std::get<3>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  4] = std::get<4>(std::get<0>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  5] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  6] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  7] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  8] = std::get<3>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  9] = std::get<4>(std::get<1>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 10] = std::get<0>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 11] = std::get<1>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 12] = std::get<2>(std::get<2>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 13] = std::get<3>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 14] = std::get<4>(std::get<2>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 15] = std::get<0>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 16] = std::get<1>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 17] = std::get<2>(std::get<3>(surfaceSquare.m_Square));
@@ -292,10 +292,10 @@ public:
 
 		if (surfaceSquare.m_SplitSquares == nullptr)
 		{
-			vertexArray[memoryIndex + 0] = std::get<0>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 1] = std::get<1>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 2] = std::get<2>(std::get<0>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 3] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 4] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 5] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 6] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 7] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 8] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
-			vertexArray[memoryIndex + 9] = std::get<0>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 10] = std::get<1>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 11] = std::get<2>(std::get<2>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  0] = std::get<0>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  1] = std::get<1>(std::get<0>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  2] = std::get<2>(std::get<0>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  3] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  4] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  5] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  6] = std::get<0>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  7] = std::get<1>(std::get<1>(surfaceSquare.m_Square));	vertexArray[memoryIndex +  8] = std::get<2>(std::get<1>(surfaceSquare.m_Square));
+			vertexArray[memoryIndex +  9] = std::get<0>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 10] = std::get<1>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 11] = std::get<2>(std::get<2>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 12] = std::get<0>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 13] = std::get<1>(std::get<2>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 14] = std::get<2>(std::get<2>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 15] = std::get<0>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 16] = std::get<1>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 17] = std::get<2>(std::get<3>(surfaceSquare.m_Square));
 			vertexArray[memoryIndex + 18] = std::get<0>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 19] = std::get<1>(std::get<3>(surfaceSquare.m_Square));	vertexArray[memoryIndex + 20] = std::get<2>(std::get<3>(surfaceSquare.m_Square));
