@@ -70,7 +70,7 @@ public:
 	void AddChildSorted(GUIObjectNode* child);
 	void RemoveChild(GUIObjectNode* child);
 	GUIObjectNode* GetChildByName(std::string childName);
-	
+
 	int m_ZOrder;
 	int m_X;
 	int m_Y;
@@ -269,7 +269,7 @@ inline void GUIObjectNode::AddChildSorted(GUIObjectNode* child)
 	for (size_t i = 0; i < m_Children.size(); ++i)
 	{
 		if (m_Children[i]->GetZOrder() >= child->GetZOrder()) continue;
-		
+
 		m_Children.insert(m_Children.begin() + i, child);
 		return;
 	}

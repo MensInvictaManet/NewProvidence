@@ -272,25 +272,25 @@ public:
 		auto point19_2 = MakePoint(0.0f, 0.0f, 0.0f, 0.8955078f, 0.0000000f);
 
 
-		m_Surfaces[0] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point00_0), AddPoints(m_PrimarySurfacePoints[1], point00_1), AddPoints(m_PrimarySurfacePoints[0], point00_2)), nullptr);	// 20
-		m_Surfaces[1] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[1], point01_0), AddPoints(m_PrimarySurfacePoints[2], point01_1), AddPoints(m_PrimarySurfacePoints[3], point01_2)), nullptr);	//  8
-		m_Surfaces[2] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[3], point02_0), AddPoints(m_PrimarySurfacePoints[2], point02_1), AddPoints(m_PrimarySurfacePoints[4], point02_2)), nullptr);	// 10
-		m_Surfaces[3] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[4], point03_0), AddPoints(m_PrimarySurfacePoints[5], point03_1), AddPoints(m_PrimarySurfacePoints[3], point03_2)), nullptr);	// 17
-		m_Surfaces[4] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point04_0), AddPoints(m_PrimarySurfacePoints[5], point04_1), AddPoints(m_PrimarySurfacePoints[4], point04_2)), nullptr);	//  7
-		m_Surfaces[5] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point05_0), AddPoints(m_PrimarySurfacePoints[7], point05_1), AddPoints(m_PrimarySurfacePoints[5], point05_2)), nullptr);	//  1
-		m_Surfaces[6] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[7], point06_0), AddPoints(m_PrimarySurfacePoints[6], point06_1), AddPoints(m_PrimarySurfacePoints[8], point06_2)), nullptr);	// 13
-		m_Surfaces[7] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[7], point07_0), AddPoints(m_PrimarySurfacePoints[8], point07_1), AddPoints(m_PrimarySurfacePoints[9], point07_2)), nullptr);	// 11
-		m_Surfaces[8] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[0], point08_0), AddPoints(m_PrimarySurfacePoints[9], point08_1), AddPoints(m_PrimarySurfacePoints[8], point08_2)), nullptr);	//  4
-		m_Surfaces[9] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[0], point09_0), AddPoints(m_PrimarySurfacePoints[1], point09_1), AddPoints(m_PrimarySurfacePoints[9], point09_2)), nullptr);	// 14
-		m_Surfaces[10] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[1], point10_0), AddPoints(m_PrimarySurfacePoints[3], point10_1), AddPoints(m_PrimarySurfacePoints[10], point10_2)), nullptr);	// 16
+		m_Surfaces[0] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point00_0), AddPoints(m_PrimarySurfacePoints[1], point00_1),   AddPoints(m_PrimarySurfacePoints[0], point00_2)), nullptr);	// 20
+		m_Surfaces[1] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[1], point01_0), AddPoints(m_PrimarySurfacePoints[2], point01_1),   AddPoints(m_PrimarySurfacePoints[3], point01_2)), nullptr);	//  8
+		m_Surfaces[2] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[3], point02_0), AddPoints(m_PrimarySurfacePoints[2], point02_1),   AddPoints(m_PrimarySurfacePoints[4], point02_2)), nullptr);	// 10
+		m_Surfaces[3] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[4], point03_0), AddPoints(m_PrimarySurfacePoints[5], point03_1),   AddPoints(m_PrimarySurfacePoints[3], point03_2)), nullptr);	// 17
+		m_Surfaces[4] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point04_0), AddPoints(m_PrimarySurfacePoints[5], point04_1),   AddPoints(m_PrimarySurfacePoints[4], point04_2)), nullptr);	//  7
+		m_Surfaces[5] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point05_0), AddPoints(m_PrimarySurfacePoints[7], point05_1),   AddPoints(m_PrimarySurfacePoints[5], point05_2)), nullptr);	//  1
+		m_Surfaces[6] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[7], point06_0), AddPoints(m_PrimarySurfacePoints[6], point06_1),   AddPoints(m_PrimarySurfacePoints[8], point06_2)), nullptr);	// 13
+		m_Surfaces[7] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[7], point07_0), AddPoints(m_PrimarySurfacePoints[8], point07_1),   AddPoints(m_PrimarySurfacePoints[9], point07_2)), nullptr);	// 11
+		m_Surfaces[8] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[0], point08_0), AddPoints(m_PrimarySurfacePoints[9], point08_1),   AddPoints(m_PrimarySurfacePoints[8], point08_2)), nullptr);	//  4
+		m_Surfaces[9] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[0], point09_0), AddPoints(m_PrimarySurfacePoints[1], point09_1),   AddPoints(m_PrimarySurfacePoints[9], point09_2)), nullptr);	// 14
+		m_Surfaces[10] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[1], point10_0), AddPoints(m_PrimarySurfacePoints[3], point10_1),  AddPoints(m_PrimarySurfacePoints[10], point10_2)), nullptr);	// 16
 		m_Surfaces[11] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[5], point11_0), AddPoints(m_PrimarySurfacePoints[10], point11_1), AddPoints(m_PrimarySurfacePoints[3], point11_2)), nullptr);	//  3
-		m_Surfaces[12] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[5], point12_0), AddPoints(m_PrimarySurfacePoints[7], point12_1), AddPoints(m_PrimarySurfacePoints[10], point12_2)), nullptr);	// 19
+		m_Surfaces[12] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[5], point12_0), AddPoints(m_PrimarySurfacePoints[7], point12_1),  AddPoints(m_PrimarySurfacePoints[10], point12_2)), nullptr);	// 19
 		m_Surfaces[13] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[10], point13_0), AddPoints(m_PrimarySurfacePoints[7], point13_1), AddPoints(m_PrimarySurfacePoints[9], point13_2)), nullptr);	//  9
-		m_Surfaces[14] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[9], point14_0), AddPoints(m_PrimarySurfacePoints[1], point14_1), AddPoints(m_PrimarySurfacePoints[10], point14_2)), nullptr);	//  6
-		m_Surfaces[15] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point15_0), AddPoints(m_PrimarySurfacePoints[0], point15_1), AddPoints(m_PrimarySurfacePoints[11], point15_2)), nullptr);	//  2
+		m_Surfaces[14] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[9], point14_0), AddPoints(m_PrimarySurfacePoints[1], point14_1),  AddPoints(m_PrimarySurfacePoints[10], point14_2)), nullptr);	//  6
+		m_Surfaces[15] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point15_0), AddPoints(m_PrimarySurfacePoints[0], point15_1),  AddPoints(m_PrimarySurfacePoints[11], point15_2)), nullptr);	//  2
 		m_Surfaces[16] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point16_0), AddPoints(m_PrimarySurfacePoints[11], point16_1), AddPoints(m_PrimarySurfacePoints[4], point16_2)), nullptr);	// 12
-		m_Surfaces[17] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point17_0), AddPoints(m_PrimarySurfacePoints[4], point17_1), AddPoints(m_PrimarySurfacePoints[11], point17_2)), nullptr);	// 15
-		m_Surfaces[18] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[8], point18_0), AddPoints(m_PrimarySurfacePoints[6], point18_1), AddPoints(m_PrimarySurfacePoints[11], point18_2)), nullptr);	//  5
+		m_Surfaces[17] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[6], point17_0), AddPoints(m_PrimarySurfacePoints[4], point17_1),  AddPoints(m_PrimarySurfacePoints[11], point17_2)), nullptr);	// 15
+		m_Surfaces[18] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[8], point18_0), AddPoints(m_PrimarySurfacePoints[6], point18_1),  AddPoints(m_PrimarySurfacePoints[11], point18_2)), nullptr);	//  5
 		m_Surfaces[19] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[11], point19_0), AddPoints(m_PrimarySurfacePoints[0], point19_1), AddPoints(m_PrimarySurfacePoints[8], point19_2)), nullptr);	// 18
 	}
 
@@ -387,11 +387,11 @@ public:
 	void Render(Vector3<float>& position, Camera& camera)
 	{
 		glPushMatrix();
-		//  Render the object at the position relative to the camera
-		BasicRenderable3D::RenderGeometry(position, camera);
+			//  Render the object at the position relative to the camera
+			BasicRenderable3D::RenderGeometry(position, camera);
 
-		//  Render the lines at the position relative to the camera
-		BasicRenderable3D::RenderLines(position, camera);
+			//  Render the lines at the position relative to the camera
+			BasicRenderable3D::RenderLines(position, camera);
 		glPopMatrix();
 	}
 };

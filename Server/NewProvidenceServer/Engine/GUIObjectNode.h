@@ -177,10 +177,10 @@ inline void GUIObjectNode::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 			else if (m_TextureAnimation != nullptr)

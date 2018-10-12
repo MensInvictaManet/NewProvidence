@@ -314,11 +314,11 @@ public:
 	void Render(Vector3<float>& position, Camera& camera)
 	{
 		glPushMatrix();
-		//  Render the object at the position relative to the camera
-		BasicRenderable3D::RenderGeometry(position, camera);
+			//  Render the object at the position relative to the camera
+			BasicRenderable3D::RenderGeometry(position, camera);
 
-		//  Render the lines at the position relative to the camera
-		BasicRenderable3D::RenderLines(position, camera);
+			//  Render the lines at the position relative to the camera
+			BasicRenderable3D::RenderLines(position, camera);
 		glPopMatrix();
 	}
 };
