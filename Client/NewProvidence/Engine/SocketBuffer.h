@@ -190,7 +190,6 @@ inline char* SocketBuffer::readchars(int len, bool peek)
 {
 	if (len < 0) return nullptr;
 	StreamRead(&m_ReturnValueBuffer, len, peek);
-	m_ReturnValueBuffer[len] = '\0';
 	return m_ReturnValueBuffer;
 }
 

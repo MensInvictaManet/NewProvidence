@@ -74,6 +74,7 @@ public:
 
 	MD5();
 	explicit MD5(const std::vector<unsigned char>& data);
+	explicit MD5(const char* data, int dataCount, int dataLength);
 	explicit MD5(const std::string& text);
 	void update(pcuchar buf, size_type length);
 	void update(pcchar buf, size_type length);
@@ -113,15 +114,15 @@ std::string md5(const std::string str);
 
 // F, G, H and I are basic MD5 functions.
 inline MD5::uint4 MD5::F(uint4 x, uint4 y, uint4 z) {
-	return x&y | ~x&z;
+	return x & y | ~x & z;
 }
 
 inline MD5::uint4 MD5::G(uint4 x, uint4 y, uint4 z) {
-	return x&z | y&~z;
+	return x & z | y & ~z;
 }
 
 inline MD5::uint4 MD5::H(uint4 x, uint4 y, uint4 z) {
-	return x^y^z;
+	return x ^ y ^ z;
 }
 
 inline MD5::uint4 MD5::I(uint4 x, uint4 y, uint4 z) {
@@ -166,6 +167,15 @@ inline MD5::MD5(const std::vector<unsigned char>& data)
 {
 	init();
 	update((const char*)(data.data()), UINT(data.size()));
+	finalize();
+}
+
+// nifty shortcut ctor, computer MD5 for data array and finalize it right away
+inline MD5::MD5(const char* data, int dataCount, int dataLength)
+{
+	init();
+	for (int i = 0; i < dataCount; ++i)
+		update(pcuchar(&data[i * dataLength]), UINT(dataLength));
 	finalize();
 }
 
@@ -410,6 +420,13 @@ inline std::string MD5::hexdigest() const
 inline std::string md5(const std::vector<unsigned char> data)
 {
 	auto md5 = MD5(data);
+
+	return md5.hexdigest();
+}
+
+inline std::string md5(const char* data, int dataCount, int dataLength)
+{
+	auto md5 = MD5(data, dataCount, dataLength);
 
 	return md5.hexdigest();
 }

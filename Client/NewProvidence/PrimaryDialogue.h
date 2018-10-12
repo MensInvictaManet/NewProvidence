@@ -36,14 +36,37 @@ GUIListBox* LatestUploadsListBox = nullptr;
 Client ClientControl;
 
 
+void RequestLatestUploadFile(GUIObjectNode* node)
+{
+	auto entry = LatestUploadsListBox->GetSelectedItem();
+	SendMessage_FileRequest(entry->GetObjectName(), ClientControl.GetServerSocket(), NEW_PROVIDENCE_IP);
+}
+
+
+void AddLatestUploadEntry(std::string upload)
+{
+	auto entry = GUIObjectNode::CreateObjectNode("");
+	entry->SetObjectName(upload);
+
+	auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), upload.c_str(), 6, 9, 100, 20);
+	entry->AddChild(label);
+
+	auto button = GUIButton::CreateTemplatedButton("Standard", LatestUploadsWidth - 100, 6, 80, 20);
+	button->SetFont("Arial");
+	button->SetText("Download");
+	button->SetLeftClickCallback(RequestLatestUploadFile);
+	entry->AddChild(button);
+
+	LatestUploadsListBox->AddItem(entry);
+}
+
 void SetLatestUploads(std::vector<std::string> latestUploadsList)
 {
 	if (LatestUploadsListBox == nullptr) return;
 
 	for (auto iter = latestUploadsList.begin(); iter != latestUploadsList.end(); ++iter)
 	{
-		auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), (*iter).c_str(), 6, 7, 100, 20);
-		LatestUploadsListBox->AddItem(label);
+		AddLatestUploadEntry((*iter));
 	}
 }
 
@@ -407,7 +430,7 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	latestUploadsTitle->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	latestUploadsContainer->AddChild(latestUploadsTitle);
 
-	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 60, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 20, 2);
+	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 60, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 24, 2);
 	latestUploadsContainer->AddChild(LatestUploadsListBox);
 }
 

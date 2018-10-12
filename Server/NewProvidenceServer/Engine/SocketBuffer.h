@@ -74,7 +74,7 @@ inline SocketBuffer::~SocketBuffer()
 	if (m_BufferData != nullptr)
 	{
 		MANAGE_MEMORY_DELETE("WinsockWrapper", m_BufferSize);
-		delete [] m_BufferData;
+		delete[] m_BufferData;
 	}
 }
 
@@ -190,7 +190,6 @@ inline char* SocketBuffer::readchars(int len, bool peek)
 {
 	if (len < 0) return nullptr;
 	StreamRead(&m_ReturnValueBuffer, len, peek);
-	m_ReturnValueBuffer[len] = '\0';
 	return m_ReturnValueBuffer;
 }
 
@@ -265,7 +264,7 @@ inline void SocketBuffer::clear()
 	if (m_BufferSize > 30)
 	{
 		MANAGE_MEMORY_DELETE("WinsockWrapper", sizeof(m_BufferData));
-		delete [] m_BufferData;
+		delete[] m_BufferData;
 		m_BufferSize = 30;
 		MANAGE_MEMORY_NEW("WinsockWrapper", m_BufferSize);
 		m_BufferData = new char[m_BufferSize];

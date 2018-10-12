@@ -24,6 +24,7 @@ public:
 
 	void SetItemClickCallback(const GUIListBoxCallback& callback) { m_ItemClickCallback = callback; }
 	void Input(int xOffset = 0, int yOffset = 0) override;
+	void Update(void) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
 
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
@@ -225,7 +226,11 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 		}
 	}
 
-	if (leftButtonState == MOUSE_BUTTON_UNPRESSED) return;
+	if (leftButtonState != MOUSE_BUTTON_PRESSED)
+	{
+		for (auto i = 0; i != int(m_ItemList.size()); ++i) m_ItemList[i]->Input(x, y + ((EntryHeight + SpaceBetweenEntries) * i));
+		return;
+	}
 	if (mx < x || mx > x + m_Width || my < y || my > y + m_Height) return;
 
 	//  If we're left of the directional buttons, assume we're clicking an entry in the list and find out which one
@@ -234,6 +239,11 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 		auto newSelectedIndex = (int(my) - y - TextureTopSide->getHeight()) / (EntryHeight + SpaceBetweenEntries) + MovementIndex;
 		if (newSelectedIndex >= MovementIndex && newSelectedIndex < int(m_ItemList.size()) && newSelectedIndex < MovementIndex + int(ItemDisplayCount))
 		{
+			//  If this index is already selected, check for input inside of the entry node first
+			auto selected_y_offset = (EntryHeight + SpaceBetweenEntries) * SelectedIndex;
+			if (newSelectedIndex == SelectedIndex) m_ItemList[SelectedIndex]->Input(x, y + selected_y_offset);
+			if (inputManager.GetMouseButtonLeft() != MOUSE_BUTTON_PRESSED) return;
+
 			inputManager.TakeMouseButtonLeft();
 			if (SelectedIndex != newSelectedIndex && m_ItemClickCallback != nullptr) m_ItemClickCallback(this);
 			SelectedIndex = newSelectedIndex;
@@ -277,6 +287,16 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
+
+inline void GUIListBox::Update(void)
+{
+	//  Render the items contained within
+	for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter)
+		(*iter)->Update();
+
+	GUIObjectNode::Update();
+}
+
 inline void GUIListBox::Render(int xOffset, int yOffset)
 {
 	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
@@ -308,10 +328,10 @@ inline void GUIListBox::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 		}

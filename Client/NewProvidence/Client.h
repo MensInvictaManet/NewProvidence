@@ -2,9 +2,13 @@
 
 #include "Groundfish.h"
 #include "Engine/WinsockWrapper.h"
+#include "Engine/SimpleMD5.h"
+#include "Engine/SimpleSHA256.h"
 
-#define NEW_PROVIDENCE_IP		"98.181.188.165"
-#define NEW_PROVIDENCE_PORT		2347
+#define NEW_PROVIDENCE_IP				"98.181.188.165"
+#define NEW_PROVIDENCE_PORT				2347
+#define FILE_CHUNK_SIZE					1000
+#define FILE_CHUNK_BUFFER_COUNT			256
 
 //  Incoming message type IDs (enum list syncronous with both client and server)
 enum MessageIDs
@@ -85,8 +89,8 @@ void SendMessage_FileChunksRemaining(std::unordered_map<int, bool>& chunksRemain
 
 struct FileReceiveTask
 {
-	FileReceiveTask(const char* fileName, int fileSize, int fileChunkSize, int fileChunkBufferSize, int socketID, std::string ipAddress) :
-		FileName(fileName),
+	FileReceiveTask(std::string fileName, int fileSize, int fileChunkSize, int fileChunkBufferSize, int socketID, std::string ipAddress) :
+		FileName("./_DownloadedFiles/" + fileName),
 		FileSize(fileSize),
 		FileChunkSize(fileChunkSize),
 		FileChunkBufferSize(fileChunkBufferSize),
@@ -103,33 +107,34 @@ struct FileReceiveTask
 		if ((FileChunkCount % FileChunkBufferSize) != 0) FilePortionCount += 1;
 
 		//  Create a file of the proper size based on the server's description
-		std::ofstream outputFile(fileName, std::ios::binary | std::ios::trunc | std::ios_base::beg);
+		std::ofstream outputFile("./_DownloadedFiles/_download.tempfile", std::ios::binary | std::ios::trunc | std::ios_base::beg);
 		outputFile.seekp(fileSize - 1);
 		outputFile.write("", 1);
 		outputFile.close();
 
 		//  Open the file again, this time keeping the file handle open for later writing
-		FileStream.open(FileName.c_str(), std::ios_base::binary | std::ios_base::out | std::ios_base::in);
+		FileStream.open("./_DownloadedFiles/_download.tempfile", std::ios_base::binary | std::ios_base::out | std::ios_base::in);
 		assert(FileStream.good() && !FileStream.bad());
 
-		FileReceiveBuffer = new char[FileChunkSize];
 		SendMessage_FileReceiveReady(FileName, SocketID, IPAddress.c_str());
 	}
 
-	~FileReceiveTask()
-	{
-		delete[] FileReceiveBuffer;
-	}
+	~FileReceiveTask() {}
 
 	inline void ResetChunksToReceiveMap(int chunkCount) { FilePortionsToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FilePortionsToReceive[i] = true; }
 
 
 	bool ReceiveFile(std::string& progress)
 	{
+		unsigned char chunkData[1000];
+		std::string chunkChecksum;
+
 		auto filePortionIndex = winsockWrapper.ReadInt(0);
 		auto chunkIndex = winsockWrapper.ReadInt(0);
 		auto chunkSize = winsockWrapper.ReadInt(0);
-		unsigned char* chunkData = winsockWrapper.ReadChars(0, chunkSize);
+		auto checksumSize = winsockWrapper.ReadInt(0);
+		chunkChecksum = std::string((char*)winsockWrapper.ReadChars(0, checksumSize), checksumSize);
+		memcpy(chunkData, winsockWrapper.ReadChars(0, chunkSize), chunkSize);
 
 		if (filePortionIndex != FilePortionIndex)
 		{
@@ -140,6 +145,7 @@ struct FileReceiveTask
 
 		auto iter = FilePortionsToReceive.find(chunkIndex);
 		if (iter == FilePortionsToReceive.end()) return false;
+		if (sha256((char*)chunkData, 1, chunkSize).substr(0, 4) != chunkChecksum) return false;
 
 		auto chunkPosition = (filePortionIndex * FileChunkSize * FileChunkBufferSize) + (chunkIndex * FileChunkSize) + 0;
 		FileStream.seekp(chunkPosition);
@@ -168,6 +174,8 @@ struct FileReceiveTask
 			{
 				FileDownloadComplete = true;
 				FileStream.close();
+				Groundfish::DecryptAndMoveFile("./_DownloadedFiles/_download.tempfile", FileName);
+				//  TODO: Delete the temp file
 			}
 
 			//  Reset the chunk list to ensure we're waiting on the right number of chunks for the next portion
@@ -193,7 +201,6 @@ struct FileReceiveTask
 	std::ofstream FileStream;
 
 	int FilePortionIndex;
-	char* FileReceiveBuffer;
 	std::unordered_map<int, bool> FilePortionsToReceive;
 	bool FileDownloadComplete;
 };
@@ -338,10 +345,8 @@ bool Client::ReadMessages(void)
 		int fileNameSize = winsockWrapper.ReadInt(0);
 
 		//  Decrypt using Groundfish and save as the filename
-		unsigned char encryptedFileName[256];
-		memcpy(encryptedFileName, winsockWrapper.ReadChars(0, fileNameSize), fileNameSize);
-		std::vector<unsigned char> decryptedFileName = Groundfish::Decrypt(encryptedFileName);
-		std::string decryptedFileNameString = std::string((char*)decryptedFileName.data(), decryptedFileName.size());
+		auto decryptedFileName = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
+		auto decryptedFileNameString = std::string((char*)decryptedFileName.data(), decryptedFileName.size());
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadInt(0);
@@ -349,7 +354,7 @@ bool Client::ReadMessages(void)
 		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
 
 		//  Create a new file receive task
-		FileReceive = new FileReceiveTask(decryptedFileNameString.c_str(), fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP);
+		FileReceive = new FileReceiveTask(decryptedFileNameString, fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP);
 
 		//  Output the file name
 		std::string newString = "Downloading file: " + decryptedFileNameString + " (size: " + std::to_string(fileSize) + ")";
@@ -375,6 +380,7 @@ bool Client::ReadMessages(void)
 	case MESSAGE_ID_FILE_PORTION_COMPLETE:
 	{
 		auto portionIndex = winsockWrapper.ReadInt(0);
+
 		if (FileReceive == nullptr) break;
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{

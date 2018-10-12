@@ -150,6 +150,7 @@
     <ClInclude Include="Engine\Shader.h" />
     <ClInclude Include="Engine\ShapeSplitPoints.h" />
     <ClInclude Include="Engine\SimpleMD5.h" />
+    <ClInclude Include="Engine\SimpleSHA256.h" />
     <ClInclude Include="Engine\Socket.h" />
     <ClInclude Include="Engine\SocketBuffer.h" />
     <ClInclude Include="Engine\SoundWrapper.h" />

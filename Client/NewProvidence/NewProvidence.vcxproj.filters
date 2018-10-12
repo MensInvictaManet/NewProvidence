@@ -13,136 +13,136 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\Engine">
-      <UniqueIdentifier>{3efcefc5-4622-478c-9c54-da38085b2751}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Engine\3D Base Objects">
-      <UniqueIdentifier>{d8482593-e6d7-4a1a-8313-7c092f2692f9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Engine\GUI Object Types">
-      <UniqueIdentifier>{105f8e0b-48de-46b2-8f4a-6bbede5ffc41}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Engine\Winsock Helpers">
-      <UniqueIdentifier>{320104b2-4780-41a0-b277-db36b37bbb7b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Engine\Utilities">
-      <UniqueIdentifier>{77720233-8597-455b-8fc4-c2308873e039}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Resource Files\Shaders">
       <UniqueIdentifier>{bb17bac9-456d-418a-a544-9d71f5f1685c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ArcadiaEngine">
+      <UniqueIdentifier>{3efcefc5-4622-478c-9c54-da38085b2751}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ArcadiaEngine\3D Base Objects">
+      <UniqueIdentifier>{d8482593-e6d7-4a1a-8313-7c092f2692f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ArcadiaEngine\GUI Object Types">
+      <UniqueIdentifier>{105f8e0b-48de-46b2-8f4a-6bbede5ffc41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ArcadiaEngine\Winsock Helpers">
+      <UniqueIdentifier>{320104b2-4780-41a0-b277-db36b37bbb7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ArcadiaEngine\Utilities">
+      <UniqueIdentifier>{77720233-8597-455b-8fc4-c2308873e039}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\TextureManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\TimeSlice.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\WindowManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\WinsockWrapper.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\XMLWrapper.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\ArcadiaEngine.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\AutoPlayManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\DebugConsole.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\FontManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GLMCamera.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\InputManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\MemoryManager.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Program.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Shader.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SimpleMD5.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SoundWrapper.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\TextureAnimation.h">
-      <Filter>Header Files\Engine</Filter>
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Socket.h">
-      <Filter>Header Files\Engine\Winsock Helpers</Filter>
+      <Filter>Header Files\ArcadiaEngine\Winsock Helpers</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SocketBuffer.h">
-      <Filter>Header Files\Engine\Winsock Helpers</Filter>
+      <Filter>Header Files\ArcadiaEngine\Winsock Helpers</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SplittableCube.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\SplittableIcosahedron.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\BasicPrimativeCube.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\BasicPrimativeIcosahedron.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\BasicPrimativeQuad.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\BasicRenderable3D.h">
-      <Filter>Header Files\Engine\3D Base Objects</Filter>
+      <Filter>Header Files\ArcadiaEngine\3D Base Objects</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUILabel.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIListBox.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIMoveable.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIObjectNode.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIButton.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUICheckbox.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIDropDown.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\GUIEditBox.h">
-      <Filter>Header Files\Engine\GUI Object Types</Filter>
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Vector3.h">
-      <Filter>Header Files\Engine\Utilities</Filter>
+      <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Color.h">
-      <Filter>Header Files\Engine\Utilities</Filter>
+      <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="Engine\ShapeSplitPoints.h">
-      <Filter>Header Files\Engine\Utilities</Filter>
+      <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
     </ClInclude>
     <ClInclude Include="EngineInit.h">
       <Filter>Header Files</Filter>
@@ -155,6 +155,9 @@
     </ClInclude>
     <ClInclude Include="Client.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\SimpleSHA256.h">
+      <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

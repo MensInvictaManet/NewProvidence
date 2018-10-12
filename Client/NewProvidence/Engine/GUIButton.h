@@ -21,6 +21,7 @@ public:
 	void SetMiddleClickCallback(const GUIButtonCallback& callback) { m_MiddleClickCallback = callback; }
 	void SetRightClickCallback(const GUIButtonCallback& callback) { m_RightClickCallback = callback; }
 	void SetFont(const Font* font) { m_Font = font; }
+	void SetFont(std::string fontName) { m_Font = fontManager.GetFont(fontName.c_str()); }
 	void SetText(const std::string text) { m_Text = text; }
 	void SetPressedSizeRatio(float ratio) { m_PressedSizeRatio = ratio; }
 

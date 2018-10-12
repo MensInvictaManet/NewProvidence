@@ -21,7 +21,9 @@ public:
 	void SetMiddleClickCallback(const GUIButtonCallback& callback) { m_MiddleClickCallback = callback; }
 	void SetRightClickCallback(const GUIButtonCallback& callback) { m_RightClickCallback = callback; }
 	void SetFont(const Font* font) { m_Font = font; }
+	void SetFont(std::string fontName) { m_Font = fontManager.GetFont(fontName.c_str()); }
 	void SetText(const std::string text) { m_Text = text; }
+	void SetPressedSizeRatio(float ratio) { m_PressedSizeRatio = ratio; }
 
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -33,6 +35,7 @@ private:
 	bool m_Pressed;
 	const Font* m_Font;
 	std::string m_Text;
+	float m_PressedSizeRatio;
 
 	bool m_Templated;
 	TextureManager::ManagedTexture* TextureTopLeftCorner[2];
@@ -102,6 +105,7 @@ inline GUIButton::GUIButton(bool templated) :
 	m_Pressed(false),
 	m_Font(nullptr),
 	m_Text(""),
+	m_PressedSizeRatio(0.95f),
 	m_Templated(templated)
 {
 	TextureTopLeftCorner[0] = TextureTopLeftCorner[1] = nullptr;
@@ -152,50 +156,53 @@ inline void GUIButton::Render(int xOffset, int yOffset)
 	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
 
 	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && ((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
+	if (!m_SetToDestroy && m_Visible)
 	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-		auto pressedSqueeze = 0.95f;
-
-		if (m_Templated)
+		if (((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
 		{
-			auto pressedIndex = (m_Pressed ? 1 : 0);
-			pressedSqueeze = 1.0f;
+			auto x = m_X + xOffset;
+			auto y = m_Y + yOffset;
+			auto pressedSqueeze = m_PressedSizeRatio;
 
-			TextureTopLeftCorner[pressedIndex]->RenderTexture(x, y, TextureTopLeftCorner[pressedIndex]->getWidth(), TextureTopLeftCorner[pressedIndex]->getHeight());
-			TextureTopRightCorner[pressedIndex]->RenderTexture(x + m_Width - TextureTopRightCorner[pressedIndex]->getWidth(), y, TextureTopRightCorner[pressedIndex]->getWidth(), TextureTopRightCorner[pressedIndex]->getHeight());
-			TextureBottomLeftCorner[pressedIndex]->RenderTexture(x, y + m_Height - TextureBottomLeftCorner[pressedIndex]->getHeight(), TextureBottomLeftCorner[pressedIndex]->getWidth(), TextureBottomLeftCorner[pressedIndex]->getHeight());
-			TextureBottomRightCorner[pressedIndex]->RenderTexture(x + m_Width - TextureBottomRightCorner[pressedIndex]->getWidth(), y + m_Height - TextureBottomRightCorner[pressedIndex]->getHeight(), TextureBottomRightCorner[pressedIndex]->getWidth(), TextureBottomLeftCorner[pressedIndex]->getHeight());
-			TextureLeftSide[pressedIndex]->RenderTexture(x, y + TextureTopLeftCorner[pressedIndex]->getHeight(), TextureLeftSide[pressedIndex]->getWidth(), m_Height - TextureTopLeftCorner[pressedIndex]->getHeight() - TextureBottomLeftCorner[pressedIndex]->getHeight());
-			TextureRightSide[pressedIndex]->RenderTexture(x + m_Width - TextureRightSide[pressedIndex]->getWidth(), y + TextureTopRightCorner[pressedIndex]->getHeight(), TextureRightSide[pressedIndex]->getWidth(), m_Height - TextureTopRightCorner[pressedIndex]->getHeight() - TextureBottomRightCorner[pressedIndex]->getHeight());
-			TextureTopSide[pressedIndex]->RenderTexture(x + TextureTopLeftCorner[pressedIndex]->getWidth(), y, m_Width - TextureBottomLeftCorner[pressedIndex]->getWidth() - TextureBottomRightCorner[pressedIndex]->getWidth(), TextureTopSide[pressedIndex]->getHeight());
-			TextureBottomSide[pressedIndex]->RenderTexture(x + TextureBottomLeftCorner[pressedIndex]->getWidth(), y + m_Height - TextureBottomSide[pressedIndex]->getHeight(), m_Width - TextureBottomLeftCorner[pressedIndex]->getWidth() - TextureBottomRightCorner[pressedIndex]->getWidth(), TextureBottomSide[pressedIndex]->getHeight());
-			TextureMiddle[pressedIndex]->RenderTexture(x + TextureLeftSide[pressedIndex]->getWidth(), y + TextureTopSide[pressedIndex]->getHeight(), m_Width - TextureLeftSide[pressedIndex]->getWidth() - TextureRightSide[pressedIndex]->getWidth(), m_Height - TextureTopSide[pressedIndex]->getHeight() - TextureBottomSide[pressedIndex]->getHeight());
+			if (m_Templated)
+			{
+				auto pressedIndex = (m_Pressed ? 1 : 0);
+				pressedSqueeze = 1.0f;
+
+				TextureTopLeftCorner[pressedIndex]->RenderTexture(x, y, TextureTopLeftCorner[pressedIndex]->getWidth(), TextureTopLeftCorner[pressedIndex]->getHeight());
+				TextureTopRightCorner[pressedIndex]->RenderTexture(x + m_Width - TextureTopRightCorner[pressedIndex]->getWidth(), y, TextureTopRightCorner[pressedIndex]->getWidth(), TextureTopRightCorner[pressedIndex]->getHeight());
+				TextureBottomLeftCorner[pressedIndex]->RenderTexture(x, y + m_Height - TextureBottomLeftCorner[pressedIndex]->getHeight(), TextureBottomLeftCorner[pressedIndex]->getWidth(), TextureBottomLeftCorner[pressedIndex]->getHeight());
+				TextureBottomRightCorner[pressedIndex]->RenderTexture(x + m_Width - TextureBottomRightCorner[pressedIndex]->getWidth(), y + m_Height - TextureBottomRightCorner[pressedIndex]->getHeight(), TextureBottomRightCorner[pressedIndex]->getWidth(), TextureBottomLeftCorner[pressedIndex]->getHeight());
+				TextureLeftSide[pressedIndex]->RenderTexture(x, y + TextureTopLeftCorner[pressedIndex]->getHeight(), TextureLeftSide[pressedIndex]->getWidth(), m_Height - TextureTopLeftCorner[pressedIndex]->getHeight() - TextureBottomLeftCorner[pressedIndex]->getHeight());
+				TextureRightSide[pressedIndex]->RenderTexture(x + m_Width - TextureRightSide[pressedIndex]->getWidth(), y + TextureTopRightCorner[pressedIndex]->getHeight(), TextureRightSide[pressedIndex]->getWidth(), m_Height - TextureTopRightCorner[pressedIndex]->getHeight() - TextureBottomRightCorner[pressedIndex]->getHeight());
+				TextureTopSide[pressedIndex]->RenderTexture(x + TextureTopLeftCorner[pressedIndex]->getWidth(), y, m_Width - TextureBottomLeftCorner[pressedIndex]->getWidth() - TextureBottomRightCorner[pressedIndex]->getWidth(), TextureTopSide[pressedIndex]->getHeight());
+				TextureBottomSide[pressedIndex]->RenderTexture(x + TextureBottomLeftCorner[pressedIndex]->getWidth(), y + m_Height - TextureBottomSide[pressedIndex]->getHeight(), m_Width - TextureBottomLeftCorner[pressedIndex]->getWidth() - TextureBottomRightCorner[pressedIndex]->getWidth(), TextureBottomSide[pressedIndex]->getHeight());
+				TextureMiddle[pressedIndex]->RenderTexture(x + TextureLeftSide[pressedIndex]->getWidth(), y + TextureTopSide[pressedIndex]->getHeight(), m_Width - TextureLeftSide[pressedIndex]->getWidth() - TextureRightSide[pressedIndex]->getWidth(), m_Height - TextureTopSide[pressedIndex]->getHeight() - TextureBottomSide[pressedIndex]->getHeight());
+			}
+			else
+			{
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, m_TextureID);
+
+				auto pressedWidthDelta = m_Pressed ? int(m_Width * (1.0f - pressedSqueeze)) : 0;
+				auto pressedHeightDelta = m_Pressed ? int(m_Height * (1.0f - pressedSqueeze)) : 0;
+
+				glBegin(GL_QUADS);
+					glTexCoord2f(0.0f, 0.0f); glVertex2i(x + pressedWidthDelta, y + pressedHeightDelta);
+					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + pressedHeightDelta);
+					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + m_Height - pressedHeightDelta);
+					glTexCoord2f(0.0f, 1.0f); glVertex2i(x + pressedWidthDelta, y + m_Height - pressedHeightDelta);
+				glEnd();
+			}
+
+			//  Render the font the same way regardless of templating
+			if (m_Font != nullptr && !m_Text.empty())
+			{
+				m_Font->RenderText(m_Text.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, m_Pressed ? pressedSqueeze : 1.0f, m_Pressed ? pressedSqueeze : 1.0f);
+			}
 		}
-		else
-		{
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
-			auto pressedWidthDelta = m_Pressed ? int(m_Width * (1.0f - pressedSqueeze)) : 0;
-			auto pressedHeightDelta = m_Pressed ? int(m_Height * (1.0f - pressedSqueeze)) : 0;
-
-			glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x + pressedWidthDelta, y + pressedHeightDelta);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + pressedHeightDelta);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + m_Height - pressedHeightDelta);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x + pressedWidthDelta, y + m_Height - pressedHeightDelta);
-			glEnd();
-		}
-
-		//  Render the font the same way regardless of templating
-		if (m_Font != nullptr && !m_Text.empty())
-		{
-			m_Font->RenderText(m_Text.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, m_Pressed ? pressedSqueeze : 1.0f, m_Pressed ? pressedSqueeze : 1.0f);
-		}
+		//  Pass the render call to all children
+		for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }

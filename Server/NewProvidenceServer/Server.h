@@ -2,14 +2,15 @@
 
 #include "Engine/WinsockWrapper.h"
 #include "Engine/SimpleMD5.h"
+#include "Engine/SimpleSHA256.h"
 #include "Groundfish.h"
 
 #include <fstream>
 #include <ctime>
 
 #define SERVER_PORT						2347
-#define FILE_CHUNK_SIZE					1024
-#define FILE_CHUNK_BUFFER_COUNT			500
+#define FILE_CHUNK_SIZE					1000
+#define FILE_CHUNK_BUFFER_COUNT			256
 #define FILE_SEND_BUFFER_SIZE			(FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT)
 #define MAXIMUM_PACKET_COUNT			10
 #define PORTION_COMPLETE_REMIND_TIME	0.5
@@ -37,7 +38,7 @@ enum MessageIDs
 
 struct HostedFileData
 {
-	std::string FileNameMD5;
+	std::string FileTitleMD5;
 	std::vector<unsigned char> EncryptedFileName;
 	std::vector<unsigned char> EncryptedFileTitle;
 	std::vector<unsigned char> EncryptedFileDescription;
@@ -128,13 +129,19 @@ void SendMessage_FileSendInitializer(std::string fileName, int fileSize, int soc
 
 void SendMessage_FileSendChunk(int chunkBufferIndex, int chunkIndex, int chunkSize, unsigned char* buffer, int socket, const char* ip)
 {
+	assert(chunkSize > 0);
+	auto checksum4 = sha256((char*)buffer, 1, chunkSize).substr(0, 4);
+
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION, 0);
 	winsockWrapper.WriteInt(chunkBufferIndex, 0);
 	winsockWrapper.WriteInt(chunkIndex, 0);
 	winsockWrapper.WriteInt(chunkSize, 0);
-	winsockWrapper.WriteChars(buffer, chunkSize, 0);
+	assert(winsockWrapper.WriteInt(4, 0) == sizeof(int));
+	assert(winsockWrapper.WriteChars((unsigned char*)checksum4.c_str(), 4, 0) == 4);
+	assert(winsockWrapper.WriteChars(buffer, chunkSize, 0) == chunkSize);
 	winsockWrapper.SendMessagePacket(socket, ip, SERVER_PORT, 0);
+	std::cout << chunkBufferIndex << " - " << chunkIndex << ": " << chunkSize << std::endl;
 }
 
 
@@ -208,8 +215,8 @@ void ReadUserNotifications(UserConnection* user)
 class FileSendTask
 {
 public:
-	FileSendTask(std::string fileName, int socketID, std::string ipAddress) :
-		FileName(fileName),
+	FileSendTask(HostedFileData& hostedFileData, int socketID, std::string ipAddress) :
+		FileName(""),
 		SocketID(socketID),
 		IPAddress(ipAddress),
 		FileTransferReady(false),
@@ -217,8 +224,11 @@ public:
 		FilePortionIndex(0),
 		LastMessageTime(clock())
 	{
+		auto decryptedFileName = Groundfish::Decrypt(hostedFileData.EncryptedFileName.data());
+		FileName = std::string((char*)decryptedFileName.data(), decryptedFileName.size());
+
 		//  Open the file, determine that the file handler is good or not, then save off the chunk send indicator map
-		FileStream.open(FileName.c_str(), std::ios_base::binary);
+		FileStream.open("./_HostedFiles/" + hostedFileData.FileTitleMD5 + ".hostedfile", std::ios_base::binary);
 		assert(FileStream.good() && !FileStream.bad());
 
 		//  Get the file size by reading the beginning and end memory positions
@@ -393,7 +403,7 @@ private:
 	void SaveLatestUploadsList(void);
 
 	void ContinueFileTransfers(void);
-	void BeginFileTransfer(const char* fileName, UserConnection* user);
+	void BeginFileTransfer(HostedFileData& fileData, UserConnection* user);
 	void SendChatString(const char* chatString);
 
 	inline const std::unordered_map<UserConnection*, bool> GetUserList(void) const { return UserConnectionsList; }
@@ -433,7 +443,8 @@ bool Server::Initialize(void)
 
 	//  Load the hosted files list
 	LoadHostedFilesData();
-	//AddHostedFileFromUnencrypted("fileToTransfer.png", "Test file", "This is a test image file");
+	//AddHostedFileFromUnencrypted("fileToTransfer.png", "Test file 2", "This is a test image file");
+	//AddHostedFileFromUnencrypted("testFile.txt", "Test file 3", "This is a test test file");
 	//Groundfish::DecryptAndMoveFile("./_HostedFiles/" + md5("Test file") + ".hostedfile", "./_HostedFiles/fileToTransfer.jpeg");
 
 	return true;
@@ -538,8 +549,7 @@ void Server::ReceiveMessages(void)
 			std::vector<unsigned char> descryptedChatString = Groundfish::Decrypt(encryptedChatString);
 			std::string decryptedString((char*)descryptedChatString.data(), descryptedChatString.size());
 
-			if (decryptedString.find("download") != std::string::npos) BeginFileTransfer("fileToTransfer.jpeg", user);
-			else SendChatString(decryptedString.c_str());
+			SendChatString(decryptedString.c_str());
 		}
 		break;
 
@@ -583,9 +593,7 @@ void Server::ReceiveMessages(void)
 			else
 			{
 				auto hostedFileData = (*hostedFileIter).second;
-
-				std::vector<unsigned char> decryptedFileName = Groundfish::Decrypt(hostedFileData.EncryptedFileName.data());
-				BeginFileTransfer((char*)decryptedFileName.data(), user);
+				BeginFileTransfer(hostedFileData, user);
 			}
 		}
 		break;
@@ -751,18 +759,6 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 	SaveUserLoginDetails();
 }
 
-/*
-struct HostedFileData
-{
-	std::string FileNameMD5;
-	std::vector<unsigned char> EncryptedFileName;
-	std::vector<unsigned char> EncryptedFileTitle;
-	std::vector<unsigned char> EncryptedFileDescription;
-};
-
-std::unordered_map<std::string, HostedFileData> HostedFileDataList;
-*/
-
 void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
 {
 	//  Find the file's primary name (no directories)
@@ -775,24 +771,24 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 
 	//  Add the hosted file data to the hosted file data list
 	HostedFileData newFile;
-	newFile.FileNameMD5 = md5(pureFileName);
+	newFile.FileTitleMD5 = fileTitleMD5;
 	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
 	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
 	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
 	HostedFileDataList[fileTitleMD5] = newFile;
 
 	//  Add the hosted file data to the HostedFiles.data file and move to the end of it
-	std::ofstream hfFile("HostedFiles.data");
+	std::ofstream hfFile("HostedFiles.data", std::ios_base::app);
 	assert(!hfFile.bad() && hfFile.good());
 
-	int md5Length = int(newFile.FileNameMD5.length());
+	int md5Length = int(newFile.FileTitleMD5.length());
 	int encryptedFileNameLength = int(newFile.EncryptedFileName.size());
 	int encryptedFileTitleLength = int(newFile.EncryptedFileTitle.size());
 	int encryptedFileDescLength = int(newFile.EncryptedFileDescription.size());
 
 	//  Write the hosted file data into the file, then close it
 	hfFile.write((const char*)&md5Length, sizeof(md5Length));
-	hfFile.write((const char*)newFile.FileNameMD5.c_str(), md5Length);
+	hfFile.write((const char*)newFile.FileTitleMD5.c_str(), md5Length);
 	hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
 	hfFile.write((const char*)newFile.EncryptedFileName.data(), encryptedFileNameLength);
 	hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
@@ -814,7 +810,7 @@ void Server::LoadHostedFilesData(void)
 	int fileNameLength = 0;
 	int fileTitleLength = 0;
 	int fileDescLength = 0;
-	unsigned char fileNameMD5[128];
+	unsigned char fileTitleMD5[128];
 	unsigned char encryptedFileName[128];
 	unsigned char encryptedFileTitle[128];
 	unsigned char encryptedFileDesc[256];
@@ -833,7 +829,7 @@ void Server::LoadHostedFilesData(void)
 
 		//  Read in the hosted file data
 		hfFile.read((char*)(&md5Length), sizeof(md5Length)); if (md5Length == 0) break;
-		hfFile.read((char*)(fileNameMD5), md5Length);
+		hfFile.read((char*)(fileTitleMD5), md5Length);
 		hfFile.read((char*)(&fileNameLength), sizeof(fileNameLength));
 		hfFile.read((char*)(encryptedFileName), fileNameLength);
 		hfFile.read((char*)(&fileTitleLength), sizeof(fileTitleLength));
@@ -846,11 +842,11 @@ void Server::LoadHostedFilesData(void)
 		auto decryptedFileTitleString = std::string((char*)decryptedFileTitle.data(), decryptedFileTitle.size());
 
 		HostedFileData newFile;
-		newFile.FileNameMD5 = std::string((char*)fileNameMD5);
+		newFile.FileTitleMD5 = std::string((char*)fileTitleMD5, md5Length);
 		for (auto i = 0; i < fileNameLength; ++i) newFile.EncryptedFileName.push_back(encryptedFileName[i]);
 		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
 		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
-		HostedFileDataList[md5(decryptedFileTitleString)] = newFile;
+		HostedFileDataList[newFile.FileTitleMD5] = newFile;
 	}
 
 	hfFile.close();
@@ -921,10 +917,10 @@ void Server::ContinueFileTransfers(void)
 }
 
 
-void Server::BeginFileTransfer(const char* fileName, UserConnection* user)
+void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 {
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSendTask* newTask = new FileSendTask("./_HostedFiles/" + std::string(fileName), user->SocketID, std::string(user->IPAddress));
+	FileSendTask* newTask = new FileSendTask(fileData, user->SocketID, std::string(user->IPAddress));
 	FileSendTaskList[user] = newTask;
 }
 
