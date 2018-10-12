@@ -71,12 +71,13 @@ static float Background_R = 0.5f;
 static float Background_G = 0.5f;
 static float Background_B = 0.5f;
 
-inline void SetBackgroundColor(float r, float g, float b) { Background_R = r; Background_G = g; Background_B = b; glClearColor(Background_R, Background_G, Background_B, 1.f); }
+inline void ClearBackground() { glClearColor(Background_R, Background_G, Background_B, 1.f); }
+inline void SetBackgroundColor(float r, float g, float b) { Background_R = r; Background_G = g; Background_B = b; ClearBackground(); }
 
 inline void AddDebugConsoleCommands()
 {
 	//  MOVE_MOUSE_OVER: Automatically moves the mouse to a UI object click position
-	debugConsole->AddDebugCommand("MOVE_MOUSE_OVER", [=](std::string& commandString) -> bool
+	debugConsole->AddDebugCommand("MOVE_MOUSE_OVER", [=](std::string commandString) -> bool
 	{
 		std::string args[3];
 		auto argCount = 0;
@@ -127,7 +128,7 @@ inline void AddDebugConsoleCommands()
 	});
 
 	//  CLICK_MOUSE_LEFT: Simulates a left click
-	debugConsole->AddDebugCommand("CLICK_MOUSE_LEFT", [=](std::string& commandString) -> bool
+	debugConsole->AddDebugCommand("CLICK_MOUSE_LEFT", [=](std::string commandString) -> bool
 	{
 		debugConsole->AddDebugConsoleLine("Left mouse click simulated");
 		inputManager.SetSimulatedMouseButtonLeft(MOUSE_BUTTON_PRESSED);
@@ -135,7 +136,7 @@ inline void AddDebugConsoleCommands()
 	});
 
 	//  CLICK_MOUSE_MIDDLE: Simulates a middle click
-	debugConsole->AddDebugCommand("CLICK_MOUSE_MIDDLE", [=](std::string& commandString) -> bool
+	debugConsole->AddDebugCommand("CLICK_MOUSE_MIDDLE", [=](std::string commandString) -> bool
 	{
 		debugConsole->AddDebugConsoleLine("Middle mouse click simulated");
 		inputManager.SetSimulatedMouseButtonMiddle(MOUSE_BUTTON_PRESSED);
@@ -143,7 +144,7 @@ inline void AddDebugConsoleCommands()
 	});
 
 	//  CLICK_MOUSE_LEFT: Simulates a Right click
-	debugConsole->AddDebugCommand("CLICK_MOUSE_RIGHT", [=](std::string& commandString) -> bool
+	debugConsole->AddDebugCommand("CLICK_MOUSE_RIGHT", [=](std::string commandString) -> bool
 	{
 		debugConsole->AddDebugConsoleLine("Right mouse click simulated");
 		inputManager.SetSimulatedMouseButtonRight(MOUSE_BUTTON_PRESSED);
@@ -151,7 +152,7 @@ inline void AddDebugConsoleCommands()
 	});
 
 	//  ENTER_TEXT: Simulates a text input
-	debugConsole->AddDebugCommand("ENTER_TEXT", [=](std::string& commandString) -> bool
+	debugConsole->AddDebugCommand("ENTER_TEXT", [=](std::string commandString) -> bool
 	{
 		debugConsole->AddDebugConsoleLine("Text input simulated");
 		inputManager.AddTextInput(commandString);
@@ -253,7 +254,7 @@ inline bool InitializeOpenGL()
 	}
 
 	//  Initialize clear color
-	glClearColor(Background_R, Background_G, Background_B, 1.f);
+	ClearBackground();
 
 	//  Check for an error
 	error = glGetError();
@@ -270,8 +271,10 @@ inline bool InitializeOpenGL()
 	return success;
 }
 
-inline bool InitializeEngine(const char* programTitle)
+inline bool InitializeEngine(const char* programTitle, float screenWidth, float screenHeght)
 {
+	SetScreenDimensions(screenWidth, screenHeght);
+
 	//  Initialize SDL
 	if (!InitializeSDL())
 	{

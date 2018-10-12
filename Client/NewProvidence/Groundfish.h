@@ -118,7 +118,7 @@ namespace Groundfish
 		return decryptedData;
 	}
 
-	void DecryptAndMoveFile(std::string targetFileName, std::string newFileName)
+	void DecryptAndMoveFile(std::string targetFileName, std::string newFileName, bool deleteOld)
 	{
 		std::ifstream targetFile(targetFileName, std::ios_base::binary);
 		assert(targetFile.good() && !targetFile.bad());
@@ -152,6 +152,8 @@ namespace Groundfish
 
 		targetFile.close();
 		newFile.close();
+
+		if (deleteOld) std::remove(targetFileName.c_str());
 	}
 
 	void SaveWordList(GroundfishWordlist& savedList, std::string filename)

@@ -73,12 +73,16 @@
     <IncludePath>$(SolutionDir)\_Dependencies\glew-2.1.0\include;$(SolutionDir)\_Dependencies\glm-0.9.8.5;$(SolutionDir)\_Dependencies\rapidxml-1.13;$(SolutionDir)\_Dependencies\SDL2_image-2.0.3\include;$(SolutionDir)\_Dependencies\SDL2_mixer-2.0.2\include;$(SolutionDir)\_Dependencies\SDL2-2.0.8\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)\_Dependencies\glew-2.1.0\lib\Release\Win32;$(SolutionDir)\_Dependencies\SDL2-2.0.8\lib\x86;$(SolutionDir)\_Dependencies\SDL2_image-2.0.3\lib\x86;$(SolutionDir)\_Dependencies\SDL2_mixer-2.0.2\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>$(SolutionDir)\_Dependencies\glew-2.1.0\include;$(SolutionDir)\_Dependencies\glm-0.9.8.5;$(SolutionDir)\_Dependencies\rapidxml-1.13;$(SolutionDir)\_Dependencies\SDL2_image-2.0.3\include;$(SolutionDir)\_Dependencies\SDL2_mixer-2.0.2\include;$(SolutionDir)\_Dependencies\SDL2-2.0.8\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(SolutionDir)\_Dependencies\glew-2.1.0\lib\Release\Win32;$(SolutionDir)\_Dependencies\SDL2-2.0.8\lib\x86;$(SolutionDir)\_Dependencies\SDL2_image-2.0.3\lib\x86;$(SolutionDir)\_Dependencies\SDL2_mixer-2.0.2\lib\x86;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <ConformanceMode>false</ConformanceMode>
+      <ConformanceMode>true</ConformanceMode>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
   </ItemDefinitionGroup>

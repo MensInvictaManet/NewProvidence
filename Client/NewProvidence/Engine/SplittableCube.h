@@ -73,15 +73,26 @@ protected:
 			if (splitCount == 0) return;
 
 			//  If we arrive here, splitCount is greater than 0 and we have no Split Triangles. Create the triangles, and send the split ahead
-			SC_Point point1 = MakePoint(std::get<0>(std::get<0>(m_Square)), std::get<1>(std::get<0>(m_Square)), std::get<2>(std::get<0>(m_Square)), std::get<3>(std::get<0>(m_Square)), std::get<4>(std::get<0>(m_Square)));
-			SC_Point point2 = MakePoint(std::get<0>(std::get<1>(m_Square)), std::get<1>(std::get<1>(m_Square)), std::get<2>(std::get<1>(m_Square)), std::get<3>(std::get<1>(m_Square)), std::get<4>(std::get<1>(m_Square)));
-			SC_Point point3 = MakePoint(std::get<0>(std::get<2>(m_Square)), std::get<1>(std::get<2>(m_Square)), std::get<2>(std::get<2>(m_Square)), std::get<3>(std::get<2>(m_Square)), std::get<4>(std::get<2>(m_Square)));
-			SC_Point point4 = MakePoint(std::get<0>(std::get<3>(m_Square)), std::get<1>(std::get<3>(m_Square)), std::get<2>(std::get<3>(m_Square)), std::get<3>(std::get<3>(m_Square)), std::get<4>(std::get<3>(m_Square)));
-			auto midpoint12 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point1, point2), 0.5f)), pointDistance, true);
-			auto midpoint23 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point2, point3), 0.5f)), pointDistance, true);
-			auto midpoint34 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point3, point4), 0.5f)), pointDistance, true);
-			auto midpoint41 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point4, point1), 0.5f)), pointDistance, true);
-			auto midpoint = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(AddPoints(AddPoints(point1, point2), point3), point4), (1.0f / 4.0f))), pointDistance, true);
+			auto point1 = MakePoint(std::get<0>(std::get<0>(m_Square)), std::get<1>(std::get<0>(m_Square)), std::get<2>(std::get<0>(m_Square)), std::get<3>(std::get<0>(m_Square)), std::get<4>(std::get<0>(m_Square)));
+			auto point2 = MakePoint(std::get<0>(std::get<1>(m_Square)), std::get<1>(std::get<1>(m_Square)), std::get<2>(std::get<1>(m_Square)), std::get<3>(std::get<1>(m_Square)), std::get<4>(std::get<1>(m_Square)));
+			auto point3 = MakePoint(std::get<0>(std::get<2>(m_Square)), std::get<1>(std::get<2>(m_Square)), std::get<2>(std::get<2>(m_Square)), std::get<3>(std::get<2>(m_Square)), std::get<4>(std::get<2>(m_Square)));
+			auto point4 = MakePoint(std::get<0>(std::get<3>(m_Square)), std::get<1>(std::get<3>(m_Square)), std::get<2>(std::get<3>(m_Square)), std::get<3>(std::get<3>(m_Square)), std::get<4>(std::get<3>(m_Square)));
+			auto point12 = AddPoints(point1, point2);
+			auto point23 = AddPoints(point2, point3);
+			auto point34 = AddPoints(point3, point4);
+			auto point41 = AddPoints(point4, point1);
+			auto halfPoint12 = MultiplyPoint(point12, 0.5f);
+			auto halfPoint23 = MultiplyPoint(point23, 0.5f);
+			auto halfPoint34 = MultiplyPoint(point34, 0.5f);
+			auto halfPoint41 = MultiplyPoint(point41, 0.5f);
+			auto point1234 = AddPoints(point12, point34);
+			auto centerPoint = MultiplyPoint(point1234, (1.0f / 4.0f));
+
+			auto midpoint12 = MultiplyPoint(NormalizePointDistance(halfPoint12), pointDistance, true);
+			auto midpoint23 = MultiplyPoint(NormalizePointDistance(halfPoint23), pointDistance, true);
+			auto midpoint34 = MultiplyPoint(NormalizePointDistance(halfPoint34), pointDistance, true);
+			auto midpoint41 = MultiplyPoint(NormalizePointDistance(halfPoint41), pointDistance, true);
+			auto midpoint = MultiplyPoint(NormalizePointDistance(centerPoint), pointDistance, true);
 			m_SplitSquares = new SC_SplitSquare(SC_Square(point1, midpoint12, midpoint, midpoint41), SC_Square(point2, midpoint23, midpoint, midpoint12), SC_Square(point3, midpoint34, midpoint, midpoint23), SC_Square(point4, midpoint41, midpoint, midpoint34));
 			std::get<0>(*m_SplitSquares).Split(splitCount - 1, pointDistance);
 			std::get<1>(*m_SplitSquares).Split(splitCount - 1, pointDistance);

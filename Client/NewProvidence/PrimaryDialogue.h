@@ -11,7 +11,7 @@
 
 const auto SideBarWidth = 300;
 bool SideBarOpen = false;
-const auto LatestUploadsWidth = 300;
+const auto LatestUploadsWidth = 600;
 const auto LatestUploadsHeight = 300;
 
 //  Global UI objects
@@ -143,6 +143,16 @@ void LoginRequestResponseCallback(bool success, int inboxCount, int notification
 	SetStatusBarMessage(success ? "Successfully logged in to server!" : "Failed to log in to server. Try again.", !success);
 	SetInboxMessageCount(inboxCount);
 	SetNotificationCount(notificationCount);
+}
+
+void FileRequestSucceeded(std::string fileID)
+{
+	SetStatusBarMessage("File download request success: [" + fileID + "] downloading now...", false);
+}
+
+void FileRequestFailureCallback(std::string fileID, std::string failureReason)
+{
+	SetStatusBarMessage("File download request failed: [" + fileID + "] " + failureReason, true);
 }
 
 void InboxAndNotificationsCountCallback(int inboxCount, int notificationCount)
@@ -362,6 +372,8 @@ void PrimaryDialogue::LoadMainProgramUI()
 	ClientControl.SetLoginResponseCallback(LoginRequestResponseCallback);
 	ClientControl.SetInboxAndNotificationCountCallback(InboxAndNotificationsCountCallback);
 	ClientControl.SetLatestUploadsCallback(SetLatestUploads);
+	ClientControl.SetFileRequestFailureCallback(FileRequestFailureCallback);
+	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
 
 	MainProgramUINode->SetVisible(false);
 }

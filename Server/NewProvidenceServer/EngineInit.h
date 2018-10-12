@@ -33,14 +33,12 @@ void CreateInitializationData()
 
 void AppMain()
 {
-	SetScreenDimensions(1280.0f, 720.0f);
-	if (!InitializeEngine("New Providence Server"))
+	SetBackgroundColor(0.0f, 0.04f, 0.08f);
+	if (!InitializeEngine("New Providence Server", 1280.0f, 720.0f))
 	{
 		ShutdownEngine();
 		throw std::runtime_error("InitializeEngine failed");
 	}
-
-	SetBackgroundColor(0.0f, 0.04f, 0.08f);
 
 	//  Create data for different systems to start the main program functionality
 	CreateInitializationData();

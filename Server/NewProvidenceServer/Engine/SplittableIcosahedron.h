@@ -14,7 +14,7 @@ protected:
 
 	static SI_Point MakePoint(float x, float y, float z, float tx = 0.0f, float ty = 0.0f) { return SI_Point(x, y, z, tx, ty); }
 	static SI_Point MakePoint(Vector3<float> v) { return SI_Point(v.x, v.y, v.z, 0.0f, 0.0f); }
-	static SI_Point AddPoints(const SI_Point& a, const SI_Point& b) {
+	static SI_Point AddPoints(SI_Point& a, SI_Point& b) {
 		return SI_Point(std::get<0>(a) + std::get<0>(b), std::get<1>(a) + std::get<1>(b), std::get<2>(a) + std::get<2>(b), std::get<3>(a) + std::get<3>(b), std::get<4>(a) + std::get<4>(b));
 	}
 	static SI_Point MultiplyPoint(SI_Point& p, float f, bool posOnly = false) {
@@ -53,6 +53,15 @@ protected:
 			if (m_SplitTriangles != nullptr) delete m_SplitTriangles;
 		}
 
+		SI_SurfaceTriangle& operator=(const SI_SurfaceTriangle& other) // copy assignment
+		{
+			if (this != &other) { // self-assignment check expected
+				m_Triangle = other.m_Triangle;
+				m_SplitTriangles = other.m_SplitTriangles;
+			}
+			return *this;
+		}
+
 		void Split(int splitCount, float pointDistance)
 		{
 			if (splitCount != 0 && m_SplitTriangles != nullptr)
@@ -74,13 +83,21 @@ protected:
 			if (splitCount == 0) return;
 
 			//  If we arrive here, splitCount is greater than 0 and we have no Split Triangles. Create the triangles, and send the split ahead
-			SI_Point point1 = MakePoint(std::get<0>(std::get<0>(m_Triangle)), std::get<1>(std::get<0>(m_Triangle)), std::get<2>(std::get<0>(m_Triangle)), std::get<3>(std::get<0>(m_Triangle)), std::get<4>(std::get<0>(m_Triangle)));
-			SI_Point point2 = MakePoint(std::get<0>(std::get<1>(m_Triangle)), std::get<1>(std::get<1>(m_Triangle)), std::get<2>(std::get<1>(m_Triangle)), std::get<3>(std::get<1>(m_Triangle)), std::get<4>(std::get<1>(m_Triangle)));
-			SI_Point point3 = MakePoint(std::get<0>(std::get<2>(m_Triangle)), std::get<1>(std::get<2>(m_Triangle)), std::get<2>(std::get<2>(m_Triangle)), std::get<3>(std::get<2>(m_Triangle)), std::get<4>(std::get<2>(m_Triangle)));
-			auto midpoint12 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point1, point2), 0.5f)), pointDistance, true);
-			auto midpoint23 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point2, point3), 0.5f)), pointDistance, true);
-			auto midpoint31 = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(point3, point1), 0.5f)), pointDistance, true);
-			auto midpoint = MultiplyPoint(NormalizePointDistance(MultiplyPoint(AddPoints(AddPoints(point1, point2), point3), (1.0f / 3.0f))), pointDistance, true);
+			auto point1 = MakePoint(std::get<0>(std::get<0>(m_Triangle)), std::get<1>(std::get<0>(m_Triangle)), std::get<2>(std::get<0>(m_Triangle)), std::get<3>(std::get<0>(m_Triangle)), std::get<4>(std::get<0>(m_Triangle)));
+			auto point2 = MakePoint(std::get<0>(std::get<1>(m_Triangle)), std::get<1>(std::get<1>(m_Triangle)), std::get<2>(std::get<1>(m_Triangle)), std::get<3>(std::get<1>(m_Triangle)), std::get<4>(std::get<1>(m_Triangle)));
+			auto point3 = MakePoint(std::get<0>(std::get<2>(m_Triangle)), std::get<1>(std::get<2>(m_Triangle)), std::get<2>(std::get<2>(m_Triangle)), std::get<3>(std::get<2>(m_Triangle)), std::get<4>(std::get<2>(m_Triangle)));
+			auto point12 = AddPoints(point1, point2);
+			auto point23 = AddPoints(point2, point3);
+			auto point31 = AddPoints(point3, point1);
+			auto halfPoint12 = MultiplyPoint(point12, 0.5f);
+			auto halfPoint23 = MultiplyPoint(point23, 0.5f);
+			auto halfPoint31 = MultiplyPoint(point31, 0.5f);
+			auto point123 = AddPoints(point12, point3);
+			auto centerPoint = MultiplyPoint(point123, (1.0f / 3.0f));
+			auto midpoint12 = MultiplyPoint(NormalizePointDistance(halfPoint12), pointDistance, true);
+			auto midpoint23 = MultiplyPoint(NormalizePointDistance(halfPoint23), pointDistance, true);
+			auto midpoint31 = MultiplyPoint(NormalizePointDistance(halfPoint31), pointDistance, true);
+			auto midpoint = MultiplyPoint(NormalizePointDistance(centerPoint), pointDistance, true);
 			m_SplitTriangles = new SI_SplitTriangle(SI_Triangle(point1, midpoint12, midpoint31), SI_Triangle(point2, midpoint23, midpoint12), SI_Triangle(point3, midpoint31, midpoint23), SI_Triangle(midpoint12, midpoint23, midpoint31));
 			std::get<0>(*m_SplitTriangles).Split(splitCount - 1, pointDistance);
 			std::get<1>(*m_SplitTriangles).Split(splitCount - 1, pointDistance);
@@ -253,6 +270,7 @@ public:
 		auto point19_0 = MakePoint(0.0f, 0.0f, 0.0f, 0.8720703f, 1.0000000f);
 		auto point19_1 = MakePoint(0.0f, 0.0f, 0.0f, 0.9179687f, 1.0000000f);
 		auto point19_2 = MakePoint(0.0f, 0.0f, 0.0f, 0.8955078f, 0.0000000f);
+
 
 		m_Surfaces[0] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[2], point00_0), AddPoints(m_PrimarySurfacePoints[1], point00_1), AddPoints(m_PrimarySurfacePoints[0], point00_2)), nullptr);	// 20
 		m_Surfaces[1] = MakeSurfaceTriangle(MakeTriangle(AddPoints(m_PrimarySurfacePoints[1], point01_0), AddPoints(m_PrimarySurfacePoints[2], point01_1), AddPoints(m_PrimarySurfacePoints[3], point01_2)), nullptr);	//  8

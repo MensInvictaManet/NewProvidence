@@ -21,12 +21,13 @@ enum MessageIDs
 	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
 	MESSAGE_ID_LATEST_UPLOADS_LIST				= 6,	// The list of the latest uploads on the server (server to client)
 	MESSAGE_ID_FILE_REQUEST						= 7,	// File Request (client to server)
-	MESSAGE_ID_FILE_SEND_INIT					= 8,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 9,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 10,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 11,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 12,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 13,	// File Portion Complete Confirm (two-way)
+	MESSAGE_ID_FILE_REQUEST_FAILED				= 8,	// File Request Failure message (server to client)
+	MESSAGE_ID_FILE_SEND_INIT					= 9,	// File Send Initializer (two-way)
+	MESSAGE_ID_FILE_RECEIVE_READY				= 10,	// File Receive Ready (two-way)
+	MESSAGE_ID_FILE_PORTION						= 11,	// File Portion Send (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE			= 12,	// File Portion Complete Check (two-way)
+	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 13,	// File Chunks Remaining (two-way)
+	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 14,	// File Portion Complete Confirm (two-way)
 };
 
 
@@ -49,12 +50,12 @@ void SendMessage_UserLoginRequest(std::vector<unsigned char>& encryptedUsername,
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_FileRequest(std::string fileName, int socket, const char* ip)
+void SendMessage_FileRequest(std::string fileID, int socket, const char* ip)
 {
 	//  Send a "File Request" message
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_REQUEST, 0);
-	winsockWrapper.WriteString(fileName.c_str(), 0);
+	winsockWrapper.WriteString(fileID.c_str(), 0);
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
@@ -126,7 +127,7 @@ struct FileReceiveTask
 
 	bool ReceiveFile(std::string& progress)
 	{
-		unsigned char chunkData[1000];
+		unsigned char chunkData[1024];
 		std::string chunkChecksum;
 
 		auto filePortionIndex = winsockWrapper.ReadInt(0);
@@ -174,8 +175,7 @@ struct FileReceiveTask
 			{
 				FileDownloadComplete = true;
 				FileStream.close();
-				Groundfish::DecryptAndMoveFile("./_DownloadedFiles/_download.tempfile", FileName);
-				//  TODO: Delete the temp file
+				Groundfish::DecryptAndMoveFile("./_DownloadedFiles/_download.tempfile", FileName, true);
 			}
 
 			//  Reset the chunk list to ensure we're waiting on the right number of chunks for the next portion
@@ -215,6 +215,8 @@ private:
 	std::function<void(bool, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
+	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
+	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
@@ -225,6 +227,8 @@ public:
 	inline void SetLoginResponseCallback(const std::function<void(bool, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
+	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
+	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 
 	bool Connect();
 
@@ -340,6 +344,15 @@ bool Client::ReadMessages(void)
 	break;
 
 
+	case MESSAGE_ID_FILE_REQUEST_FAILED:
+	{
+		auto failedFileID = std::string(winsockWrapper.ReadString(0));
+		auto failureReason = std::string(winsockWrapper.ReadString(0));
+		if (FileRequestFailureCallback != nullptr) FileRequestFailureCallback(failedFileID, failureReason);
+	}
+	break;
+
+
 	case MESSAGE_ID_FILE_SEND_INIT:
 	{
 		int fileNameSize = winsockWrapper.ReadInt(0);
@@ -359,19 +372,21 @@ bool Client::ReadMessages(void)
 		//  Output the file name
 		std::string newString = "Downloading file: " + decryptedFileNameString + " (size: " + std::to_string(fileSize) + ")";
 		//NewLine(newString.c_str());
+
+		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback("test");
 	}
 	break;
 
 	case MESSAGE_ID_FILE_PORTION:
 	{
-		if (FileReceive == NULL) break;
+		if (FileReceive == nullptr) break;
 
 		std::string progressString = "ERROR";
 		if (FileReceive->ReceiveFile(progressString))
 		{
 			//  If ReceiveFile returns true, the transfer is complete
 			delete FileReceive;
-			FileReceive = NULL;
+			FileReceive = nullptr;
 		}
 		//NewLine(progressString.c_str());
 	}
