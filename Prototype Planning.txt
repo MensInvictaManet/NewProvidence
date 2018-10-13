@@ -1,6 +1,6 @@
 This project uses Arcadia Engine, build 181004
 
-Prototype v1 breakdown:
+Prototype v1 breakdown (Complete 181012):
 
 - The server connection should be automatic when starting the application, and the connection status and any form of warning message or news alerts should be sent down and displayed on the login screen (sent encrypted)
 - Login screen where the password is properly hidden, and both the username and password are encrypted before being sent up to the server.

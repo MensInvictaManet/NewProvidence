@@ -100,6 +100,8 @@ struct FileReceiveTask
 		FilePortionIndex(0),
 		FileDownloadComplete(false)
 	{
+		_wmkdir(L"_DownloadedFiles");
+
 		FileChunkCount = FileSize / FileChunkSize;
 		if ((FileSize % FileChunkSize) != 0) FileChunkCount += 1;
 		auto nextChunkCount = (FileChunkCount > (FileChunkBufferSize)) ? FileChunkBufferSize : FileChunkCount;
@@ -117,6 +119,7 @@ struct FileReceiveTask
 		FileStream.open("./_DownloadedFiles/_download.tempfile", std::ios_base::binary | std::ios_base::out | std::ios_base::in);
 		assert(FileStream.good() && !FileStream.bad());
 
+		DownloadTime = gameSeconds;
 		SendMessage_FileReceiveReady(FileName, SocketID, IPAddress.c_str());
 	}
 
@@ -173,8 +176,10 @@ struct FileReceiveTask
 			SendMessage_FilePortionCompleteConfirmation(FilePortionIndex, SocketID, IPAddress.c_str());
 			if (++FilePortionIndex == FilePortionCount)
 			{
+				DownloadTime = gameSeconds - DownloadTime;
 				FileDownloadComplete = true;
 				FileStream.close();
+				_wmkdir(L"_DownloadedFiles");
 				Groundfish::DecryptAndMoveFile("./_DownloadedFiles/_download.tempfile", FileName, true);
 			}
 
@@ -188,7 +193,7 @@ struct FileReceiveTask
 	}
 
 	inline bool GetFileDownloadComplete() const { return FileDownloadComplete; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex) / float(FilePortionCount) * 100.0f; }
+	inline float GetPercentageComplete() const { return float(FilePortionIndex) / float(FilePortionCount); }
 
 	std::string FileName;
 	int FileSize;
@@ -199,6 +204,7 @@ struct FileReceiveTask
 	const int FileChunkSize;
 	const int FileChunkBufferSize;
 	std::ofstream FileStream;
+	double DownloadTime;
 
 	int FilePortionIndex;
 	std::unordered_map<int, bool> FilePortionsToReceive;
@@ -217,6 +223,7 @@ private:
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
+	std::function<void(float, double, int)> DownloadPercentCompleteCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
@@ -229,6 +236,7 @@ public:
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
+	inline void SetDownloadPercentCompleteCallback(const std::function<void(float, double, int)>& callback) { DownloadPercentCompleteCallback = callback; }
 
 	bool Connect();
 
@@ -399,8 +407,7 @@ bool Client::ReadMessages(void)
 		if (FileReceive == nullptr) break;
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
-			auto percentComplete = "File Portion Complete: (" + std::to_string(FileReceive->GetPercentageComplete()) + "%)";
-			//NewLine(percentComplete.c_str());
+			if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->DownloadTime, FileReceive->FileSize);
 
 			if (FileReceive->GetFileDownloadComplete())
 			{
