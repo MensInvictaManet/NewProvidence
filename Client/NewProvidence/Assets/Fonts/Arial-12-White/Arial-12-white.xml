@@ -477,9 +477,9 @@
   </Character>
   <Character>
     <ID>100</ID>
-    <X>605</X>
+    <X>604</X>
     <Y>0</Y>
-    <W>8</W>
+    <W>9</W>
     <H>16</H>
   </Character>
   <Character>
@@ -498,9 +498,9 @@
   </Character>
   <Character>
     <ID>103</ID>
-    <X>628</X>
+    <X>627</X>
     <Y>0</Y>
-    <W>8</W>
+    <W>9</W>
     <H>16</H>
   </Character>
   <Character>
@@ -549,7 +549,7 @@
     <ID>110</ID>
     <X>677</X>
     <Y>0</Y>
-    <W>11</W>
+    <W>9</W>
     <H>16</H>
   </Character>
   <Character>
