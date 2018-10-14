@@ -43,6 +43,7 @@ struct HostedFileData
 	std::vector<unsigned char> EncryptedFileName;
 	std::vector<unsigned char> EncryptedFileTitle;
 	std::vector<unsigned char> EncryptedFileDescription;
+	std::vector<unsigned char> EncryptedUploader;
 };
 
 struct UserConnection
@@ -799,6 +800,11 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 
 void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
 {
+	//  Test that the file exists and is readable, and exit out if it is not
+	std::ifstream targetFile(fileToAdd, std::ios_base::binary);
+	if (!targetFile.good() || targetFile.bad()) return;
+	targetFile.close();
+
 	//  Find the file's primary name (no directories)
 	std::string pureFileName = fileToAdd;
 	if (fileToAdd.find_last_of('/') != -1) pureFileName = fileToAdd.substr(fileToAdd.find_last_of('/') + 1, fileToAdd.length() - fileToAdd.find_last_of('/') - 1);
@@ -813,6 +819,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
 	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
 	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
+	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
 	HostedFileDataList[fileTitleMD5] = newFile;
 
 	//  Add the hosted file data to the HostedFiles.data file and move to the end of it
@@ -823,6 +830,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	int encryptedFileNameLength = int(newFile.EncryptedFileName.size());
 	int encryptedFileTitleLength = int(newFile.EncryptedFileTitle.size());
 	int encryptedFileDescLength = int(newFile.EncryptedFileDescription.size());
+	int encryptedFileUploaderLength = int(newFile.EncryptedUploader.size());
 
 	//  Write the hosted file data into the file, then close it
 	hfFile.write((const char*)&md5Length, sizeof(md5Length));
@@ -833,6 +841,8 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	hfFile.write((const char*)newFile.EncryptedFileTitle.data(), encryptedFileTitleLength);
 	hfFile.write((const char*)&encryptedFileDescLength, sizeof(encryptedFileDescLength));
 	hfFile.write((const char*)newFile.EncryptedFileDescription.data(), encryptedFileDescLength);
+	hfFile.write((const char*)&encryptedFileUploaderLength, sizeof(encryptedFileUploaderLength));
+	hfFile.write((const char*)newFile.EncryptedUploader.data(), encryptedFileUploaderLength);
 	hfFile.close();
 
 	Groundfish::EncryptAndMoveFile(fileToAdd, "./_HostedFiles/" + fileTitleMD5 + ".hostedfile");
@@ -848,10 +858,12 @@ void Server::LoadHostedFilesData(void)
 	int fileNameLength = 0;
 	int fileTitleLength = 0;
 	int fileDescLength = 0;
+	int fileUploaderLength = 0;
 	unsigned char fileTitleMD5[128];
 	unsigned char encryptedFileName[128];
 	unsigned char encryptedFileTitle[128];
 	unsigned char encryptedFileDesc[256];
+	unsigned char encryptedFileUploader[256];
 
 	auto fileSize = int(hfFile.tellg());
 	hfFile.seekg(0, std::ios::end);
@@ -864,6 +876,7 @@ void Server::LoadHostedFilesData(void)
 		fileNameLength = 0;
 		fileTitleLength = 0;
 		fileDescLength = 0;
+		fileUploaderLength = 0;
 
 		//  Read in the hosted file data
 		hfFile.read((char*)(&md5Length), sizeof(md5Length)); if (md5Length == 0) break;
@@ -874,6 +887,8 @@ void Server::LoadHostedFilesData(void)
 		hfFile.read((char*)(encryptedFileTitle), fileTitleLength);
 		hfFile.read((char*)(&fileDescLength), sizeof(fileDescLength));
 		hfFile.read((char*)(encryptedFileDesc), fileDescLength);
+		hfFile.read((char*)(&fileUploaderLength), sizeof(fileUploaderLength));
+		hfFile.read((char*)(encryptedFileUploader), fileUploaderLength);
 
 		//  Create a Hosted File Data struct and store it off in memory
 		auto decryptedFileTitle = Groundfish::Decrypt(encryptedFileTitle);
@@ -884,6 +899,7 @@ void Server::LoadHostedFilesData(void)
 		for (auto i = 0; i < fileNameLength; ++i) newFile.EncryptedFileName.push_back(encryptedFileName[i]);
 		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
 		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
+		for (auto i = 0; i < fileUploaderLength; ++i) newFile.EncryptedUploader.push_back(encryptedFileUploader[i]);
 		HostedFileDataList[newFile.FileTitleMD5] = newFile;
 	}
 
