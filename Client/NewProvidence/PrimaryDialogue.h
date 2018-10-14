@@ -175,12 +175,22 @@ void LoginRequestResponseCallback(bool success, int inboxCount, int notification
 
 void FileRequestSucceeded(std::string fileID)
 {
-	SetStatusBarMessage("File download request success: [" + fileID + "] downloading now...", false);
+	//  Shorten any null values at the end of the string (which can come from decryption)
+	while (fileID.size() > 0 && fileID[fileID.size() - 1] == 0) fileID = fileID.substr(0, fileID.size() - 1);
+	
+	//  Generate the full string and set the status bar message
+	auto fullString = "File download request success [" + fileID + "]:  Downloading now...";
+	SetStatusBarMessage(fullString, false);
 }
 
 void FileRequestFailureCallback(std::string fileID, std::string failureReason)
 {
-	SetStatusBarMessage("File download request failed: [" + fileID + "] " + failureReason, true);
+	//  Shorten any null values at the end of the string (which can come from decryption)
+	while (fileID.size() > 0 && fileID[fileID.size() - 1] == 0) fileID = fileID.substr(0, fileID.size() - 1);
+
+	//  Generate the full string and set the status bar message
+	auto fullString = "File download request failed [" + fileID + "]: " + failureReason;
+	SetStatusBarMessage(fullString, true);
 }
 
 void InboxAndNotificationsCountCallback(int inboxCount, int notificationCount)

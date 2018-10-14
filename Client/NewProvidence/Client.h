@@ -192,8 +192,9 @@ bool Client::ReadMessages(void)
 		int fileNameSize = winsockWrapper.ReadInt(0);
 
 		//  Decrypt using Groundfish and save as the filename
-		auto decryptedFileName = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
-		auto decryptedFileNameString = std::string((char*)decryptedFileName.data(), decryptedFileName.size());
+		auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
+		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+		auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadInt(0);
@@ -201,13 +202,11 @@ bool Client::ReadMessages(void)
 		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
 
 		//  Create a new file receive task
-		FileReceive = new FileReceiveTask(decryptedFileNameString, fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+		_wmkdir(L"_DownloadedFiles");
+		FileReceive = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, "./_DownloadedFiles/_download.tempfile", 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 
-		//  Output the file name
-		std::string newString = "Downloading file: " + decryptedFileNameString + " (size: " + std::to_string(fileSize) + ")";
-		//NewLine(newString.c_str());
-
-		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback("test");
+		//  Respond to the file request success
+		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback(decryptedFileNamePure);
 	}
 	break;
 
@@ -231,6 +230,7 @@ bool Client::ReadMessages(void)
 		auto portionIndex = winsockWrapper.ReadInt(0);
 
 		if (FileReceive == nullptr) break;
+		_wmkdir(L"_DownloadedFiles");
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
 			if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->DownloadTime, FileReceive->FileSize);

@@ -413,12 +413,10 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_RECEIVE_READY:
 		{
-			char* fileName = winsockWrapper.ReadString(0);
 			auto taskIter = FileSendTaskList.find(user);
 			assert(taskIter != FileSendTaskList.end());
 
 			auto task = (*taskIter).second;
-			task->SetFileTransferReady(true);
 			task->SetFileTransferState(FileSendTask::CHUNK_STATE_SENDING);
 		}
 		break;
@@ -748,7 +746,7 @@ void Server::ContinueFileTransfers(void)
 		auto task = (*taskIter).second;
 
 		//  If we aren't ready to send the file, continue out and wait for a ready signal
-		if (task->GetFileTransferReady() == false) continue;
+		if (task->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
 
 		//  If we have data to send, send it and continue out so we can keep sending it until we're done
 		if (!task->SendFileChunk()) continue;
