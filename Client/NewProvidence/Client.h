@@ -4,32 +4,10 @@
 #include "Engine/WinsockWrapper.h"
 #include "Engine/SimpleMD5.h"
 #include "Engine/SimpleSHA256.h"
+#include "FileSendAndReceive.h"
 
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
-#define FILE_CHUNK_SIZE					1000
-#define FILE_CHUNK_BUFFER_COUNT			256
-
-//  Incoming message type IDs (enum list syncronous with both client and server)
-enum MessageIDs
-{
-	MESSAGE_ID_PING_REQUEST						= 0,	// Ping Request (server to client)
-	MESSAGE_ID_PING_RESPONSE					= 1,	// Ping Return (client to server)
-	MESSAGE_ID_ENCRYPTED_CHAT_STRING			= 2,	// Chat String [encrypted] (two-way)
-	MESSAGE_ID_USER_LOGIN_REQUEST				= 3,	// User Login Request (client to server)
-	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
-	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)	
-	MESSAGE_ID_LATEST_UPLOADS_LIST				= 6,	// The list of the latest uploads on the server (server to client)
-	MESSAGE_ID_FILE_REQUEST						= 7,	// File Request (client to server)
-	MESSAGE_ID_FILE_REQUEST_FAILED				= 8,	// File Request Failure message (server to client)
-	MESSAGE_ID_FILE_SEND_INIT					= 9,	// File Send Initializer (two-way)
-	MESSAGE_ID_FILE_RECEIVE_READY				= 10,	// File Receive Ready (two-way)
-	MESSAGE_ID_FILE_PORTION						= 11,	// File Portion Send (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE			= 12,	// File Portion Complete Check (two-way)
-	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 13,	// File Chunks Remaining (two-way)
-	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 14,	// File Portion Complete Confirm (two-way)
-};
-
 
 //  Outgoing message send functions
 void SendMessage_PingResponse(int socket)
@@ -58,158 +36,6 @@ void SendMessage_FileRequest(std::string fileID, int socket, const char* ip)
 	winsockWrapper.WriteString(fileID.c_str(), 0);
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
-
-void SendMessage_FileReceiveReady(std::string fileName, int socket, const char* ip)
-{
-	//  Send a "File Receive Ready" message
-	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_FILE_RECEIVE_READY, 0);
-	//  TODO: Encrypt the file name
-	winsockWrapper.WriteString(fileName.c_str(), 0);
-	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
-}
-
-void SendMessage_FilePortionCompleteConfirmation(int portionIndex, int socket, const char* ip)
-{
-	//  Send a "File Portion Complete" message
-	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM, 0);
-	winsockWrapper.WriteInt(portionIndex, 0);
-	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
-}
-
-void SendMessage_FileChunksRemaining(std::unordered_map<int, bool>& chunksRemaining, int socket, const char* ip)
-{
-	//  Send a "File Portion Complete" message
-	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_FILE_CHUNKS_REMAINING, 0);
-	winsockWrapper.WriteInt(chunksRemaining.size(), 0);
-	for (auto i = chunksRemaining.begin(); i != chunksRemaining.end(); ++i) winsockWrapper.WriteShort((short)((*i).first), 0);
-	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
-}
-
-struct FileReceiveTask
-{
-	FileReceiveTask(std::string fileName, int fileSize, int fileChunkSize, int fileChunkBufferSize, int socketID, std::string ipAddress) :
-		FileName("./_DownloadedFiles/" + fileName),
-		FileSize(fileSize),
-		FileChunkSize(fileChunkSize),
-		FileChunkBufferSize(fileChunkBufferSize),
-		SocketID(socketID),
-		IPAddress(ipAddress),
-		FilePortionIndex(0),
-		FileDownloadComplete(false)
-	{
-		_wmkdir(L"_DownloadedFiles");
-
-		FileChunkCount = FileSize / FileChunkSize;
-		if ((FileSize % FileChunkSize) != 0) FileChunkCount += 1;
-		auto nextChunkCount = (FileChunkCount > (FileChunkBufferSize)) ? FileChunkBufferSize : FileChunkCount;
-		ResetChunksToReceiveMap(nextChunkCount);
-		FilePortionCount = FileChunkCount / FileChunkBufferSize;
-		if ((FileChunkCount % FileChunkBufferSize) != 0) FilePortionCount += 1;
-
-		//  Create a file of the proper size based on the server's description
-		std::ofstream outputFile("./_DownloadedFiles/_download.tempfile", std::ios::binary | std::ios::trunc | std::ios_base::beg);
-		outputFile.seekp(fileSize - 1);
-		outputFile.write("", 1);
-		outputFile.close();
-
-		//  Open the file again, this time keeping the file handle open for later writing
-		FileStream.open("./_DownloadedFiles/_download.tempfile", std::ios_base::binary | std::ios_base::out | std::ios_base::in);
-		assert(FileStream.good() && !FileStream.bad());
-
-		DownloadTime = gameSeconds;
-		SendMessage_FileReceiveReady(FileName, SocketID, IPAddress.c_str());
-	}
-
-	~FileReceiveTask() {}
-
-	inline void ResetChunksToReceiveMap(int chunkCount) { FilePortionsToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FilePortionsToReceive[i] = true; }
-
-
-	bool ReceiveFile(std::string& progress)
-	{
-		unsigned char chunkData[1024];
-		std::string chunkChecksum;
-
-		auto filePortionIndex = winsockWrapper.ReadInt(0);
-		auto chunkIndex = winsockWrapper.ReadInt(0);
-		auto chunkSize = winsockWrapper.ReadInt(0);
-		auto checksumSize = winsockWrapper.ReadInt(0);
-		chunkChecksum = std::string((char*)winsockWrapper.ReadChars(0, checksumSize), checksumSize);
-		memcpy(chunkData, winsockWrapper.ReadChars(0, chunkSize), chunkSize);
-
-		if (filePortionIndex != FilePortionIndex)
-		{
-			return false;
-		}
-
-		if (FileDownloadComplete) return true;
-
-		auto iter = FilePortionsToReceive.find(chunkIndex);
-		if (iter == FilePortionsToReceive.end()) return false;
-		if (sha256((char*)chunkData, 1, chunkSize).substr(0, 4) != chunkChecksum) return false;
-
-		auto chunkPosition = (filePortionIndex * FileChunkSize * FileChunkBufferSize) + (chunkIndex * FileChunkSize) + 0;
-		FileStream.seekp(chunkPosition);
-		FileStream.write((char*)chunkData, chunkSize);
-
-		progress = "Downloaded Portion [" + std::to_string(chunkPosition) + " to " + std::to_string(chunkPosition + chunkSize - 1) + "]";
-		assert(iter != FilePortionsToReceive.end());
-		FilePortionsToReceive.erase(iter);
-
-		return false;
-	}
-
-	bool CheckFilePortionComplete(int portionIndex)
-	{
-		if (portionIndex != FilePortionIndex) return false;
-
-		if (FilePortionsToReceive.size() != 0)
-		{
-			SendMessage_FileChunksRemaining(FilePortionsToReceive, SocketID, IPAddress.c_str());
-			return false;
-		}
-		else
-		{
-			SendMessage_FilePortionCompleteConfirmation(FilePortionIndex, SocketID, IPAddress.c_str());
-			if (++FilePortionIndex == FilePortionCount)
-			{
-				DownloadTime = gameSeconds - DownloadTime;
-				FileDownloadComplete = true;
-				FileStream.close();
-				_wmkdir(L"_DownloadedFiles");
-				Groundfish::DecryptAndMoveFile("./_DownloadedFiles/_download.tempfile", FileName, true);
-			}
-
-			//  Reset the chunk list to ensure we're waiting on the right number of chunks for the next portion
-			auto chunksProcessed = FilePortionIndex * FileChunkBufferSize;
-			auto nextChunkCount = (FileChunkCount > (chunksProcessed + FileChunkBufferSize)) ? FileChunkBufferSize : (FileChunkCount - chunksProcessed);
-			ResetChunksToReceiveMap(nextChunkCount);
-
-			return true;
-		}
-	}
-
-	inline bool GetFileDownloadComplete() const { return FileDownloadComplete; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex) / float(FilePortionCount); }
-
-	std::string FileName;
-	int FileSize;
-	int SocketID;
-	std::string IPAddress;
-	int FilePortionCount;
-	int FileChunkCount;
-	const int FileChunkSize;
-	const int FileChunkBufferSize;
-	std::ofstream FileStream;
-	double DownloadTime;
-
-	int FilePortionIndex;
-	std::unordered_map<int, bool> FilePortionsToReceive;
-	bool FileDownloadComplete;
-};
 
 class Client
 {
@@ -375,7 +201,7 @@ bool Client::ReadMessages(void)
 		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
 
 		//  Create a new file receive task
-		FileReceive = new FileReceiveTask(decryptedFileNameString, fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP);
+		FileReceive = new FileReceiveTask(decryptedFileNameString, fileSize, fileChunkSize, FileChunkBufferSize, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 
 		//  Output the file name
 		std::string newString = "Downloading file: " + decryptedFileNameString + " (size: " + std::to_string(fileSize) + ")";

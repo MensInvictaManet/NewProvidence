@@ -159,6 +159,12 @@
     <ClInclude Include="Engine\SimpleSHA256.h">
       <Filter>Header Files\ArcadiaEngine</Filter>
     </ClInclude>
+    <ClInclude Include="FileSendAndReceive.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MessageIdentifiers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt">

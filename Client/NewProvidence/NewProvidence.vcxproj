@@ -163,7 +163,9 @@
     <ClInclude Include="Engine\WindowManager.h" />
     <ClInclude Include="Engine\WinsockWrapper.h" />
     <ClInclude Include="Engine\XMLWrapper.h" />
+    <ClInclude Include="FileSendAndReceive.h" />
     <ClInclude Include="Groundfish.h" />
+    <ClInclude Include="MessageIdentifiers.h" />
     <ClInclude Include="PrimaryDialogue.h" />
   </ItemGroup>
   <ItemGroup>

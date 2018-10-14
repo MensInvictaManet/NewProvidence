@@ -16,6 +16,7 @@ public:
 	inline std::string GetText() const { return m_Text; }
 
 	void SetFont(const Font* font) { m_Font = font; }
+	void SetFont(std::string fontName) { m_Font = fontManager.GetFont(fontName.c_str()); }
 	void SetText(const std::string text) { m_Text = text; }
 	void SetJustification(int justify) { m_Justification = justify; }
 

@@ -397,6 +397,7 @@ void PrimaryDialogue::LoadMainProgramUI()
 {
 	if (MainProgramUINode != nullptr) return;
 	MainProgramUINode = GUIObjectNode::CreateObjectNode("");
+	MainProgramUINode->SetVisible(false);
 	AddChild(MainProgramUINode);
 
 	//  Create the individual UI pieces
@@ -410,8 +411,6 @@ void PrimaryDialogue::LoadMainProgramUI()
 	ClientControl.SetFileRequestFailureCallback(FileRequestFailureCallback);
 	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
 	ClientControl.SetDownloadPercentCompleteCallback(SetDownloadPercentage);
-
-	MainProgramUINode->SetVisible(false);
 }
 
 void PrimaryDialogue::LoadSideBarUI()
