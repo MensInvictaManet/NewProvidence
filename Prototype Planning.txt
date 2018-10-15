@@ -15,7 +15,7 @@ Prototype v2 breakdown (currently underway):
 
 - The client should allow for the uploading of files to the server, which should list them as hosted files, updating the "latest uploads" list for all clients. Clients can add names, titles, tags, etc
 - The notifications menu should be able to be opened and notifications should be sent down and be readable on the client
-- The server window should show the list of currently connected users, showing name, user identifier, and current status (downloading? uploading?)
+- The server window should show the list of currently connected users, showing user identifier, name, and current status (downloading? uploading?)
 - The server should be able to send files to multiple people at once (Each user connection should contain it's own FileSendTask*)
 - Clicking to download a second file in the client should queue it for the user-connection on the server, and automatically start the download as soon as the previous one is confirmed finished
 ----------------------------------------

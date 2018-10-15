@@ -14,7 +14,7 @@
 
 struct HostedFileData
 {
-	std::string FileTitleMD5;
+	std::string FileTitleChecksum;
 	std::vector<unsigned char> EncryptedFileName;
 	std::vector<unsigned char> EncryptedFileTitle;
 	std::vector<unsigned char> EncryptedFileDescription;
@@ -30,8 +30,12 @@ struct UserConnection
 	int				InboxCount;
 
 	std::string		UserIdentifier;
+	std::string		Username;
+	std::string		CurrentStatus;
 
 	std::vector<std::string> NotificationsList;
+
+	FileSendTask*	UserFileSendTask = nullptr;
 };
 
 
@@ -168,7 +172,6 @@ private:
 	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
 	std::unordered_map<std::string, HostedFileData> HostedFileDataList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
-	std::unordered_map<UserConnection*, FileSendTask*> FileSendTaskList; // NOTE: Key is the client ID, so we should limit them to one transfer in the future
 	std::vector< std::vector<unsigned char> > LatestUploadsList;
 
 public:
@@ -283,7 +286,9 @@ void Server::AddClient(int socketID, std::string ipAddress)
 	newConnection->SocketID = socketID;
 	newConnection->IPAddress = ipAddress;
 	newConnection->PingCount = 0;
-	newConnection->UserIdentifier = "Unidentified User";
+	newConnection->UserIdentifier = "User ID Unknown";
+	newConnection->Username = "Username Unknown";
+	newConnection->CurrentStatus = "Not Signed In";
 	newConnection->InboxCount = 0;
 	UserConnectionsList[newConnection] = true;
 	
@@ -397,7 +402,7 @@ void Server::ReceiveMessages(void)
 				SendMessage_FileRequestFailed(fileTitle, "The specified file was not found.", user);
 				break;
 			}
-			else if (FileSendTaskList.find(user) != FileSendTaskList.end())
+			else if (user->UserFileSendTask != nullptr)
 			{
 				//  The user is already downloading something.
 				SendMessage_FileRequestFailed(fileTitle, "User is currently already downloading a file.", user);
@@ -413,20 +418,18 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_RECEIVE_READY:
 		{
-			auto taskIter = FileSendTaskList.find(user);
-			assert(taskIter != FileSendTaskList.end());
+			auto task = user->UserFileSendTask;
+			assert(task != nullptr);
 
-			auto task = (*taskIter).second;
 			task->SetFileTransferState(FileSendTask::CHUNK_STATE_SENDING);
 		}
 		break;
 
 		case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
 		{
-			auto taskIter = FileSendTaskList.find(user);
-			assert(taskIter != FileSendTaskList.end());
+			auto task = user->UserFileSendTask;
+			assert(task != nullptr);
 
-			auto task = (*taskIter).second;
 			assert(task->GetFileTransferState() == FileSendTask::CHUNK_STATE_PENDING_COMPLETE);
 
 			auto portionIndex = winsockWrapper.ReadInt(0);
@@ -436,10 +439,9 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_CHUNKS_REMAINING:
 		{
-			auto taskIter = FileSendTaskList.find(user);
-			assert(taskIter != FileSendTaskList.end());
+			auto task = user->UserFileSendTask;
+			assert(task != nullptr);
 
-			auto task = (*taskIter).second;
 			auto chunkCount = winsockWrapper.ReadInt(0);
 			std::unordered_map<int, bool> chunksRemaining;
 			for (auto i = 0; i < chunkCount; ++i) chunksRemaining[winsockWrapper.ReadShort(0)] = true;
@@ -470,8 +472,12 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 
 	SendMessage_LoginResponse(true, user);
 
-	//  Set the user identifier, and read the Inbox and Notifications data for the user
+	//  Set the user identifier and name
 	user->UserIdentifier = loginDataMD5;
+	user->Username = username;
+	user->CurrentStatus = "Logged In, Idle";
+
+	//  Read the Inbox and Notifications data for the user
 	ReadUserInbox(user);
 	ReadUserNotifications(user);
 	SendMessage_InboxAndNotifications(user);
@@ -603,7 +609,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 
 	//  Add the hosted file data to the hosted file data list
 	HostedFileData newFile;
-	newFile.FileTitleMD5 = fileTitleMD5;
+	newFile.FileTitleChecksum = fileTitleMD5;
 	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
 	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
 	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
@@ -614,7 +620,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	std::ofstream hfFile("HostedFiles.data", std::ios_base::app);
 	assert(!hfFile.bad() && hfFile.good());
 
-	int md5Length = int(newFile.FileTitleMD5.length());
+	int md5Length = int(newFile.FileTitleChecksum.length());
 	int encryptedFileNameLength = int(newFile.EncryptedFileName.size());
 	int encryptedFileTitleLength = int(newFile.EncryptedFileTitle.size());
 	int encryptedFileDescLength = int(newFile.EncryptedFileDescription.size());
@@ -622,7 +628,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 
 	//  Write the hosted file data into the file, then close it
 	hfFile.write((const char*)&md5Length, sizeof(md5Length));
-	hfFile.write((const char*)newFile.FileTitleMD5.c_str(), md5Length);
+	hfFile.write((const char*)newFile.FileTitleChecksum.c_str(), md5Length);
 	hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
 	hfFile.write((const char*)newFile.EncryptedFileName.data(), encryptedFileNameLength);
 	hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
@@ -683,12 +689,12 @@ void Server::LoadHostedFilesData(void)
 		auto decryptedFileTitleString = std::string((char*)decryptedFileTitle.data(), decryptedFileTitle.size());
 
 		HostedFileData newFile;
-		newFile.FileTitleMD5 = std::string((char*)fileTitleMD5, md5Length);
+		newFile.FileTitleChecksum = std::string((char*)fileTitleMD5, md5Length);
 		for (auto i = 0; i < fileNameLength; ++i) newFile.EncryptedFileName.push_back(encryptedFileName[i]);
 		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
 		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
 		for (auto i = 0; i < fileUploaderLength; ++i) newFile.EncryptedUploader.push_back(encryptedFileUploader[i]);
-		HostedFileDataList[newFile.FileTitleMD5] = newFile;
+		HostedFileDataList[newFile.FileTitleChecksum] = newFile;
 	}
 
 	hfFile.close();
@@ -741,9 +747,11 @@ void Server::SaveLatestUploadsList(void)
 void Server::ContinueFileTransfers(void)
 {
 	//  Find all file transfers and send a file chunk for each one if the file transfer is ready
-	for (auto taskIter = FileSendTaskList.begin(); taskIter != FileSendTaskList.end(); ++taskIter)
+	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)
 	{
-		auto task = (*taskIter).second;
+		auto user = (*userIter).first;
+		auto task = user->UserFileSendTask;
+		if (task == nullptr) continue;
 
 		//  If we aren't ready to send the file, continue out and wait for a ready signal
 		if (task->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
@@ -752,7 +760,9 @@ void Server::ContinueFileTransfers(void)
 		{
 			//  If the file send is complete, delete the file send task and move on
 			delete task;
-			FileSendTaskList.erase(taskIter);
+			user->UserFileSendTask = nullptr;
+			user->CurrentStatus = "Logged In, Idle";
+			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 			break;
 		}
 
@@ -767,11 +777,13 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 	//  Decrypt the file name and hosted file path
 	auto decryptedFileNameVector = Groundfish::Decrypt(fileData.EncryptedFileName.data());
 	auto fileName = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
-	auto filePath = "./_HostedFiles/" + fileData.FileTitleMD5 + ".hostedfile";
+	auto filePath = "./_HostedFiles/" + fileData.FileTitleChecksum + ".hostedfile";
 
 	//  Add a new FileSendTask to our list, so it can manage itself
 	FileSendTask* newTask = new FileSendTask(fileName, filePath, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
-	FileSendTaskList[user] = newTask;
+	user->UserFileSendTask = newTask;
+	user->CurrentStatus = "Downloading file: " + fileData.FileTitleChecksum;
+	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 
 void Server::SendChatString(const char* chatString)
