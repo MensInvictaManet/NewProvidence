@@ -174,6 +174,13 @@ private:
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
 	std::vector< std::vector<unsigned char> > LatestUploadsList;
 
+	inline UserConnection* FindUserByUserID(std::string userID)
+	{
+		for (auto iter = UserConnectionsList.begin(); iter != UserConnectionsList.end(); ++iter)
+			if ((*iter).first->UserIdentifier == userID) return (*iter).first;
+		return nullptr;
+	}
+
 public:
 	Server() {}
 	~Server() {}
@@ -460,11 +467,17 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	std::transform(password.begin(), password.end(), password.begin(), ::tolower);
 
 	//  Locate the user entry in the login details list, if possible
-	auto loginDataMD5 = md5(username + password);
-	auto userIter = UserLoginDetailsList.find(loginDataMD5);
+	auto loginDataChecksum = md5(username + password);
 
-	//  if the user does not exist
-	if (userIter == UserLoginDetailsList.end())
+	//  If the user does not exist, send a failure message and return out
+	if (UserLoginDetailsList.find(loginDataChecksum) == UserLoginDetailsList.end())
+	{
+		SendMessage_LoginResponse(false, user);
+		return;
+	}
+
+	//  If the username given is already assigned to a connected user, send a failure message and return out
+	if (FindUserByUserID(loginDataChecksum) != nullptr)
 	{
 		SendMessage_LoginResponse(false, user);
 		return;
@@ -473,7 +486,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	SendMessage_LoginResponse(true, user);
 
 	//  Set the user identifier and name
-	user->UserIdentifier = loginDataMD5;
+	user->UserIdentifier = loginDataChecksum;
 	user->Username = username;
 	user->CurrentStatus = "Logged In, Idle";
 
