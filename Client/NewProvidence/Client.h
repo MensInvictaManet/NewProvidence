@@ -214,14 +214,12 @@ bool Client::ReadMessages(void)
 	{
 		if (FileReceive == nullptr) break;
 
-		std::string progressString = "ERROR";
-		if (FileReceive->ReceiveFile(progressString))
+		if (FileReceive->ReceiveFileChunk())
 		{
 			//  If ReceiveFile returns true, the transfer is complete
 			delete FileReceive;
 			FileReceive = nullptr;
 		}
-		//NewLine(progressString.c_str());
 	}
 	break;
 
@@ -233,7 +231,7 @@ bool Client::ReadMessages(void)
 		_wmkdir(L"_DownloadedFiles");
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
-			if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->DownloadTime, FileReceive->FileSize);
+			if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
 
 			if (FileReceive->GetFileDownloadComplete())
 			{

@@ -430,7 +430,7 @@ void Server::ReceiveMessages(void)
 			assert(task->GetFileTransferState() == FileSendTask::CHUNK_STATE_PENDING_COMPLETE);
 
 			auto portionIndex = winsockWrapper.ReadInt(0);
-			task->FilePortionComplete(portionIndex);
+			task->ConfirmFilePortionSendComplete(portionIndex);
 		}
 		break;
 
@@ -748,13 +748,16 @@ void Server::ContinueFileTransfers(void)
 		//  If we aren't ready to send the file, continue out and wait for a ready signal
 		if (task->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
 
-		//  If we have data to send, send it and continue out so we can keep sending it until we're done
-		if (!task->SendFileChunk()) continue;
+		if (task->GetFileSendComplete())
+		{
+			//  If the file send is complete, delete the file send task and move on
+			delete task;
+			FileSendTaskList.erase(taskIter);
+			break;
+		}
 
-		//  If we've gotten this far, we're ready to delete the file send task, as it completed.
-		delete task;
-		FileSendTaskList.erase(taskIter);
-		break;
+		//  If we get this far, we have data to send. Send it and continue out
+		task->SendFileChunk();
 	}
 }
 
