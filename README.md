@@ -1,2 +1,6 @@
 # NewProvidence
-New Providence is intended to be an encrypted file sharing server and client program, for sharing files between friends
+New Providence is intended to be an encrypted file sharing server and client program, for sharing between friends. Users within the client can upload files to the server, titling and tagging their uploads so that other users in their group of friends can have easy access to their music, movies, or other desired files.
+
+All file-based communication is encrypted between client and server, as are usernames and passwords. This is intended to prevent any network watchman from determining the legality of any specific traffic on the network. Although the program is not necessarily intended for illegal file-sharing, it could easily be utilized for that purpose. All encryption is done using a proprietary encryption system I call "Groundfish".
+
+Users can communicate with others within the application, leaving messages for people based on their uploads or just cordially. Users can put up a "bounty request" for a certain file, and others can fulfill that bounty by uploading it and marking it fulfilled, in which case the original user who put up the request will receive a notification upon their next login. Additionally, users can recommend certain uploads to other users, who will receive the recommendations when they log in. In this way, a user could upload a music file and let their friends know to download it and see if they like it.
