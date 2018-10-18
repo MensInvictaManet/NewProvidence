@@ -71,8 +71,12 @@ static float Background_R = 0.5f;
 static float Background_G = 0.5f;
 static float Background_B = 0.5f;
 
+static bool EscapeToQuit = true;
+
 inline void ClearBackground() { glClearColor(Background_R, Background_G, Background_B, 1.f); }
 inline void SetBackgroundColor(float r, float g, float b) { Background_R = r; Background_G = g; Background_B = b; ClearBackground(); }
+
+inline void SetEscapeToQuit(bool escape) { EscapeToQuit = escape; }
 
 inline void AddDebugConsoleCommands()
 {
@@ -390,7 +394,7 @@ inline void PrimaryLoop()
 
 		//  Get the current state of mouse and keyboard input
 		inputManager.GetInputForFrame();
-		if (inputManager.GetKeyPressed(SDL_SCANCODE_ESCAPE)) quit = true;
+		if (EscapeToQuit && inputManager.GetKeyPressed(SDL_SCANCODE_ESCAPE)) quit = true;
 
 		//  Handle events on queue
 		SDL_Event e;
