@@ -29,6 +29,8 @@ void CreateInitializationData()
 	//  Create the first test dialogue and add it to the scene
 	currentDialogue = new PrimaryDialogue;
 	guiManager.GetBaseNode()->AddChild(currentDialogue);
+
+	SetEscapeToQuit(false);
 }
 
 void AppMain()
