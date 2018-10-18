@@ -23,8 +23,9 @@ void CreateInitializationData()
 	fontManager.LoadFont("Arial");
 	fontManager.LoadFont("Arial-12-White");
 
-	//  Set the font on the Debug Console
+	//  Set the font and template on the Debug Console
 	debugConsole->SetFont(fontManager.GetFont("Arial-12-White"));
+	debugConsole->GetListbox()->SetTemplate("DebugConsole", int(ScreenWidth) - 20, 0, 12, 12, 12, 12, 12);
 
 	//  Create the first test dialogue and add it to the scene
 	currentDialogue = new PrimaryDialogue;
