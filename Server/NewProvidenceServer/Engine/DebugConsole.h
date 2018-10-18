@@ -35,6 +35,8 @@ public:
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
 
+	inline GUIListBox* GetListbox() { return m_DebugConsoleListBox; }
+
 private:
 	int m_WindowWidth;
 	int m_WindowHeight;
@@ -58,7 +60,7 @@ inline DebugConsole::DebugConsole() :
 	SetZOrder(-9999);
 	SetVisible(false);
 
-	m_DebugConsoleListBox = GUIListBox::CreateListBox("", 4, 8, m_WindowWidth, m_WindowHeight / 2 - 36, 22, 1);
+	m_DebugConsoleListBox = GUIListBox::CreateListBox("DebugConsole", 4, 8, m_WindowWidth, m_WindowHeight, 22, 1);
 	m_DebugConsoleListBox->SetSelectable(false);
 	m_DebugConsoleListBox->SetFlowToBottom(true);
 	AddChild(m_DebugConsoleListBox);
@@ -74,8 +76,14 @@ inline void DebugConsole::SetWindowDimensions(int width, int height)
 	m_WindowWidth = width;
 	m_WindowHeight = height;
 
+	auto debugConsoleEntrySpacing = m_DebugConsoleListBox->GetEntryHeight() + m_DebugConsoleListBox->GetSpaceBetweenEntries();
+	auto debugConsoleHeightSubtract = 0;
+	auto debugConsoleHeight = ((height / 2) - debugConsoleEntrySpacing - debugConsoleHeightSubtract);
+	if ((debugConsoleHeight % debugConsoleEntrySpacing) != 0)
+		debugConsoleHeight = (debugConsoleHeight / debugConsoleEntrySpacing * debugConsoleEntrySpacing);
+
 	m_DebugConsoleListBox->SetWidth(width);
-	m_DebugConsoleListBox->SetHeight(height / 2 - 24);
+	m_DebugConsoleListBox->SetHeight(debugConsoleHeight);
 }
 
 inline void DebugConsole::EnterCommand(std::string& commandString)
@@ -137,7 +145,7 @@ inline void DebugConsole::Render(int xOffset, int yOffset)
 	if (m_SetToDestroy || !m_Visible) return;
 	
 	glDisable(GL_TEXTURE_2D);
-	glColor4f(0.1f, 0.1f, 0.1f, 0.8f);
+	glColor4f(0.1f, 0.1f, 0.1f, 0.9f);
 	glBegin(GL_QUADS);
 		glVertex2i(0, 0);
 		glVertex2i(m_WindowWidth, 0);
