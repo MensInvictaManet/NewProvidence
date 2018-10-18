@@ -3,10 +3,16 @@
 #include "MessageIdentifiers.h"
 #include "Engine/WinsockWrapper.h"
 
+
+#define FILE_TRANSFER_DEBUGGING			1
 #define FILE_CHUNK_SIZE					1024
 #define FILE_CHUNK_BUFFER_COUNT			500
 #define FILE_SEND_BUFFER_SIZE			(FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT)
 #define PORTION_COMPLETE_REMIND_TIME	0.1
+
+#if FILE_TRANSFER_DEBUGGING
+#include "Engine/DebugConsole.h"
+#endif
 
 
 void SendMessage_FileSendInitializer(std::string fileName, int fileSize, int socket, const char* ip, const int port)
@@ -22,6 +28,10 @@ void SendMessage_FileSendInitializer(std::string fileName, int fileSize, int soc
 	winsockWrapper.WriteInt(FILE_CHUNK_SIZE, 0);
 	winsockWrapper.WriteInt(FILE_CHUNK_BUFFER_COUNT, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
+
+#if FILE_TRANSFER_DEBUGGING
+	debugConsole->AddDebugConsoleLine("Message Sent: MESSAGE_ID_FILE_SEND_INIT");
+#endif
 }
 
 
@@ -49,6 +59,10 @@ void SendMessage_FileTransferPortionComplete(int portionIndex, int socket, const
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE, 0);
 	winsockWrapper.WriteInt(portionIndex, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
+
+#if FILE_TRANSFER_DEBUGGING
+	debugConsole->AddDebugConsoleLine("Message Sent: MESSAGE_ID_FILE_PORTION_COMPLETE");
+#endif
 }
 
 
@@ -58,6 +72,10 @@ void SendMessage_FileReceiveReady(int socket, const char* ip, const int port)
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_RECEIVE_READY, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
+
+#if FILE_TRANSFER_DEBUGGING
+	debugConsole->AddDebugConsoleLine("Message Sent: MESSAGE_ID_FILE_RECEIVE_READY");
+#endif
 }
 
 
@@ -68,6 +86,10 @@ void SendMessage_FilePortionCompleteConfirmation(int portionIndex, int socket, c
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM, 0);
 	winsockWrapper.WriteInt(portionIndex, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
+
+#if FILE_TRANSFER_DEBUGGING
+	debugConsole->AddDebugConsoleLine("Message Sent: MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM");
+#endif
 }
 
 
@@ -79,6 +101,10 @@ void SendMessage_FileChunksRemaining(std::unordered_map<int, bool>& chunksRemain
 	winsockWrapper.WriteInt(chunksRemaining.size(), 0);
 	for (auto i = chunksRemaining.begin(); i != chunksRemaining.end(); ++i) winsockWrapper.WriteShort((short)((*i).first), 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
+
+#if FILE_TRANSFER_DEBUGGING
+	debugConsole->AddDebugConsoleLine("Message Sent: MESSAGE_ID_FILE_CHUNKS_REMAINING");
+#endif
 }
 
 //  FileSendTask class
@@ -145,6 +171,10 @@ public:
 		//  Buffer a portion of the file in preparation of sending it
 		BufferFilePortion(FilePortionIndex);
 
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileSendTask created!");
+#endif
+
 		//  Send a "File Send Initializer" message
 		SendMessage_FileSendInitializer(FileName, FileSize, SocketID, IPAddress.c_str(), ConnectionPort);
 	}
@@ -156,6 +186,10 @@ public:
 
 	void BufferFilePortion(int filePortionIndex)
 	{
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileSendTask: Buffering file portion...");
+#endif
+
 		//  Determine the values needed to buffer the data (we might need less than the full buffer)
 		auto portionPosition = filePortionIndex * FILE_SEND_BUFFER_SIZE;
 		auto portionByteCount = ((portionPosition + FILE_SEND_BUFFER_SIZE) > FileSize) ? (FileSize - portionPosition) : FILE_SEND_BUFFER_SIZE;
@@ -202,6 +236,9 @@ public:
 		//  First, check that we have data left unsent in the current chunk buffer. If not, set us to "Pending Complete" on the current chunk buffer
 		if (FileChunksToSend.begin() == FileChunksToSend.end())
 		{
+#if FILE_TRANSFER_DEBUGGING
+			debugConsole->AddDebugConsoleLine("CHUNK_STATE_PENDING_COMPLETE");
+#endif
 			FileChunkTransferState = CHUNK_STATE_PENDING_COMPLETE;
 			SendMessage_FileTransferPortionComplete(FilePortionIndex, SocketID, IPAddress.c_str(), ConnectionPort);
 			LastMessageTime = clock();
@@ -230,6 +267,10 @@ public:
 
 	void ConfirmFilePortionSendComplete(int portionIndex)
 	{
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileSendTask ConfirmFilePortionSendComplete");
+#endif
+
 		//  If this message is not regarding the current file portion index, ignore it
 		if (FilePortionIndex != portionIndex) return;
 
@@ -311,6 +352,10 @@ public:
 		//  Set the download time to the starting seconds (we'll subtract this number from current time when the download finishes)
 		DownloadTime = gameSeconds;
 
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileRecieveTask created!");
+#endif
+
 		//  Send a signal to the file sender that we're ready to receive the file
 		SendMessage_FileReceiveReady(SocketID, IPAddress.c_str(), ConnectionPort);
 	}
@@ -329,10 +374,17 @@ public:
 
 		//  Get the file chunk data from the message, as well as a checksum to check it against
 		auto filePortionIndex = winsockWrapper.ReadInt(0);
+		assert(filePortionIndex >= 0);
+		assert(filePortionIndex <= FilePortionCount);
 		auto chunkIndex = winsockWrapper.ReadInt(0);
+		assert(chunkIndex >= 0);
+		assert(chunkIndex < FILE_CHUNK_BUFFER_COUNT);
 		auto chunkSize = winsockWrapper.ReadInt(0);
+		assert(chunkSize >= 0);
 		assert(chunkSize <= FILE_CHUNK_SIZE);
 		auto checksumSize = winsockWrapper.ReadInt(0);
+		assert(checksumSize >= 0);
+		assert(checksumSize == 4);
 		chunkChecksum = std::string((char*)winsockWrapper.ReadChars(0, checksumSize), checksumSize);
 		memcpy(FileChunkDataBuffer, winsockWrapper.ReadChars(0, chunkSize), chunkSize);
 
@@ -372,14 +424,19 @@ public:
 
 		//  If there are no chunks to receive, send a confirmation that this file portion is complete
 		SendMessage_FilePortionCompleteConfirmation(FilePortionIndex, SocketID, IPAddress.c_str(), ConnectionPort);
-		
+
 		//  Iterate to the next file portion, and if we've completed all portions in the file, complete the download and decrypt the file
 		if (++FilePortionIndex == FilePortionCount)
 		{
 			DownloadTime = gameSeconds - DownloadTime;
 			FileDownloadComplete = true;
 			FileStream.close();
-			Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
+			std::remove(FileName.c_str());
+			std::rename(TempFileName.c_str(), FileName.c_str());
+#if FILE_TRANSFER_DEBUGGING
+			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
+#endif
+			//Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
 		}
 		else
 		{
