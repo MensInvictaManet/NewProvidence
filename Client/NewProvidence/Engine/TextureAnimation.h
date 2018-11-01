@@ -31,19 +31,19 @@ private:
 			m_Callback(callback)
 		{}
 
-		float m_Time;
-		float m_Length;
-		int m_X;
-		int m_Y;
-		int m_W;
-		int m_H;
-		float m_Alpha;
-		int m_XOff;
-		int m_YOff;
-		std::string m_Callback;
+		float m_Time = 0.0f;
+		float m_Length = 0.0f;
+		int m_X = 0;
+		int m_Y = 0;
+		int m_W = 0;
+		int m_H = 0;
+		float m_Alpha = 0.0f;
+		int m_XOff = 0;
+		int m_YOff = 0;
+		std::string m_Callback = "";
 	};
 
-	TextureAnimation() : 
+	TextureAnimation() :
 		m_Texture(nullptr),
 		m_StartTime(gameTicksUint),
 		m_Length(0),
@@ -115,7 +115,7 @@ inline TextureAnimation* TextureAnimation::CreateTextureAnimation(const char* xm
 		auto yOff = int(atoi(dataAttribute->value()));
 		dataAttribute = dataAttribute->next_attribute("callback");
 		std::string callback = (dataAttribute == nullptr) ? "" : dataAttribute->value();
-		
+
 		auto lastKeyframe = anim->GetLastKeyframe();
 		if (lastKeyframe != nullptr) lastKeyframe->m_Length = t - lastKeyframe->m_Time;
 		anim->AddKeyframeData(t, x, y, w, h, a, xOff, yOff, callback);
@@ -147,7 +147,7 @@ inline void TextureAnimation::Update()
 
 	auto animTimeTotalUint = (gameTicksUint - m_StartTime);
 	auto animTimeUint = (animTimeTotalUint % m_Length);
-	auto animTime = TICKS_TO_SECONDS(animTimeUint);
+	float animTime = float(TICKS_TO_SECONDS(animTimeUint));
 	auto index = 0;
 	for (auto iter = m_KeyframeList.begin(); iter != m_KeyframeList.end(); ++iter, ++index)
 	{

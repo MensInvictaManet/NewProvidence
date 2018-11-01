@@ -155,24 +155,45 @@ inline void MD5::II(uint4 &a, uint4 b, uint4 c, uint4 d, uint4 x, uint4 s, uint4
 //////////////////////////////////////////////
 
 // default ctor, just initailize
-inline MD5::MD5()
+inline MD5::MD5() :
+	finalized(false)
 {
+	//  Initialize member variable data arrays
+	memset(buffer, 0, blocksize);
+	memset(count, 0, 2);
+	memset(state, 0, 4);
+	memset(digest, 0, 16);
+
 	init();
 }
 
 //////////////////////////////////////////////
 
 // nifty shortcut ctor, computer MD5 for data array and finalize it right away
-inline MD5::MD5(const std::vector<unsigned char>& data)
+inline MD5::MD5(const std::vector<unsigned char>& data) :
+	finalized(false)
 {
+	//  Initialize member variable data arrays
+	memset(buffer, 0, blocksize);
+	memset(count, 0, 2);
+	memset(state, 0, 4);
+	memset(digest, 0, 16);
+
 	init();
 	update((const char*)(data.data()), UINT(data.size()));
 	finalize();
 }
 
 // nifty shortcut ctor, computer MD5 for data array and finalize it right away
-inline MD5::MD5(const char* data, int dataCount, int dataLength)
+inline MD5::MD5(const char* data, int dataCount, int dataLength) :
+	finalized(false)
 {
+	//  Initialize member variable data arrays
+	memset(buffer, 0, blocksize);
+	memset(count, 0, 2);
+	memset(state, 0, 4);
+	memset(digest, 0, 16);
+
 	init();
 	for (int i = 0; i < dataCount; ++i)
 		update(pcuchar(&data[i * dataLength]), UINT(dataLength));
@@ -180,8 +201,15 @@ inline MD5::MD5(const char* data, int dataCount, int dataLength)
 }
 
 // nifty shortcut ctor, compute MD5 for string and finalize it right away
-inline MD5::MD5(const std::string &text)
+inline MD5::MD5(const std::string &text) :
+	finalized(false)
 {
+	//  Initialize member variable data arrays
+	memset(buffer, 0, blocksize);
+	memset(count, 0, 2);
+	memset(state, 0, 4);
+	memset(digest, 0, 16);
+
 	init();
 	update(text.c_str(), UINT(text.length()));
 	finalize();

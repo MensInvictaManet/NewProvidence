@@ -65,8 +65,8 @@ namespace tdogl {
         ~Shader();
         
     private:
-        GLuint _object;
-        unsigned* _refCount;
+        GLuint _object			= 0;
+        unsigned* _refCount		= nullptr;
         
         void _retain();
         void _release();
