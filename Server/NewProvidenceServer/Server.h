@@ -23,6 +23,18 @@ struct HostedFileData
 
 struct UserConnection
 {
+	UserConnection() :
+		SocketID(-1),
+		IPAddress(""),
+		PingCount(0),
+		InboxCount(0),
+		UserIdentifier(""),
+		Username(""),
+		CurrentStatus(""),
+		UserFileSendTask(nullptr),
+		UserFileReceiveTask(nullptr)
+	{}
+
 	int				SocketID;
 	std::string		IPAddress;
 	int				PingCount;
@@ -35,7 +47,8 @@ struct UserConnection
 
 	std::vector<std::string> NotificationsList;
 
-	FileSendTask*	UserFileSendTask = nullptr;
+	FileSendTask*		UserFileSendTask = nullptr;
+	FileReceiveTask*	UserFileReceiveTask = nullptr;
 };
 
 
@@ -182,7 +195,10 @@ private:
 	}
 
 public:
-	Server() {}
+	Server() :
+		ServerSocketHandle(-1)
+	{}
+
 	~Server() {}
 
 	inline void SetUserConnectionListChangedCallback(const std::function<void(std::unordered_map<UserConnection*, bool>&)>& callback) { UserConnectionListChangedCallback = callback; }
@@ -235,9 +251,9 @@ bool Server::Initialize(void)
 	winsockWrapper.SetNagle(ServerSocketHandle, true);
 
 	//  ensure there is an Inbox, Notifications, and Files folder
-	_wmkdir(L"_UserInbox");
-	_wmkdir(L"_UserNotifications");
-	_wmkdir(L"_HostedFiles");
+	(void)  _wmkdir(L"_UserInbox");
+	(void) _wmkdir(L"_UserNotifications");
+	(void) _wmkdir(L"_HostedFiles");
 
 	//  Load the list of latest uploads to the server
 	LoadLatestUploadsList();
@@ -331,7 +347,7 @@ void Server::ReceiveMessages(void)
 	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)
 	{
 		auto user = (*userIter).first;
-		auto messageBufferSize = winsockWrapper.ReceiveMessagePacket(user->SocketID, 0, 0);
+		auto messageBufferSize = winsockWrapper.ReceiveMessagePacket(user->SocketID, 0);
 
 		//  If no message has arrived, move on to the next connection
 		if (messageBufferSize < 0) continue;
@@ -419,7 +435,29 @@ void Server::ReceiveMessages(void)
 			{
 				auto hostedFileData = (*hostedFileIter).second;
 				BeginFileTransfer(hostedFileData, user);
+				break;
 			}
+		}
+		break;
+
+		case MESSAGE_ID_FILE_SEND_INIT:
+		{
+			//  Decrypt the file name using Groundfish and save it off
+			auto fileNameSize = winsockWrapper.ReadInt(0);
+			auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
+			auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+			auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
+
+			//  Grab the file size, file chunk size, and buffer count
+			auto fileSize = winsockWrapper.ReadInt(0);
+			auto fileChunkSize = winsockWrapper.ReadInt(0);
+			auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
+
+			if (user->UserFileReceiveTask != nullptr) return;
+
+			//  Create a new file receive task
+			(void) _wmkdir(L"_DownloadedFiles");
+			user->UserFileReceiveTask = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
 		}
 		break;
 
@@ -432,15 +470,52 @@ void Server::ReceiveMessages(void)
 		}
 		break;
 
-		case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
+		case MESSAGE_ID_FILE_PORTION:
 		{
-			auto task = user->UserFileSendTask;
-			assert(task != nullptr);
+			if (user->UserFileReceiveTask == nullptr) break;
 
-			assert(task->GetFileTransferState() == FileSendTask::CHUNK_STATE_PENDING_COMPLETE);
+			if (user->UserFileReceiveTask->ReceiveFileChunk())
+			{
+				assert(false); // ALERT: We should never be receiving a chunk after the file download is complete
 
+				//  If ReceiveFile returns true, the transfer is complete
+				delete user->UserFileReceiveTask;
+				user->UserFileReceiveTask = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+				debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+#endif
+			}
+		}
+		break;
+
+		case MESSAGE_ID_FILE_PORTION_COMPLETE:
+		{
 			auto portionIndex = winsockWrapper.ReadInt(0);
-			task->ConfirmFilePortionSendComplete(portionIndex);
+
+			if (user->UserFileReceiveTask == nullptr)
+			{
+				SendMessage_FilePortionCompleteConfirmation(portionIndex, user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT);
+				break;
+			}
+
+			(void) _wmkdir(L"_DownloadedFiles");
+			if (user->UserFileReceiveTask->CheckFilePortionComplete(portionIndex))
+			{
+				//if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
+
+				if (user->UserFileReceiveTask->GetFileTransferComplete())
+				{
+					delete user->UserFileReceiveTask;
+					user->UserFileReceiveTask = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+					debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+#endif
+
+					break;
+				}
+			}
 		}
 		break;
 
@@ -455,6 +530,23 @@ void Server::ReceiveMessages(void)
 			task->SetChunksRemaining(chunksRemaining);
 		}
 		break;
+
+		case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
+		{
+			auto portionIndex = winsockWrapper.ReadInt(0);
+
+			auto task = user->UserFileSendTask;
+			if (task == nullptr) break;
+
+			if (task->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;
+
+			task->ConfirmFilePortionSendComplete(portionIndex);
+		}
+		break;
+
+		default:
+			assert(false);
+			break;
 		}
 	}
 }
@@ -763,24 +855,28 @@ void Server::ContinueFileTransfers(void)
 	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)
 	{
 		auto user = (*userIter).first;
-		auto task = user->UserFileSendTask;
-		if (task == nullptr) continue;
+		if (user->UserFileSendTask == nullptr) continue;
 
 		//  If we aren't ready to send the file, continue out and wait for a ready signal
-		if (task->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
+		if (user->UserFileSendTask->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
 
-		if (task->GetFileSendComplete())
+		if (user->UserFileSendTask->GetFileTransferComplete())
 		{
 			//  If the file send is complete, delete the file send task and move on
-			delete task;
+			delete user->UserFileSendTask;
 			user->UserFileSendTask = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+			debugConsole->AddDebugConsoleLine("FileSendTask deleted...");
+#endif
+
 			user->CurrentStatus = "Logged In, Idle";
 			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 			break;
 		}
 
 		//  If we get this far, we have data to send. Send it and continue out
-		task->SendFileChunk();
+		user->UserFileSendTask->SendFileChunk();
 	}
 }
 
@@ -798,6 +894,7 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 	user->CurrentStatus = "Downloading file: " + fileData.FileTitleChecksum;
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
+
 
 void Server::SendChatString(const char* chatString)
 {

@@ -17,7 +17,7 @@ const auto LatestUploadsHeight = 300;
 //  Global UI objects
 GUIObjectNode* StatusBarBG = nullptr;
 GUILabel* StatusBarTextLabel = nullptr;
-GUIObjectNode* StatusBarDownloadFill = nullptr;
+GUIObjectNode* StatusBarTransferFill = nullptr;
 
 GUIObjectNode* LoginMenuNode = nullptr;
 GUIEditBox* UsernameEditBox = nullptr;
@@ -33,7 +33,7 @@ GUIObjectNode* NotificationsIconNode = nullptr;
 GUIObjectNode* SideBarBox = nullptr;
 
 GUIListBox* LatestUploadsListBox = nullptr;
-GUIObjectNode* CurrentDownloadContainer = nullptr;
+GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
@@ -73,7 +73,7 @@ void SetLatestUploads(std::vector<std::string> latestUploadsList)
 }
 
 
-void SetUserMenuOpen(GUIObjectNode*)
+void SetUserMenuOpen(GUIObjectNode* node)
 {
 	SideBarOpen = !SideBarOpen;
 
@@ -84,6 +84,10 @@ void SetUserMenuOpen(GUIObjectNode*)
 	NotificationsSideTabButton->SetVisible(!SideBarOpen);
 
 	//  TODO: Show User Menu in SideBar
+
+	//  DEBUG  //
+	ClientControl.SendFileToServer("TestImage8.png");
+	//  DEBUG  //
 }
 
 
@@ -144,20 +148,22 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 }
 
 
-void SetDownloadPercentage(float percent, double time, int fileSize)
+void SetTransferPercentage(float percent, double time, int fileSize, bool download)
 {
 	int averageKBs = int((float(fileSize) / 1024.0f) / time);
 
+	std::string transferType = (download ? "Download" : "Upload");
+
 	if (percent >= 1.0f)
 	{
-		StatusBarDownloadFill->SetVisible(false);
-		SetStatusBarMessage("Download completed in " + std::to_string(int(time)) + " seconds (avg " + std::to_string(averageKBs) + " KB/s)", false);
+		StatusBarTransferFill->SetVisible(false);
+		SetStatusBarMessage(transferType + " completed in " + std::to_string(int(time)) + " seconds (avg " + std::to_string(averageKBs) + " KB/s)", false);
 	}
 	else
 	{
-		StatusBarDownloadFill->SetVisible(true);
-		StatusBarDownloadFill->SetWidth(int(percent * ScreenWidth));
-		SetStatusBarMessage("Download " + std::to_string(int(percent * 100.0f)) + "% complete...", false);
+		StatusBarTransferFill->SetVisible(true);
+		StatusBarTransferFill->SetWidth(int(percent * ScreenWidth));
+		SetStatusBarMessage(transferType + " " + std::to_string(int(percent * 100.0f)) + "% complete...", false);
 	}
 }
 
@@ -303,12 +309,12 @@ void PrimaryDialogue::LoadStatusBar()
 	StatusBarBG->SetPosition(0, backgroundStripY);
 	StatusBarNode->AddChild(StatusBarBG);
 
-	//  Load the status bar download fill, for showing download progress
-	StatusBarDownloadFill = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_TransparentDarkRed.png");
-	StatusBarDownloadFill->SetObjectName("StatusBarDownloadFill");
-	StatusBarDownloadFill->SetDimensions(0, backgroundStripHeight);
-	StatusBarDownloadFill->SetPosition(0, backgroundStripY);
-	StatusBarNode->AddChild(StatusBarDownloadFill);
+	//  Load the status bar transfer fill, for showing download progress
+	StatusBarTransferFill = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_TransparentDarkRed.png");
+	StatusBarTransferFill->SetObjectName("StatusBarTransferFill");
+	StatusBarTransferFill->SetDimensions(0, backgroundStripHeight);
+	StatusBarTransferFill->SetPosition(0, backgroundStripY);
+	StatusBarNode->AddChild(StatusBarTransferFill);
 
 	//  Load the status bar text label
 	StatusBarTextLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial-12-White"), "Test", -100, 0, int(ScreenWidth), backgroundStripHeight);
@@ -420,7 +426,7 @@ void PrimaryDialogue::LoadMainProgramUI()
 	ClientControl.SetLatestUploadsCallback(SetLatestUploads);
 	ClientControl.SetFileRequestFailureCallback(FileRequestFailureCallback);
 	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
-	ClientControl.SetDownloadPercentCompleteCallback(SetDownloadPercentage);
+	ClientControl.SetTransferPercentCompleteCallback(SetTransferPercentage);
 }
 
 void PrimaryDialogue::LoadSideBarUI()

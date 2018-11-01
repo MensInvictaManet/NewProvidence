@@ -43,18 +43,19 @@ private:
 	int					ServerSocket = -1;
 	std::string			UserName;
 	FileReceiveTask*	FileReceive = NULL;
+	FileSendTask*		FileSend = NULL;
 
 	std::function<void(bool, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
-	std::function<void(float, double, int)> DownloadPercentCompleteCallback = nullptr;
+	std::function<void(float, double, int, bool)> TransferPercentCompleteCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
 	Client()	{}
-	~Client()	{}
+	~Client()	{ Shutdown(); }
 
 	inline int GetServerSocket(void) const { return ServerSocket; }
 	inline void SetLoginResponseCallback(const std::function<void(bool, int, int)>& callback) { LoginResponseCallback = callback; }
@@ -62,25 +63,64 @@ public:
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
-	inline void SetDownloadPercentCompleteCallback(const std::function<void(float, double, int)>& callback) { DownloadPercentCompleteCallback = callback; }
+	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
-	bool Connect();
+	bool Connect(void);
+	void SendFileToServer(std::string filePath);
+	void ContinueFileTransfers(void);
 
-	void Initialize();
-	bool MainProcess();
-	void Shutdown();
+	void Initialize(void);
+	bool MainProcess(void);
+	void Shutdown(void);
 
 	bool ReadMessages(void);
 };
 
-bool Client::Connect()
+
+bool Client::Connect(void)
 {
 	// Connect to the New Providence server
 	ServerSocket = winsockWrapper.TCPConnect(NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 1);
 	return (ServerSocket >= 0);
 }
 
-void Client::Initialize()
+void Client::SendFileToServer(std::string filePath)
+{
+	if (FileSend != nullptr) return;
+
+	//  Add a new FileSendTask to our list, so it can manage itself
+	FileSend = new FileSendTask(filePath, filePath, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+}
+
+void Client::ContinueFileTransfers(void)
+{
+	// If there is a file send task, send a file chunk for each one if the file transfer is ready
+	if (FileSend == nullptr) return;
+
+	//  If we aren't ready to send the file, continue out and wait for a ready signal
+	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
+
+	FileSend->DetermineFileTransferTime();
+	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), false);
+
+	if (FileSend->GetFileTransferComplete())
+	{
+		//  If the file send is complete, delete the file send task and move on
+		delete FileSend;
+		FileSend = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileSendTask deleted...");
+#endif
+		return;
+	}
+
+	//  If we get this far, we have data to send. Send it and continue out
+	FileSend->SendFileChunk();
+}
+
+
+void Client::Initialize(void)
 {
 	//  Seed the random number generator
 	srand((unsigned int)(time(NULL)));
@@ -92,22 +132,29 @@ void Client::Initialize()
 	winsockWrapper.WinsockInitialize();
 }
 
-bool Client::MainProcess()
+bool Client::MainProcess(void)
 {
 	if (ServerSocket < 0) return false;
-	
+
+	// Receive messages
 	ReadMessages();
+
+	//  Send files
+	ContinueFileTransfers();
+
 	return true;
 }
 
-void Client::Shutdown()
+void Client::Shutdown(void)
 {
+	if (ServerSocket == -1) return;
 	closesocket(ServerSocket);
+	ServerSocket = -1;
 }
 
 bool Client::ReadMessages(void)
 {
-	auto messageBufferSize = winsockWrapper.ReceiveMessagePacket(ServerSocket, 0, 0);
+	auto messageBufferSize = winsockWrapper.ReceiveMessagePacket(ServerSocket, 0);
 	if (messageBufferSize == 0) return false;
 	if (messageBufferSize < 0) return true;
 
@@ -202,11 +249,19 @@ bool Client::ReadMessages(void)
 		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
 
 		//  Create a new file receive task
-		_wmkdir(L"_DownloadedFiles");
+		(void)_wmkdir(L"_DownloadedFiles");
 		FileReceive = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, "./_DownloadedFiles/_download.tempfile", 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 
 		//  Respond to the file request success
 		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback(decryptedFileNamePure);
+	}
+	break;
+
+	case MESSAGE_ID_FILE_RECEIVE_READY:
+	{
+		assert(FileSend != nullptr);
+
+		FileSend->SetFileTransferState(FileSendTask::CHUNK_STATE_SENDING);
 	}
 	break;
 
@@ -216,9 +271,15 @@ bool Client::ReadMessages(void)
 
 		if (FileReceive->ReceiveFileChunk())
 		{
+			assert(false); // ALERT: We should never be receiving a chunk after the file transfer is complete
+
 			//  If ReceiveFile returns true, the transfer is complete
 			delete FileReceive;
 			FileReceive = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+			debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+#endif
 		}
 	}
 	break;
@@ -227,19 +288,51 @@ bool Client::ReadMessages(void)
 	{
 		auto portionIndex = winsockWrapper.ReadInt(0);
 
-		if (FileReceive == nullptr) break;
-		_wmkdir(L"_DownloadedFiles");
+		if (FileReceive == nullptr)
+		{
+			SendMessage_FilePortionCompleteConfirmation(portionIndex, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+			break;
+		}
+
+		(void) _wmkdir(L"_DownloadedFiles");
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
-			if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
+			FileReceive->DetermineFileTransferTime();
+			if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), true);
 
-			if (FileReceive->GetFileDownloadComplete())
+			if (FileReceive->GetFileTransferComplete())
 			{
 				delete FileReceive;
 				FileReceive = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+				debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+#endif
 				break;
 			}
 		}
+	}
+	break;
+
+	case MESSAGE_ID_FILE_CHUNKS_REMAINING:
+	{
+		assert(FileSend != nullptr);
+
+		auto chunkCount = winsockWrapper.ReadInt(0);
+		std::unordered_map<int, bool> chunksRemaining;
+		for (auto i = 0; i < chunkCount; ++i) chunksRemaining[winsockWrapper.ReadShort(0)] = true;
+		FileSend->SetChunksRemaining(chunksRemaining);
+	}
+	break;
+
+	case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
+	{
+		auto portionIndex = winsockWrapper.ReadInt(0);
+
+		if (FileSend == nullptr) break;
+		if (FileSend->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;
+
+		FileSend->ConfirmFilePortionSendComplete(portionIndex);
 	}
 	break;
 	}

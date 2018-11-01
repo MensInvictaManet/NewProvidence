@@ -37,7 +37,7 @@ public:
 
 	//  Miscelaneous
 	int SendMessagePacket(int socketID, const char* ipAddress, int port, int bufferID);
-	int ReceiveMessagePacket(int socketID, int len, int bufferID, int length_specific = 0);
+	int ReceiveMessagePacket(int socketID, int bufferID);
 	int PeekMessagePacket(int socketID, int len, int bufferID);
 	int SetFormat(int socketID, int mode, char* separater);
 	int SetSync(int socketID, int mode);
@@ -153,7 +153,7 @@ inline void WinsockWrapper::WinsockInitialize(unsigned int bufferCount)
 
 	//  Start up the Winsock library, requesting version 2.2
 	WSADATA wsaData;
-	WSAStartup(MAKEWORD(2, 2), &wsaData);
+	(void) WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 	for (unsigned int i = 0; i < bufferCount; ++i)
 	{
@@ -255,17 +255,19 @@ inline int WinsockWrapper::SendMessagePacket(int socketID, const char* ipAddress
 	return size;
 }
 
-inline int WinsockWrapper::ReceiveMessagePacket(int socketID, int len, int bufferID, int length_specific)
+inline int WinsockWrapper::ReceiveMessagePacket(int socketID, int bufferID)
 {
 	auto socket = m_SocketList[socketID];
 	auto buffer = m_BufferList[bufferID];
 	if (socket == nullptr) return -1;
 	if (buffer == nullptr) return -2;
-	auto size = socket->receivemessage(len, buffer, length_specific);
+	auto size = socket->receivemessage(buffer);
+
 	if (size < 0)
 	{
 		auto error = socket->lasterror();
-		if (error == 10054) return 0;
+		if (error == 0)		return -1;
+		if (error == 10054)	return 0;
 		return -error;
 	}
 	return size;
@@ -798,7 +800,7 @@ inline int WinsockWrapper::BinaryFileRead(HANDLE hwnd, int size, SocketBuffer* o
 	DWORD bytes_read;
 	MANAGE_MEMORY_NEW("WinsockWrapper", size);
 	auto b = new char[size];
-	ReadFile(hwnd, b, size, &bytes_read, nullptr);
+	(void) ReadFile(hwnd, b, size, &bytes_read, nullptr);
 	out->StreamWrite(b, bytes_read);
 	MANAGE_MEMORY_DELETE("WinsockWrapper", size);
 	delete [] b;

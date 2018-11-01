@@ -6,6 +6,8 @@
 #include <WS2tcpip.h>
 #pragma comment(lib, "Ws2_32.lib")
 
+static char ReceiveBuffer[8195];
+
 class Socket
 {
 private:
@@ -13,8 +15,6 @@ private:
 	int m_DataFormat;
 	char m_FormatString[30];
 	static SOCKADDR_IN SenderAddr;
-
-	int receivetext(char*buf, int max);
 
 public:
 	SOCKET m_SocketID;
@@ -32,7 +32,7 @@ public:
 	int setsync(int mode) const;
 	bool udpconnect(int port, int mode);
 	int sendmessage(const char* ip, int port, SocketBuffer* source);
-	int receivemessage(int len, SocketBuffer*destination, int length_specific = 0);
+	int receivemessage(SocketBuffer*destination);
 	int peekmessage(int size, SocketBuffer*destination) const;
 	static int lasterror();
 	static std::string GetHostIP(const char* address);
@@ -112,7 +112,8 @@ inline Socket::Socket(SOCKET sock) :
 	m_IsConnectionUDP(false),
 	m_DataFormat(0)
 {
-
+	//  Initialize member variable data arrays
+	memset(m_FormatString, 0, 30);
 }
 
 inline Socket::Socket() :
@@ -120,7 +121,8 @@ inline Socket::Socket() :
 	m_IsConnectionUDP(false),
 	m_DataFormat(0)
 {
-
+	//  Initialize member variable data arrays
+	memset(m_FormatString, 0, 30);
 }
 
 inline Socket::~Socket()
@@ -232,77 +234,54 @@ inline int Socket::sendmessage(const char *ip, int port, SocketBuffer *source)
 	return ((size == SOCKET_ERROR) ? -WSAGetLastError() : size);
 }
 
-inline int Socket::receivetext(char*buf, int max)
-{
-	auto len = int(strlen(m_FormatString));
-	if ((max = recv(m_SocketID, buf, max, MSG_PEEK)) != SOCKET_ERROR)
-	{
-		int i, ii;
-		for (i = 0; i < max; i++)
-		{
-			for (ii = 0; ii < len; ii++)
-				if (buf[i + ii] != m_FormatString[ii]) break;
-			if (ii == len)
-				return recv(m_SocketID, buf, i + len, 0);
-		}
-	}
-	return -1;
-}
-
-inline int Socket::receivemessage(int len, SocketBuffer* destination, int length_specific)
+inline int Socket::receivemessage(SocketBuffer* destination)
 {
 	if (m_SocketID < 0) return -1;
-	auto size = -1;
-	char* buff = nullptr;
+	auto packetSize = -1;
+	uint16_t messageDataLength = 0;
+	char* messageBuffer = nullptr;
+
 	if (m_IsConnectionUDP)
 	{
-		size = 8195;
-		MANAGE_MEMORY_NEW("WinsockWrapper", size);
-		buff = new char[size];
-		size = recvfrom(m_SocketID, buff, size, 0, (SOCKADDR *)&SenderAddr, &SenderAddrSize);
+		packetSize = 8195;
+		packetSize = recvfrom(m_SocketID, ReceiveBuffer, packetSize, 0, (SOCKADDR *)&SenderAddr, &SenderAddrSize);
 	}
 	else
 	{
-		if (m_DataFormat == 0 && !len)
+		if ((m_DataFormat == 0))
 		{
-			if (length_specific == 0)
-			{
-				//  Check that 2 bytes have been received, noting the length of the incoming message. Peek the data in case it hasn't fully arrived.
-				if ((size = recv(m_SocketID, (char*)&length_specific, 2, MSG_PEEK)) == SOCKET_ERROR) { return -1; }
-				if (size == 0) { return 0; }
-			}
+			//  Check that 2 byte message precursor has been received, and read from it the length of the incoming message.
+			//  NOTE: Peek the data in case it hasn't fully arrived.
+			if ((packetSize = recv(m_SocketID, (char*)&messageDataLength, 2, MSG_PEEK)) == SOCKET_ERROR) { return -2; }
+			//  If we recieved back a 0 from recv(), this signals a disconnect (a negative number signals no data received)
+			if (packetSize == 0) return 0;
+			//  If the size is not 2, we didn't recieve the entire 2-byte message precursor yet, so cancel out
+			if (packetSize != 2) { return -2; }
 
-			auto buffer_size = length_specific;
-			MANAGE_MEMORY_NEW("WinsockWrapper", buffer_size);
-			buff = new char[buffer_size + 2];
-			if ((size = recv(m_SocketID, buff, buffer_size, MSG_PEEK)) == SOCKET_ERROR) { return -1; } // It is possible that the full data hasn't arrived yet, so peek first
-			size = recv(m_SocketID, buff, buffer_size + 2, 0);
-		}
-		else if (m_DataFormat == 1 && !len)
-		{
-			size = 65536;
-			MANAGE_MEMORY_NEW("WinsockWrapper", size);
-			buff = new char[size];
-			size = receivetext(buff, size);
-		}
-		else if (m_DataFormat == 2 || len > 0)
-		{
-			MANAGE_MEMORY_NEW("WinsockWrapper", len);
-			buff = new char[len];
-			size = recv(m_SocketID, buff, len, 0);
+
+			//  Now that we know how large the message is supposed to be, check if the entire message has arrived before continuing
+			//  NOTE: Peek the data in case it hasn't fully arrived.
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength, MSG_PEEK)) == SOCKET_ERROR) { return -2; }
+			if (packetSize != messageDataLength) return -1;
+			memset(ReceiveBuffer, NULL, sizeof(ReceiveBuffer));
+
+			//  Remove the first two byte precursor now that we know the entire message has arrived and is accessible
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, 2, 0)) == SOCKET_ERROR) { assert(false); return -1; }
+
+			//  Create the necessary buffer and take in the rest of the message from the stack
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength, 0)) == SOCKET_ERROR) { assert(false); return -1; }
 		}
 	}
-	if (size > 0)
+
+	//  If we successfully read data, add it to the destination buffer
+	if (packetSize > 0)
 	{
 		destination->clear();
-		destination->addBuffer(buff + 2, size);
+		destination->addBuffer(ReceiveBuffer, packetSize);
 	}
-	if (buff != nullptr)
-	{
-		MANAGE_MEMORY_DELETE("WinsockWrapper", sizeof(buff));
-		delete[] buff;
-	}
-	return size;
+
+	//  Return the amount of bytes in the received data packet
+	return packetSize;
 }
 
 inline int Socket::peekmessage(int size, SocketBuffer* destination) const
@@ -387,7 +366,7 @@ inline int Socket::SockExit(void)
 inline int Socket::SockStart(void)
 {
 	WSADATA wsaData;
-	WSAStartup(MAKEWORD(1, 1), &wsaData);
+	(void) WSAStartup(MAKEWORD(1, 1), &wsaData);
 	return 1;
 }
 

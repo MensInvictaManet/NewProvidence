@@ -137,11 +137,18 @@ private:
 	std::unordered_map<int, bool> FileChunksToSend;
 	char FilePortionBuffer[FILE_CHUNK_BUFFER_COUNT][FILE_CHUNK_SIZE];
 
+	double TransferStartTime;
+	double TransferTime;
+
 public:
 	//  Accessors & Modifiers
-	inline bool GetFileSendComplete(void) const { return (FilePortionIndex >= FilePortionCount); }
+	inline int GetFileSize() const { return FileSize; }
+	inline bool GetFileTransferComplete(void) const { return (FilePortionIndex >= FilePortionCount); }
 	inline int GetFileTransferState() const { return FileChunkTransferState; }
 	inline void SetFileTransferState(int state) { FileChunkTransferState = (FileChunkSendState)state; }
+	inline float GetPercentageComplete() const { return float(FilePortionIndex * FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT) / float(FileSize); }
+	inline double GetTransferTime() const { return TransferTime; }
+	inline double DetermineFileTransferTime() { return (TransferTime = gameSeconds - TransferStartTime); }
 
 	FileSendTask(std::string fileName, std::string filePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
@@ -150,8 +157,13 @@ public:
 		ConnectionPort(port),
 		FileChunkTransferState(CHUNK_STATE_INITIALIZING),
 		FilePortionIndex(0),
-		LastMessageTime(clock())
+		LastMessageTime(clock()),
+		TransferStartTime(gameSeconds),
+		TransferTime(-1.0)
 	{
+		//  Initialize the file portion buffer
+		memset(FilePortionBuffer, 0, FILE_CHUNK_BUFFER_COUNT *  FILE_CHUNK_SIZE);
+
 		//  Open the file we're sending and ensure the file handler is valid
 		FileStream.open(filePath, std::ios_base::binary);
 		assert(FileStream.good() && !FileStream.bad());
@@ -218,7 +230,7 @@ public:
 	void SendFileChunk()
 	{
 		//  Double-check we're not calling this even though our file send is complete
-		if (GetFileSendComplete()) return;
+		if (GetFileTransferComplete()) return;
 
 		//  If we're pending completion, wait and send completion confirmation only if we've reached the end
 		if (FileChunkTransferState == CHUNK_STATE_PENDING_COMPLETE)
@@ -295,23 +307,26 @@ private:
 	const int ConnectionPort;
 
 	int FilePortionIndex;
-	bool FileDownloadComplete;
+	bool FileTransferComplete;
 
 	int FileChunkCount;
 	int FilePortionCount;
 	std::unordered_map<int, bool> FileChunksToReceive;
 	std::ofstream FileStream;
-	double DownloadTime;
+
+	double TransferStartTime;
+	double TransferTime;
 
 	//  NOTE: The file chunk data buffer is set to a size of FILE_CHUNK_SIZE, which assumes this header is the same on sender and receiver.
 	unsigned char FileChunkDataBuffer[FILE_CHUNK_SIZE];
 
 public:
 	//  Accessors & Modifiers
-	inline int GetFileSize() const					{ return FileSize; }
-	inline bool GetFileDownloadComplete() const		{ return FileDownloadComplete; }
-	inline float GetPercentageComplete() const		{ return float(FilePortionIndex * FileChunkSize * FileChunkBufferSize) / float(FileSize); }
-	inline double GetDownloadTime() const			{ return DownloadTime; }
+	inline int GetFileSize() const { return FileSize; }
+	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
+	inline float GetPercentageComplete() const { return float(FilePortionIndex * FileChunkSize * FileChunkBufferSize) / float(FileSize); }
+	inline double GetTransferTime() const { return TransferTime; }
+	inline double DetermineFileTransferTime() { return (TransferTime = gameSeconds - TransferStartTime); }
 
 	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
 
@@ -333,8 +348,13 @@ public:
 		IPAddress(ipAddress),
 		ConnectionPort(port),
 		FilePortionIndex(0),
-		FileDownloadComplete(false)
+		FileTransferComplete(false),
+		TransferStartTime(gameSeconds),
+		TransferTime(-1.0)
 	{
+		//  Initialize member variable data arrays
+		memset(FileChunkDataBuffer, 0, FILE_CHUNK_SIZE);
+
 		//  Determine the count of file chunks and file portions we'll be receiving
 		FileChunkCount = ((FileSize % FileChunkSize) == 0) ? (FileSize / FileChunkSize) : ((FileSize / FileChunkSize) + 1);
 		FilePortionCount = ((FileChunkCount % FileChunkBufferSize) == 0) ? (FileChunkCount / FileChunkBufferSize) : ((FileChunkCount / FileChunkBufferSize) + 1);
@@ -348,9 +368,6 @@ public:
 		//  Open the temporary file, this time keeping the file handle open for later writing
 		FileStream.open(TempFileName, std::ios_base::binary | std::ios_base::out | std::ios_base::in);
 		assert(FileStream.good() && !FileStream.bad());
-
-		//  Set the download time to the starting seconds (we'll subtract this number from current time when the download finishes)
-		DownloadTime = gameSeconds;
 
 #if FILE_TRANSFER_DEBUGGING
 		debugConsole->AddDebugConsoleLine("FileRecieveTask created!");
@@ -388,8 +405,8 @@ public:
 		chunkChecksum = std::string((char*)winsockWrapper.ReadChars(0, checksumSize), checksumSize);
 		memcpy(FileChunkDataBuffer, winsockWrapper.ReadChars(0, chunkSize), chunkSize);
 
-		//  If the file download is already complete, return out
-		if (FileDownloadComplete) return true;
+		//  If the file transfer is already complete, return out
+		if (FileTransferComplete) return true;
 
 		//  If we're receiving a chunk from a portion other than what we're currently on, return out
 		if (filePortionIndex != FilePortionIndex) return false;
@@ -413,7 +430,12 @@ public:
 	bool CheckFilePortionComplete(int portionIndex)
 	{
 		//  If we are being requested to check a portion we're not on right now, ignore it and return out
-		if (portionIndex != FilePortionIndex) return false;
+		if (portionIndex != FilePortionIndex)
+		{
+			if (portionIndex < FilePortionIndex)
+				SendMessage_FilePortionCompleteConfirmation(portionIndex, SocketID, IPAddress.c_str(), ConnectionPort);
+			return false;
+		}
 
 		//  If there are still chunks we haven't received in this portion, send a list to the server and return out
 		if (FileChunksToReceive.size() != 0)
@@ -425,14 +447,13 @@ public:
 		//  If there are no chunks to receive, send a confirmation that this file portion is complete
 		SendMessage_FilePortionCompleteConfirmation(FilePortionIndex, SocketID, IPAddress.c_str(), ConnectionPort);
 
-		//  Iterate to the next file portion, and if we've completed all portions in the file, complete the download and decrypt the file
+		//  Iterate to the next file portion, and if we've completed all portions in the file, complete the transfer and decrypt the file
 		if (++FilePortionIndex == FilePortionCount)
 		{
-			DownloadTime = gameSeconds - DownloadTime;
-			FileDownloadComplete = true;
+			FileTransferComplete = true;
 			FileStream.close();
 			std::remove(FileName.c_str());
-			std::rename(TempFileName.c_str(), FileName.c_str());
+			(void) std::rename(TempFileName.c_str(), FileName.c_str());
 #if FILE_TRANSFER_DEBUGGING
 			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
 #endif
