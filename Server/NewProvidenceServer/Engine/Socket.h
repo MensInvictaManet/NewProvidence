@@ -237,6 +237,7 @@ inline int Socket::sendmessage(const char *ip, int port, SocketBuffer *source)
 inline int Socket::receivemessage(SocketBuffer* destination)
 {
 	if (m_SocketID < 0) return -1;
+
 	auto packetSize = -1;
 	uint16_t messageDataLength = 0;
 	char* messageBuffer = nullptr;
@@ -256,20 +257,20 @@ inline int Socket::receivemessage(SocketBuffer* destination)
 			//  If we recieved back a 0 from recv(), this signals a disconnect (a negative number signals no data received)
 			if (packetSize == 0) return 0;
 			//  If the size is not 2, we didn't recieve the entire 2-byte message precursor yet, so cancel out
-			if (packetSize != 2) { return -2; }
+			if (packetSize != 2) { return -3; }
 
 
 			//  Now that we know how large the message is supposed to be, check if the entire message has arrived before continuing
 			//  NOTE: Peek the data in case it hasn't fully arrived.
-			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength, MSG_PEEK)) == SOCKET_ERROR) { return -2; }
-			if (packetSize != messageDataLength) return -1;
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength + 2, MSG_PEEK)) == SOCKET_ERROR) { return -4; }
+			if (packetSize != messageDataLength + 2) return -5;
 			memset(ReceiveBuffer, NULL, sizeof(ReceiveBuffer));
 
 			//  Remove the first two byte precursor now that we know the entire message has arrived and is accessible
-			if ((packetSize = recv(m_SocketID, ReceiveBuffer, 2, 0)) == SOCKET_ERROR) { assert(false); return -1; }
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, 2, 0)) == SOCKET_ERROR) { assert(false); return -6; }
 
 			//  Create the necessary buffer and take in the rest of the message from the stack
-			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength, 0)) == SOCKET_ERROR) { assert(false); return -1; }
+			if ((packetSize = recv(m_SocketID, ReceiveBuffer, messageDataLength, 0)) == SOCKET_ERROR) { assert(false); return -7; }
 		}
 	}
 
