@@ -12,6 +12,9 @@
 #define NEW_PROVIDENCE_PORT				2347
 #define MAX_LATEST_UPLOADS_COUNT		7
 
+#define PING_INTERVAL_TIME				5.0
+#define PINGS_BEFORE_DISCONNECT			30
+
 struct HostedFileData
 {
 	std::string FileTitleChecksum;
@@ -26,18 +29,37 @@ struct UserConnection
 	UserConnection() :
 		SocketID(-1),
 		IPAddress(""),
-		PingCount(0),
+		LastPingTime(0.0),
+		LastPingRequest(0.0),
 		InboxCount(0),
-		UserIdentifier(""),
-		Username(""),
-		CurrentStatus(""),
+		UserIdentifier("UNKNOWN ID"),
+		Username("UNKNOWN USER"),
+		CurrentStatus("Not Connected"),
 		UserFileSendTask(nullptr),
 		UserFileReceiveTask(nullptr)
 	{}
 
+	UserConnection(int socketID, std::string ipAddress) :
+		SocketID(socketID),
+		IPAddress(ipAddress),
+		LastPingTime(0.0),
+		LastPingRequest(0.0),
+		InboxCount(0),
+		UserIdentifier("UNKNOWN ID"),
+		Username("UNKNOWN USER"),
+		CurrentStatus("Not Connected"),
+		UserFileSendTask(nullptr),
+		UserFileReceiveTask(nullptr)
+	{}
+
+	inline void UpdatePingTime() { LastPingTime = gameSeconds; UpdatePingRequestTime(); }
+	inline void UpdatePingRequestTime() { LastPingRequest = gameSeconds; }
+	inline void SetStatusIdle(int secondsSinceActive = 0) { CurrentStatus = "Logged In, Idle (last activity " + std::to_string(secondsSinceActive) + " seconds ago)"; }
+
 	int				SocketID;
 	std::string		IPAddress;
-	int				PingCount;
+	double			LastPingTime;
+	double			LastPingRequest;
 
 	int				InboxCount;
 
@@ -53,6 +75,14 @@ struct UserConnection
 
 
 //  Outgoing message send functions
+void SendMessage_PingRequest(UserConnection* user)
+{
+	winsockWrapper.ClearBuffer(0);
+	winsockWrapper.WriteChar(MESSAGE_ID_PING_REQUEST, 0);
+	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT, 0);
+}
+
+
 void SendMessage_LoginResponse(bool success, UserConnection* user)
 {
 	winsockWrapper.ClearBuffer(0);
@@ -212,6 +242,7 @@ private:
 	void RemoveClient(UserConnection* user);
 	void AcceptNewClients(void);
 	void ReceiveMessages(void);
+	void PingConnectedUsers(void);
 	void AttemptUserLogin(UserConnection* user, std::string& username, std::string& password);
 
 	void LoadUserLoginDetails(void);
@@ -287,6 +318,9 @@ void Server::MainProcess(void)
 	// Receive messages
 	ReceiveMessages();
 
+	// Ping connected users
+	PingConnectedUsers();
+
 	//  Send files
 	ContinueFileTransfers();
 }
@@ -305,14 +339,7 @@ void Server::Shutdown(void)
 
 void Server::AddClient(int socketID, std::string ipAddress)
 {
-	auto newConnection = new UserConnection;
-	newConnection->SocketID = socketID;
-	newConnection->IPAddress = ipAddress;
-	newConnection->PingCount = 0;
-	newConnection->UserIdentifier = "User ID Unknown";
-	newConnection->Username = "Username Unknown";
-	newConnection->CurrentStatus = "Not Signed In";
-	newConnection->InboxCount = 0;
+	auto newConnection = new UserConnection(socketID, ipAddress);
 	UserConnectionsList[newConnection] = true;
 	
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
@@ -359,6 +386,9 @@ void Server::ReceiveMessages(void)
 			break;
 		}
 
+		//  Update the last time we heard from this user
+		user->UpdatePingTime();
+
 		char messageID = winsockWrapper.ReadChar(0);
 		switch (messageID)
 		{
@@ -366,7 +396,9 @@ void Server::ReceiveMessages(void)
 		{
 			//  NO DATA
 
-			user->PingCount = 0;
+			user->SetStatusIdle(0);
+			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
+			//  Do nothing, as we've already updated the last ping time of the user
 		}
 		break;
 
@@ -552,6 +584,28 @@ void Server::ReceiveMessages(void)
 }
 
 
+void Server::PingConnectedUsers(void)
+{
+	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)
+	{
+		auto user = (*userIter).first;
+		auto timeSinceLastPing = gameSeconds - user->LastPingTime;
+		auto timeSinceLastRequest = gameSeconds - user->LastPingRequest;
+		if (timeSinceLastRequest < PING_INTERVAL_TIME) continue;
+		if (timeSinceLastPing < PING_INTERVAL_TIME) continue;
+
+		if (timeSinceLastPing > (PINGS_BEFORE_DISCONNECT * PING_INTERVAL_TIME)) RemoveClient(user);
+		else
+		{
+			SendMessage_PingRequest(user);
+			user->UpdatePingRequestTime();
+			user->SetStatusIdle(int(gameSeconds - user->LastPingTime));
+			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
+		}
+	}
+}
+
+
 void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::string& password)
 {
 	//  Lowercase the username and password
@@ -580,7 +634,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	//  Set the user identifier and name
 	user->UserIdentifier = loginDataChecksum;
 	user->Username = username;
-	user->CurrentStatus = "Logged In, Idle";
+	user->SetStatusIdle();
 
 	//  Read the Inbox and Notifications data for the user
 	ReadUserInbox(user);
@@ -870,7 +924,7 @@ void Server::ContinueFileTransfers(void)
 			debugConsole->AddDebugConsoleLine("FileSendTask deleted...");
 #endif
 
-			user->CurrentStatus = "Logged In, Idle";
+			user->SetStatusIdle();
 			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 			break;
 		}
