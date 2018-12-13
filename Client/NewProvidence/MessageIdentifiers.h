@@ -19,3 +19,20 @@ enum MessageIDs
 	MESSAGE_ID_FILE_CHUNKS_REMAINING			= 13,	// File Chunks Remaining (two-way)
 	MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM	= 14,	// File Portion Complete Confirm (two-way)
 };
+
+//  Login Response Identifiers
+enum LoginResponseIdentifiers
+{
+	LOGIN_RESPONSE_SUCCESS = 0,
+	LOGIN_RESPONSE_USERNAME_DOES_NOT_EXIST = 1,
+	LOGIN_RESPONSE_PASSWORD_INCORRECT = 2,
+	LOGIN_RESPONSE_VERSION_NUMBER_INCORRECT = 3
+};
+
+std::string LoginResponses[] = 
+{
+	"Successfully logged in to server!",
+	"Failed to log in to server. Username did not exist. Try again.",
+	"Failed to log in to server. Password was incorrect. Try again.",
+	"Failed to log in to server. Client version was incorrect. Contact admin."
+};

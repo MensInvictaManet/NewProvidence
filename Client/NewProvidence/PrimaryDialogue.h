@@ -168,13 +168,14 @@ void SetTransferPercentage(float percent, double time, int fileSize, bool downlo
 }
 
 
-void LoginRequestResponseCallback(bool success, int inboxCount, int notificationCount)
+void LoginRequestResponseCallback(int response, int inboxCount, int notificationCount)
 {
+	bool success = (response == LOGIN_RESPONSE_SUCCESS);
 	LoginMenuNode->SetVisible(!success);
 	MainProgramUINode->SetVisible(success);
 
 	PasswordEditBox->SetText("");
-	SetStatusBarMessage(success ? "Successfully logged in to server!" : "Failed to log in to server. Try again.", !success);
+	SetStatusBarMessage(LoginResponses[response], !success);
 	SetInboxMessageCount(inboxCount);
 	SetNotificationCount(notificationCount);
 }

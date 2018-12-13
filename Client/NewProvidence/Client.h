@@ -6,6 +6,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
 
+#define VERSION_NUMBER					"2018.12.13"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -21,6 +22,7 @@ void SendMessage_UserLoginRequest(std::vector<unsigned char>& encryptedUsername,
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_USER_LOGIN_REQUEST, 0);
+	winsockWrapper.WriteString(VERSION_NUMBER, 0);
 	winsockWrapper.WriteInt(int(encryptedUsername.size()), 0);
 	winsockWrapper.WriteChars(encryptedUsername.data(), int(encryptedUsername.size()), 0);
 	winsockWrapper.WriteInt(int(encryptedPassword.size()), 0);
@@ -45,7 +47,7 @@ private:
 	FileReceiveTask*	FileReceive = NULL;
 	FileSendTask*		FileSend = NULL;
 
-	std::function<void(bool, int, int)> LoginResponseCallback = nullptr;
+	std::function<void(int, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
@@ -58,7 +60,7 @@ public:
 	~Client()	{ Shutdown(); }
 
 	inline int GetServerSocket(void) const { return ServerSocket; }
-	inline void SetLoginResponseCallback(const std::function<void(bool, int, int)>& callback) { LoginResponseCallback = callback; }
+	inline void SetLoginResponseCallback(const std::function<void(int, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
@@ -182,10 +184,11 @@ bool Client::ReadMessages(void)
 
 	case MESSAGE_ID_USER_LOGIN_RESPONSE:
 	{
-		auto success = bool(winsockWrapper.ReadChar(0));
+		auto response = winsockWrapper.ReadInt(0);
+		bool success = (response == LOGIN_RESPONSE_SUCCESS);
 		auto inboxCount = success ? winsockWrapper.ReadInt(0) : 0;
 		auto notificationCount = success ? winsockWrapper.ReadInt(0) : 0;
-		if (LoginResponseCallback != nullptr) LoginResponseCallback(success, inboxCount, notificationCount);
+		if (LoginResponseCallback != nullptr) LoginResponseCallback(response, inboxCount, notificationCount);
 	}
 	break;
 

@@ -9,6 +9,8 @@
 #include <fstream>
 #include <ctime>
 
+#define VERSION_NUMBER					"2018.12.13"
+
 #define NEW_PROVIDENCE_PORT				2347
 #define MAX_LATEST_UPLOADS_COUNT		7
 
@@ -83,13 +85,13 @@ void SendMessage_PingRequest(UserConnection* user)
 }
 
 
-void SendMessage_LoginResponse(bool success, UserConnection* user)
+void SendMessage_LoginResponse(LoginResponseIdentifiers response, UserConnection* user)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_USER_LOGIN_RESPONSE, 0);
-	winsockWrapper.WriteChar((unsigned char)success, 0);
+	winsockWrapper.WriteInt((int)response, 0);
 
-	if (success)
+	if (response == LOGIN_RESPONSE_SUCCESS)
 	{
 		winsockWrapper.WriteInt(user->InboxCount, 0);
 		winsockWrapper.WriteInt(int(user->NotificationsList.size()), 0);
@@ -305,6 +307,7 @@ bool Server::Initialize(void)
 	//AddHostedFileFromUnencrypted("TestImage5.png", "Test Image 5", "DESCRIPTION5");
 	//AddHostedFileFromUnencrypted("TestImage6.png", "Test Image 6", "DESCRIPTION6");
 	//AddHostedFileFromUnencrypted("TestImage7.png", "Test Image 7", "DESCRIPTION7");
+	//AddHostedFileFromUnencrypted("The Thirteenth Floor (1999 - 1080p).mp4", "The Thirteenth Floor (1999 - 1080p)", "A computer scientist running a virtual reality simulation of 1937 becomes the primary suspect when his colleague and mentor is murdered.");
 
 	return true;
 }
@@ -426,6 +429,9 @@ void Server::ReceiveMessages(void)
 			//  (int) Length of encrypted password (n2)
 			//  (n2-size chars array) Encrypted password
 
+			//  Grab the current client version number to ensure they have the latest version
+			std::string versionString = winsockWrapper.ReadString(0);
+
 			//  Grab the username size and encrypted username, then the password size and encrypted password
 			auto usernameSize = winsockWrapper.ReadInt(0);
 			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
@@ -440,6 +446,12 @@ void Server::ReceiveMessages(void)
 			std::string username = std::string((char*)decryptedUsername.data(), decryptedUsername.size());
 			std::vector<unsigned char> decryptedPassword = Groundfish::Decrypt(encryptedPasswordVector.data());
 			std::string password = std::string((char*)decryptedPassword.data(), decryptedPassword.size());
+
+			if (versionString.compare(VERSION_NUMBER) != 0)
+			{
+				SendMessage_LoginResponse(LOGIN_RESPONSE_VERSION_NUMBER_INCORRECT, user);
+				break;
+			}
 
 			AttemptUserLogin(user, username, password);
 		}
@@ -594,7 +606,11 @@ void Server::PingConnectedUsers(void)
 		if (timeSinceLastRequest < PING_INTERVAL_TIME) continue;
 		if (timeSinceLastPing < PING_INTERVAL_TIME) continue;
 
-		if (timeSinceLastPing > (PINGS_BEFORE_DISCONNECT * PING_INTERVAL_TIME)) RemoveClient(user);
+		if (timeSinceLastPing > (PINGS_BEFORE_DISCONNECT * PING_INTERVAL_TIME))
+		{
+			RemoveClient(user);
+			break;
+		}
 		else
 		{
 			SendMessage_PingRequest(user);
@@ -618,18 +634,18 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	//  If the user does not exist, send a failure message and return out
 	if (UserLoginDetailsList.find(loginDataChecksum) == UserLoginDetailsList.end())
 	{
-		SendMessage_LoginResponse(false, user);
+		SendMessage_LoginResponse(LOGIN_RESPONSE_PASSWORD_INCORRECT, user);
 		return;
 	}
 
 	//  If the username given is already assigned to a connected user, send a failure message and return out
 	if (FindUserByUserID(loginDataChecksum) != nullptr)
 	{
-		SendMessage_LoginResponse(false, user);
+		SendMessage_LoginResponse(LOGIN_RESPONSE_USER_ALREADY_LOGGED_IN, user);
 		return;
 	}
 
-	SendMessage_LoginResponse(true, user);
+	SendMessage_LoginResponse(LOGIN_RESPONSE_SUCCESS, user);
 
 	//  Set the user identifier and name
 	user->UserIdentifier = loginDataChecksum;
