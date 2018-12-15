@@ -9,7 +9,7 @@
 class GUIButton : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUIButtonCallback;
+	typedef std::function<void(GUIObjectNode*)> GUIFunctionCallback;
 
 	static GUIButton* CreateButton(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUIButton* CreateTemplatedButton(const char* buttonTemplate, int x = 0, int y = 0, int w = 0, int h = 0);
@@ -17,9 +17,9 @@ public:
 	explicit GUIButton(bool templated);
 	~GUIButton();
 
-	void SetLeftClickCallback(const GUIButtonCallback& callback) { m_LeftClickCallback = callback; }
-	void SetMiddleClickCallback(const GUIButtonCallback& callback) { m_MiddleClickCallback = callback; }
-	void SetRightClickCallback(const GUIButtonCallback& callback) { m_RightClickCallback = callback; }
+	void SetLeftClickCallback(const GUIFunctionCallback& callback) { m_LeftClickCallback = callback; }
+	void SetMiddleClickCallback(const GUIFunctionCallback& callback) { m_MiddleClickCallback = callback; }
+	void SetRightClickCallback(const GUIFunctionCallback& callback) { m_RightClickCallback = callback; }
 	void SetFont(const Font* font) { m_Font = font; }
 	void SetFont(std::string fontName) { m_Font = fontManager.GetFont(fontName.c_str()); }
 	void SetText(const std::string text) { m_Text = text; }
@@ -29,9 +29,9 @@ public:
 	void Render(int xOffset = 0, int yOffset = 0) override;
 
 private:
-	GUIButtonCallback	m_LeftClickCallback;
-	GUIButtonCallback	m_MiddleClickCallback;
-	GUIButtonCallback	m_RightClickCallback;
+	GUIFunctionCallback	m_LeftClickCallback;
+	GUIFunctionCallback	m_MiddleClickCallback;
+	GUIFunctionCallback	m_RightClickCallback;
 	bool m_Pressed;
 	const Font* m_Font;
 	std::string m_Text;
