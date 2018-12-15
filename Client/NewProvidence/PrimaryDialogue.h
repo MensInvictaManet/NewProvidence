@@ -430,11 +430,12 @@ void PrimaryDialogue::LoadLoginMenu()
 	ConnectedIcon->SetVisible(false);
 	LoginMenuNode->AddChild(ConnectedIcon);
 
-	//  Set enter and tab callbacks on the username and password edit boxes
+	//  Set enter and tab callbacks on the username and password edit boxes, and default to having the username box selected
 	UsernameEditBox->SetTabKeyCallback(TabFromUsernameBoxCallback);
 	PasswordEditBox->SetTabKeyCallback(TabFromPasswordBoxCallback);
 	UsernameEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
 	PasswordEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
+	UsernameEditBox->SetSelected(true);
 }
 
 

@@ -31,7 +31,7 @@ struct UserConnection
 	UserConnection() :
 		SocketID(-1),
 		IPAddress(""),
-		LastPingTime(0.0),
+		LastPingTime(gameSeconds),
 		LastPingRequest(0.0),
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
@@ -44,7 +44,7 @@ struct UserConnection
 	UserConnection(int socketID, std::string ipAddress) :
 		SocketID(socketID),
 		IPAddress(ipAddress),
-		LastPingTime(0.0),
+		LastPingTime(gameSeconds),
 		LastPingRequest(0.0),
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
