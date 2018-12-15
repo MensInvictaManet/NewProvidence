@@ -37,6 +37,20 @@ GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
+void TabFromUsernameBoxCallback(GUIObjectNode* node)
+{
+	if (UsernameEditBox->GetSelected() == false) return;
+	UsernameEditBox->SetSelected(false);
+	PasswordEditBox->SetSelected(true);
+}
+
+void TabFromPasswordBoxCallback(GUIObjectNode* node)
+{
+	if (PasswordEditBox->GetSelected() == false) return;
+	PasswordEditBox->SetSelected(false);
+	UsernameEditBox->SetSelected(true);
+}
+
 void RequestLatestUploadFile(GUIObjectNode* node)
 {
 	auto entry = LatestUploadsListBox->GetSelectedItem();
@@ -407,6 +421,10 @@ void PrimaryDialogue::LoadLoginMenu()
 	ConnectedIcon->SetPosition(230, (int(ScreenHeight) / 2) + (mainLogo->GetHeight() / 2) - 3);
 	ConnectedIcon->SetVisible(false);
 	LoginMenuNode->AddChild(ConnectedIcon);
+
+	//  Set enter and tab callbacks on the username and password edit boxes
+	UsernameEditBox->SetTabKeyCallback(TabFromUsernameBoxCallback);
+	PasswordEditBox->SetTabKeyCallback(TabFromPasswordBoxCallback);
 }
 
 

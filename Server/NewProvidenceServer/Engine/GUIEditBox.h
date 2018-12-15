@@ -8,6 +8,7 @@
 class GUIEditBox : public GUIObjectNode
 {
 public:
+	typedef std::function<void(GUIObjectNode*)> GUIFunctionCallback;
 	enum TextAlignment { ALIGN_LEFT, ALIGN_CENTER };
 
 	static GUIEditBox* CreateEditBox(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
@@ -15,6 +16,9 @@ public:
 
 	explicit GUIEditBox(bool templated);
 	~GUIEditBox();
+
+	void SetEnterKeyCallback(const GUIFunctionCallback& callback) { m_EnterKeyCallback = callback; }
+	void SetTabKeyCallback(const GUIFunctionCallback& callback) { m_TabKeyCallback = callback; }
 
 	inline void SetFont(const Font* font) { m_Font = font; }
 	inline void SetText(const std::string text) { m_Text = text; ResetHiddenText(); }
@@ -29,10 +33,15 @@ public:
 
 	inline void ResetHiddenText() { m_HiddenText.clear(); for (auto i = 0; i < int(m_Text.size()); ++i) m_HiddenText += m_HiddenChar; }
 
+	inline bool GetSelected() const { return m_Selected; }
+	inline void SetSelected(bool selected) { m_Selected = selected; }
+
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
 
 private:
+	GUIFunctionCallback m_EnterKeyCallback;
+	GUIFunctionCallback m_TabKeyCallback;
 	bool m_Selected;
 	const Font* m_Font;
 	std::string m_Text;
@@ -166,6 +175,9 @@ inline void GUIEditBox::Input(int xOffset, int yOffset)
 	//  If selected, take keyboard text input
 	if (m_Selected)
 	{
+		if (inputManager.GetEnter() && m_EnterKeyCallback != nullptr) { m_EnterKeyCallback(this);		inputManager.ResetEnter(InputManager::KEY_STATE_HELD);		return; }
+		if (inputManager.GetTab() && m_TabKeyCallback != nullptr) { m_TabKeyCallback(this);		inputManager.ResetTab(InputManager::KEY_STATE_HELD);		return; }
+
 		if (inputManager.GetBackspace() && !m_Text.empty() && (gameSecondsF - m_LastBackspaceTime >= TIME_BETWEEN_BACKSPACES))
 		{
 			m_Text.erase(--m_Text.end());
