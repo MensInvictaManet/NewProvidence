@@ -45,8 +45,9 @@ public:
 	bool GetKeyDown(int scanCode) const { return (m_KeyStates[scanCode] == 1); }
 	bool GetKeyPressed(int scanCode) const { return (m_KeyStates[scanCode] != 0); }
 	char GetKeyState(int scanCode) const { return m_KeyStates[scanCode]; }
-	char GetBackspace() const { return m_KeyStates[SDL_SCANCODE_BACKSPACE] != 0; }
-	char GetEnter() const { return m_KeyStates[SDL_SCANCODE_RETURN] != 0; }
+	char GetTab() const { return (m_KeyStates[SDL_SCANCODE_TAB] != 0); }
+	bool GetBackspace() const { return (m_KeyStates[SDL_SCANCODE_BACKSPACE] != 0); }
+	bool GetEnter() const { return (m_KeyStates[SDL_SCANCODE_RETURN] != 0); }
 	const std::string& GetKeyboardString() const { return m_KeyboardString; }
 	bool GetIsMouseAutoMoving() const { return (m_MouseTargetPositionSpeedX != 0.0f || m_MouseTargetPositionSpeedY != 0.0f); }
 

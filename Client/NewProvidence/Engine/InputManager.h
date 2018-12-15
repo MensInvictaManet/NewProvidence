@@ -45,8 +45,9 @@ public:
 	bool GetKeyDown(int scanCode) const { return (m_KeyStates[scanCode] == 1); }
 	bool GetKeyPressed(int scanCode) const { return (m_KeyStates[scanCode] != 0); }
 	char GetKeyState(int scanCode) const { return m_KeyStates[scanCode]; }
-	char GetBackspace() const { return m_KeyStates[SDL_SCANCODE_BACKSPACE] != 0; }
-	char GetEnter() const { return m_KeyStates[SDL_SCANCODE_RETURN] != 0; }
+	char GetTab() const { return (m_KeyStates[SDL_SCANCODE_TAB] != 0); }
+	bool GetBackspace() const { return (m_KeyStates[SDL_SCANCODE_BACKSPACE] != 0); }
+	bool GetEnter() const { return (m_KeyStates[SDL_SCANCODE_RETURN] != 0); }
 	const std::string& GetKeyboardString() const { return m_KeyboardString; }
 	bool GetIsMouseAutoMoving() const { return (m_MouseTargetPositionSpeedX != 0.0f || m_MouseTargetPositionSpeedY != 0.0f); }
 
@@ -95,7 +96,7 @@ private:
 inline void InputManager::GetInputForFrame()
 {
 	m_KeyboardString = "";
-	
+
 	SDL_GetMouseState(&m_WindowMouseX, &m_WindowMouseY);
 
 	DetermineMouseClickStates();
@@ -197,7 +198,7 @@ inline void InputManager::AddKeyToString(int key)
 	default:break;
 	}
 
-	
+
 	m_KeyboardString += UCHAR(key);
 }
 
@@ -245,7 +246,7 @@ inline void InputManager::SetSimulatedMouseButtonMiddle(MouseButtonState simulat
 	{
 	default:
 	case MOUSE_BUTTON_UNPRESSED:
-		m_SimulatedMouseButtonMiddle= (m_MouseButtonMiddle == MOUSE_BUTTON_UNPRESSED) ? SIMULATED_MOUSE_UNSIMULATED : ((m_MouseButtonMiddle == MOUSE_BUTTON_PRESSED) ? SIMULATED_MOUSE_BUTTON_UNPRESSED_PRESSED : SIMULATED_MOUSE_BUTTON_UNPRESSED_HELD);
+		m_SimulatedMouseButtonMiddle = (m_MouseButtonMiddle == MOUSE_BUTTON_UNPRESSED) ? SIMULATED_MOUSE_UNSIMULATED : ((m_MouseButtonMiddle == MOUSE_BUTTON_PRESSED) ? SIMULATED_MOUSE_BUTTON_UNPRESSED_PRESSED : SIMULATED_MOUSE_BUTTON_UNPRESSED_HELD);
 		break;
 	case MOUSE_BUTTON_PRESSED:
 	case MOUSE_BUTTON_PRESSED_TAKEN:
