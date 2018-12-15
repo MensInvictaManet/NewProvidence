@@ -37,20 +37,6 @@ GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
-void TabFromUsernameBoxCallback(GUIObjectNode* node)
-{
-	if (UsernameEditBox->GetSelected() == false) return;
-	UsernameEditBox->SetSelected(false);
-	PasswordEditBox->SetSelected(true);
-}
-
-void TabFromPasswordBoxCallback(GUIObjectNode* node)
-{
-	if (PasswordEditBox->GetSelected() == false) return;
-	PasswordEditBox->SetSelected(false);
-	UsernameEditBox->SetSelected(true);
-}
-
 void RequestLatestUploadFile(GUIObjectNode* node)
 {
 	auto entry = LatestUploadsListBox->GetSelectedItem();
@@ -227,6 +213,28 @@ void LoginButtonLeftClickCallback(GUIObjectNode* button)
 	std::vector<unsigned char> encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
 
 	SendMessage_UserLoginRequest(encryptedUsernameVector, encryptedPasswordVector, ClientControl.GetServerSocket());
+}
+
+void TabFromUsernameBoxCallback(GUIObjectNode* node)
+{
+	if (UsernameEditBox->GetSelected() == false) return;
+	UsernameEditBox->SetSelected(false);
+	PasswordEditBox->SetSelected(true);
+}
+
+void TabFromPasswordBoxCallback(GUIObjectNode* node)
+{
+	if (PasswordEditBox->GetSelected() == false) return;
+	PasswordEditBox->SetSelected(false);
+	UsernameEditBox->SetSelected(true);
+}
+
+void EnterFromUsernameOrPasswordBoxCallback(GUIObjectNode* node)
+{
+	if (UsernameEditBox->GetText().length() == 0) return;
+	if (PasswordEditBox->GetText().length() == 0) return;
+
+	LoginButtonLeftClickCallback(nullptr);
 }
 
 
@@ -425,6 +433,8 @@ void PrimaryDialogue::LoadLoginMenu()
 	//  Set enter and tab callbacks on the username and password edit boxes
 	UsernameEditBox->SetTabKeyCallback(TabFromUsernameBoxCallback);
 	PasswordEditBox->SetTabKeyCallback(TabFromPasswordBoxCallback);
+	UsernameEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
+	PasswordEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
 }
 
 
