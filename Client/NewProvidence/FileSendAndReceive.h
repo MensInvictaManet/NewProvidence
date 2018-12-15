@@ -121,6 +121,7 @@ public:
 
 private:
 	const std::string FileName;
+	const std::string FileTitle;
 	const int SocketID;
 	const std::string IPAddress;
 	const int ConnectionPort;
@@ -138,31 +139,32 @@ private:
 	char FilePortionBuffer[FILE_CHUNK_BUFFER_COUNT][FILE_CHUNK_SIZE];
 
 	double TransferStartTime;
-	double TransferTime;
 
 public:
 	//  Accessors & Modifiers
+	inline std::string GetFileName() const { return FileName; }
+	inline std::string GetFileTitle() const { return FileTitle; }
 	inline int GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete(void) const { return (FilePortionIndex >= FilePortionCount); }
 	inline int GetFileTransferState() const { return FileChunkTransferState; }
 	inline void SetFileTransferState(int state) { FileChunkTransferState = (FileChunkSendState)state; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex * FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT) / float(FileSize); }
-	inline double GetTransferTime() const { return TransferTime; }
-	inline double DetermineFileTransferTime() { return (TransferTime = gameSeconds - TransferStartTime); }
+	inline int GetFileTransferBytesCompleted() const { return (FilePortionIndex * FILE_SEND_BUFFER_SIZE); }
+	inline float GetPercentageComplete() const { return float(GetFileTransferBytesCompleted()) / float(FileSize); }
+	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 1.0f))); }
 
-	FileSendTask(std::string fileName, std::string filePath, int socketID, std::string ipAddress, const int port) :
+	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
+		FileTitle(fileTitle),
 		SocketID(socketID),
 		IPAddress(ipAddress),
 		ConnectionPort(port),
 		FileChunkTransferState(CHUNK_STATE_INITIALIZING),
 		FilePortionIndex(0),
 		LastMessageTime(clock()),
-		TransferStartTime(gameSeconds),
-		TransferTime(-1.0)
+		TransferStartTime(gameSeconds)
 	{
 		//  Initialize the file portion buffer
-		memset(FilePortionBuffer, 0, FILE_CHUNK_BUFFER_COUNT *  FILE_CHUNK_SIZE);
+		memset(FilePortionBuffer, 0, FILE_SEND_BUFFER_SIZE);
 
 		//  Open the file we're sending and ensure the file handler is valid
 		FileStream.open(filePath, std::ios_base::binary);
@@ -300,7 +302,7 @@ private:
 	const std::string FileName;
 	const int FileSize;
 	const int FileChunkSize;
-	const int FileChunkBufferSize;
+	const int FileChunkBufferCount;
 	const std::string TempFileName;
 	const int SocketID;
 	const std::string IPAddress;
@@ -315,7 +317,6 @@ private:
 	std::ofstream FileStream;
 
 	double TransferStartTime;
-	double TransferTime;
 
 	//  NOTE: The file chunk data buffer is set to a size of FILE_CHUNK_SIZE, which assumes this header is the same on sender and receiver.
 	unsigned char FileChunkDataBuffer[FILE_CHUNK_SIZE];
@@ -324,9 +325,7 @@ public:
 	//  Accessors & Modifiers
 	inline int GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex * FileChunkSize * FileChunkBufferSize) / float(FileSize); }
-	inline double GetTransferTime() const { return TransferTime; }
-	inline double DetermineFileTransferTime() { return (TransferTime = gameSeconds - TransferStartTime); }
+	inline float GetPercentageComplete() const { return float(FilePortionIndex * FileChunkSize * FileChunkBufferCount) / float(FileSize); }
 
 	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
 
@@ -338,29 +337,28 @@ public:
 		outputFile.close();
 	}
 
-	FileReceiveTask(std::string fileName, const int fileSize, int fileChunkSize, int fileChunkBufferSize, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
+	FileReceiveTask(std::string fileName, const int fileSize, int fileChunkSize, int fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
 		FileSize(fileSize),
 		FileChunkSize(fileChunkSize),
-		FileChunkBufferSize(fileChunkBufferSize),
+		FileChunkBufferCount(fileChunkBufferCount),
 		TempFileName(tempFilePath),
 		SocketID(socketID),
 		IPAddress(ipAddress),
 		ConnectionPort(port),
 		FilePortionIndex(0),
 		FileTransferComplete(false),
-		TransferStartTime(gameSeconds),
-		TransferTime(-1.0)
+		TransferStartTime(gameSeconds)
 	{
 		//  Initialize member variable data arrays
 		memset(FileChunkDataBuffer, 0, FILE_CHUNK_SIZE);
 
 		//  Determine the count of file chunks and file portions we'll be receiving
 		FileChunkCount = ((FileSize % FileChunkSize) == 0) ? (FileSize / FileChunkSize) : ((FileSize / FileChunkSize) + 1);
-		FilePortionCount = ((FileChunkCount % FileChunkBufferSize) == 0) ? (FileChunkCount / FileChunkBufferSize) : ((FileChunkCount / FileChunkBufferSize) + 1);
+		FilePortionCount = ((FileChunkCount % FileChunkBufferCount) == 0) ? (FileChunkCount / FileChunkBufferCount) : ((FileChunkCount / FileChunkBufferCount) + 1);
 
 		//  Reset the FileChunksToReceive list, which we use to confirm we've successfully received all chunks in a file portion
-		ResetChunksToReceiveMap((FileChunkCount > FileChunkBufferSize) ? FileChunkBufferSize : FileChunkCount);
+		ResetChunksToReceiveMap((FileChunkCount > FileChunkBufferCount) ? fileChunkBufferCount : FileChunkCount);
 
 		//  Create a temporary file of the proper size based on the sender's file description
 		CreateTemporaryFile(TempFileName, FileSize);
@@ -419,7 +417,7 @@ public:
 		if (sha256((char*)FileChunkDataBuffer, 1, chunkSize).substr(0, 4) != chunkChecksum) return false;
 
 		//  If the data is new and valid, seek to the appropriate position and write it to the temporary file
-		FileStream.seekp((filePortionIndex * FileChunkSize * FileChunkBufferSize) + (chunkIndex * FileChunkSize));
+		FileStream.seekp((filePortionIndex * FileChunkSize * FileChunkBufferCount) + (chunkIndex * FileChunkSize));
 		FileStream.write((char*)FileChunkDataBuffer, chunkSize);
 
 		//  Remove the chunk index from the list of chunks to receive, and return out
@@ -453,17 +451,17 @@ public:
 			FileTransferComplete = true;
 			FileStream.close();
 			std::remove(FileName.c_str());
-			//(void) std::rename(TempFileName.c_str(), FileName.c_str());
+			(void)std::rename(TempFileName.c_str(), FileName.c_str());
 #if FILE_TRANSFER_DEBUGGING
 			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
 #endif
-			Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
+			//Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
 		}
 		else
 		{
 			//  Reset the chunk list to ensure we're waiting on the right number of chunks for the next portion
-			auto chunksProcessed = FilePortionIndex * FileChunkBufferSize;
-			auto nextChunkCount = (FileChunkCount > (chunksProcessed + FileChunkBufferSize)) ? FileChunkBufferSize : (FileChunkCount - chunksProcessed);
+			auto chunksProcessed = FilePortionIndex * FileChunkBufferCount;
+			auto nextChunkCount = (FileChunkCount > (chunksProcessed + FileChunkBufferCount)) ? FileChunkBufferCount : (FileChunkCount - chunksProcessed);
 			ResetChunksToReceiveMap(nextChunkCount);
 		}
 

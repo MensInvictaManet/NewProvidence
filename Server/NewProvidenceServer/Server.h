@@ -259,6 +259,7 @@ private:
 
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(HostedFileData& fileData, UserConnection* user);
+	void UpdateFileTransferPercentage(UserConnection* user);
 	void SendChatString(const char* chatString);
 
 	inline const std::unordered_map<UserConnection*, bool> GetUserList(void) const { return UserConnectionsList; }
@@ -495,13 +496,13 @@ void Server::ReceiveMessages(void)
 			//  Grab the file size, file chunk size, and buffer count
 			auto fileSize = winsockWrapper.ReadInt(0);
 			auto fileChunkSize = winsockWrapper.ReadInt(0);
-			auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
+			auto fileChunkBufferCount = winsockWrapper.ReadInt(0);
 
 			if (user->UserFileReceiveTask != nullptr) return;
 
 			//  Create a new file receive task
 			(void) _wmkdir(L"_DownloadedFiles");
-			user->UserFileReceiveTask = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
+			user->UserFileReceiveTask = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
 		}
 		break;
 
@@ -585,6 +586,10 @@ void Server::ReceiveMessages(void)
 			if (task->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;
 
 			task->ConfirmFilePortionSendComplete(portionIndex);
+
+			//  Update the user list to reflect if we've updated % of file transferred
+			UpdateFileTransferPercentage(user);
+			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 		}
 		break;
 
@@ -958,10 +963,22 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 	auto fileName = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
 	auto filePath = "./_HostedFiles/" + fileData.FileTitleChecksum + ".hostedfile";
 
+	//  Decrypt the file title
+	auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
+	auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSendTask* newTask = new FileSendTask(fileName, filePath, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
+	FileSendTask* newTask = new FileSendTask(fileName, fileTitle, filePath, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
 	user->UserFileSendTask = newTask;
-	user->CurrentStatus = "Downloading file: " + fileData.FileTitleChecksum;
+	UpdateFileTransferPercentage(user);
+}
+
+
+void Server::UpdateFileTransferPercentage(UserConnection* user)
+{
+	auto fileTitleMD5 = md5(user->UserFileSendTask->GetFileTitle());
+	auto fileData = HostedFileDataList[fileTitleMD5];
+	user->CurrentStatus = "Downloading file " + fileData.FileTitleChecksum + " [" + std::to_string(int(user->UserFileSendTask->GetPercentageComplete() * 100.0f)) + "%, @" + std::to_string(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f) + " KB/s]";
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 
