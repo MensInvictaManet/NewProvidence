@@ -68,7 +68,7 @@ public:
 	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
-	void SendFileToServer(std::string filePath);
+	void SendFileToServer(std::string filePath, std::string fileTitle);
 	void ContinueFileTransfers(void);
 
 	void Initialize(void);
@@ -86,12 +86,12 @@ bool Client::Connect(void)
 	return (ServerSocket >= 0);
 }
 
-void Client::SendFileToServer(std::string filePath)
+void Client::SendFileToServer(std::string filePath, std::string fileTitle)
 {
 	if (FileSend != nullptr) return;
 
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSend = new FileSendTask(filePath, filePath, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+	FileSend = new FileSendTask(filePath, fileTitle, filePath, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 }
 
 void Client::ContinueFileTransfers(void)
@@ -102,7 +102,7 @@ void Client::ContinueFileTransfers(void)
 	//  If we aren't ready to send the file, continue out and wait for a ready signal
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
 
-	FileSend->DetermineFileTransferTime();
+	FileSend->SetFileTransferEndTime(gameSeconds);
 	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), false);
 
 	if (FileSend->GetFileTransferComplete())
@@ -300,7 +300,7 @@ bool Client::ReadMessages(void)
 		(void) _wmkdir(L"_DownloadedFiles");
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
-			FileReceive->DetermineFileTransferTime();
+			FileReceive->SetFileTransferEndTime(gameSecondsF);
 			if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), true);
 
 			if (FileReceive->GetFileTransferComplete())

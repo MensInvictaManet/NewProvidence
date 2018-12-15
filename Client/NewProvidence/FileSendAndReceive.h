@@ -139,6 +139,7 @@ private:
 	char FilePortionBuffer[FILE_CHUNK_BUFFER_COUNT][FILE_CHUNK_SIZE];
 
 	double TransferStartTime;
+	double TransferEndTime;
 
 public:
 	//  Accessors & Modifiers
@@ -150,7 +151,9 @@ public:
 	inline void SetFileTransferState(int state) { FileChunkTransferState = (FileChunkSendState)state; }
 	inline int GetFileTransferBytesCompleted() const { return (FilePortionIndex * FILE_SEND_BUFFER_SIZE); }
 	inline float GetPercentageComplete() const { return float(GetFileTransferBytesCompleted()) / float(FileSize); }
-	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 1.0f))); }
+	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 0.01f))); }
+	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
+	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
 
 	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
@@ -161,7 +164,8 @@ public:
 		FileChunkTransferState(CHUNK_STATE_INITIALIZING),
 		FilePortionIndex(0),
 		LastMessageTime(clock()),
-		TransferStartTime(gameSeconds)
+		TransferStartTime(gameSeconds),
+		TransferEndTime(gameSeconds + 0.1)
 	{
 		//  Initialize the file portion buffer
 		memset(FilePortionBuffer, 0, FILE_SEND_BUFFER_SIZE);
@@ -317,6 +321,7 @@ private:
 	std::ofstream FileStream;
 
 	double TransferStartTime;
+	double TransferEndTime;
 
 	//  NOTE: The file chunk data buffer is set to a size of FILE_CHUNK_SIZE, which assumes this header is the same on sender and receiver.
 	unsigned char FileChunkDataBuffer[FILE_CHUNK_SIZE];
@@ -326,6 +331,8 @@ public:
 	inline int GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
 	inline float GetPercentageComplete() const { return float(FilePortionIndex * FileChunkSize * FileChunkBufferCount) / float(FileSize); }
+	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
+	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
 
 	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
 
@@ -348,7 +355,8 @@ public:
 		ConnectionPort(port),
 		FilePortionIndex(0),
 		FileTransferComplete(false),
-		TransferStartTime(gameSeconds)
+		TransferStartTime(gameSeconds),
+		TransferEndTime(gameSeconds + 0.1)
 	{
 		//  Initialize member variable data arrays
 		memset(FileChunkDataBuffer, 0, FILE_CHUNK_SIZE);

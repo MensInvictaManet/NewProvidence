@@ -978,7 +978,7 @@ void Server::UpdateFileTransferPercentage(UserConnection* user)
 {
 	auto fileTitleMD5 = md5(user->UserFileSendTask->GetFileTitle());
 	auto fileData = HostedFileDataList[fileTitleMD5];
-	user->CurrentStatus = "Downloading file " + fileData.FileTitleChecksum + " [" + std::to_string(int(user->UserFileSendTask->GetPercentageComplete() * 100.0f)) + "%, @" + std::to_string(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f) + " KB/s]";
+	user->CurrentStatus = "Downloading file " + fileData.FileTitleChecksum + " [" + std::to_string(int(user->UserFileSendTask->GetPercentageComplete() * 100.0f)) + "%, @" + std::to_string(int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f)) + " KB/s]";
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 
