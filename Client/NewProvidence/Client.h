@@ -6,7 +6,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
 
-#define VERSION_NUMBER					"2018.12.15"
+#define VERSION_NUMBER					"2018.12.16"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
