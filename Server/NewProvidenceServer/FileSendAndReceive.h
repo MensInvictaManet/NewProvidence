@@ -459,11 +459,11 @@ public:
 			FileTransferComplete = true;
 			FileStream.close();
 			std::remove(FileName.c_str());
-			(void)std::rename(TempFileName.c_str(), FileName.c_str());
+			//(void)std::rename(TempFileName.c_str(), FileName.c_str());
 #if FILE_TRANSFER_DEBUGGING
 			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
 #endif
-			//Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
+			Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
 		}
 		else
 		{
