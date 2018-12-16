@@ -52,7 +52,7 @@ private:
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
-	std::function<void(float, double, int, bool)> TransferPercentCompleteCallback = nullptr;
+	std::function<void(float, double, int, int, bool)> TransferPercentCompleteCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
@@ -65,7 +65,7 @@ public:
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
-	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
+	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
 	void SendFileToServer(std::string filePath, std::string fileTitle);
@@ -103,7 +103,7 @@ void Client::ContinueFileTransfers(void)
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
 
 	FileSend->SetFileTransferEndTime(gameSeconds);
-	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), false);
+	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), 0, false);
 
 	if (FileSend->GetFileTransferComplete())
 	{
@@ -243,8 +243,9 @@ bool Client::ReadMessages(void)
 
 		//  Decrypt using Groundfish and save as the filename
 		auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
-		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size() - 1);
 		auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
+		auto tempFilename = std::string(decryptedFilename) + std::string(".tempfile");
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadInt(0);
@@ -253,7 +254,7 @@ bool Client::ReadMessages(void)
 
 		//  Create a new file receive task
 		(void)_wmkdir(L"_DownloadedFiles");
-		FileReceive = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, "./_DownloadedFiles/_download.tempfile", 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+		FileReceive = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, tempFilename, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 
 		//  Respond to the file request success
 		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback(decryptedFileNamePure);
@@ -301,7 +302,7 @@ bool Client::ReadMessages(void)
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
 			FileReceive->SetFileTransferEndTime(gameSecondsF);
-			if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), true);
+			if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), FileReceive->GetEstimatedSecondsRemaining(), true);
 
 			if (FileReceive->GetFileTransferComplete())
 			{

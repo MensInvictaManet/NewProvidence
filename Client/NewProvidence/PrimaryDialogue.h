@@ -148,7 +148,7 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 }
 
 
-void SetTransferPercentage(float percent, double time, int fileSize, bool download)
+void SetTransferPercentage(float percent, double time, int fileSize, int timeRemaining, bool download)
 {
 	int averageKBs = int((float(fileSize) / 1024.0f) / time);
 
@@ -161,9 +161,13 @@ void SetTransferPercentage(float percent, double time, int fileSize, bool downlo
 	}
 	else
 	{
+		auto minutesRemaining = timeRemaining / 60;
+		auto secondsRemaining = timeRemaining % 60;
+		auto timeString = (minutesRemaining != 0) ? (std::to_string(minutesRemaining) + " minutes") : std::to_string(secondsRemaining) + " seconds";
+
 		StatusBarTransferFill->SetVisible(true);
 		StatusBarTransferFill->SetWidth(int(percent * ScreenWidth));
-		SetStatusBarMessage(transferType + " " + std::to_string(int(percent * 100.0f)) + "% complete...", false);
+		SetStatusBarMessage(transferType + " " + std::to_string(int(percent * 100.0f)) + "% complete (est. " + timeString + " remaining)", false);
 	}
 }
 

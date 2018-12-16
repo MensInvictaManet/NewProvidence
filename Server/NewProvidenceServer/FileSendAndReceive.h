@@ -1,5 +1,6 @@
 #pragma once
 
+#include <thread>
 #include "MessageIdentifiers.h"
 #include "Engine/WinsockWrapper.h"
 
@@ -330,9 +331,14 @@ public:
 	//  Accessors & Modifiers
 	inline int GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex * FileChunkSize * FileChunkBufferCount) / float(FileSize); }
+	inline int GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
+	inline float GetPercentageComplete() const { return float(FilePortionIndex * GetFileSendBufferSize()) / float(FileSize); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
+	inline int GetFileTransferBytesCompleted() const { return (FilePortionIndex * GetFileSendBufferSize()); }
+	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 0.01f))); }
+	inline int GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
+	inline int GetEstimatedSecondsRemaining() const { return int(double(GetFilePortionsRemaining() * GetFileSendBufferSize()) / GetEstimatedTransferSpeed()); }
 
 	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
 
@@ -459,11 +465,12 @@ public:
 			FileTransferComplete = true;
 			FileStream.close();
 			std::remove(FileName.c_str());
-			//(void)std::rename(TempFileName.c_str(), FileName.c_str());
 #if FILE_TRANSFER_DEBUGGING
 			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
 #endif
-			Groundfish::DecryptAndMoveFile(TempFileName, FileName, true);
+
+			std::thread decryptThread(Groundfish::DecryptAndMoveFile, TempFileName, FileName, true);
+			decryptThread.detach();
 		}
 		else
 		{
