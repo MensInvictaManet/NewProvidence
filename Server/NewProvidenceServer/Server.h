@@ -24,10 +24,14 @@ struct HostedFileData
 	std::vector<unsigned char> EncryptedFileTitle;
 	std::vector<unsigned char> EncryptedFileDescription;
 	std::vector<unsigned char> EncryptedUploader;
+	int FileSize;
 };
 
 struct UserConnection
 {
+	enum LoginStatus { LOGIN_STATUS_CONNECTED, LOGIN_STATUS_LOGGED_IN, LOGIN_STATUS_COUNT };
+	const std::string UserStatusStrings[LOGIN_STATUS_COUNT] = { "Connected", "Logged In" };
+
 	UserConnection() :
 		SocketID(-1),
 		IPAddress(""),
@@ -36,7 +40,8 @@ struct UserConnection
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
 		Username("UNKNOWN USER"),
-		CurrentStatus("Not Connected"),
+		LoginStatus(LOGIN_STATUS_CONNECTED),
+		StatusString("Connected"),
 		UserFileSendTask(nullptr),
 		UserFileReceiveTask(nullptr)
 	{}
@@ -49,14 +54,17 @@ struct UserConnection
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
 		Username("UNKNOWN USER"),
-		CurrentStatus("Not Connected"),
+		LoginStatus(LOGIN_STATUS_CONNECTED),
+		StatusString("Connected"),
 		UserFileSendTask(nullptr),
 		UserFileReceiveTask(nullptr)
 	{}
 
 	inline void UpdatePingTime() { LastPingTime = gameSeconds; UpdatePingRequestTime(); }
 	inline void UpdatePingRequestTime() { LastPingRequest = gameSeconds; }
-	inline void SetStatusIdle(int secondsSinceActive = 0) { CurrentStatus = "Logged In, Idle (last activity " + std::to_string(secondsSinceActive) + " seconds ago)"; }
+	inline std::string GetLoginStatusString() const { return UserStatusStrings[LoginStatus]; }
+	inline void SetStatusIdle(int secondsSinceActive = 0) { StatusString = GetLoginStatusString() + ", Idle (last activity " + std::to_string(secondsSinceActive) + " seconds ago)"; }
+	inline void SetStatusDownloading(std::string checksum, float percent, int kbps) { StatusString = "Downloading file " + checksum + " [" + std::to_string(int(percent * 100.0f)) + "% @" + std::to_string(kbps) + " KB/s]"; }
 
 	int				SocketID;
 	std::string		IPAddress;
@@ -67,7 +75,8 @@ struct UserConnection
 
 	std::string		UserIdentifier;
 	std::string		Username;
-	std::string		CurrentStatus;
+	LoginStatus		LoginStatus;
+	std::string		StatusString;
 
 	std::vector<std::string> NotificationsList;
 
@@ -120,7 +129,7 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_LatestUploads(std::vector< std::vector<unsigned char> > latestUploads, UserConnection* user)
+void SendMessage_LatestUploads(std::vector< std::vector<unsigned char> >& latestUploads, UserConnection* user)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
@@ -211,6 +220,7 @@ class Server
 private:
 	int		ServerSocketHandle;
 
+	std::function<void(const std::unordered_map<std::string, HostedFileData >&)> HostedFileListChangedCallback = nullptr;
 	std::function<void(std::unordered_map<UserConnection*, bool>&)> UserConnectionListChangedCallback = nullptr;
 
 	typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char>> UserLoginDetails;
@@ -233,11 +243,15 @@ public:
 
 	~Server() {}
 
+	inline void SetHostedFileListChangedCallback(const std::function<void(const std::unordered_map<std::string, HostedFileData>& hostedFileDataList)>& callback) { HostedFileListChangedCallback = callback; }
 	inline void SetUserConnectionListChangedCallback(const std::function<void(std::unordered_map<UserConnection*, bool>&)>& callback) { UserConnectionListChangedCallback = callback; }
+	inline const std::unordered_map<std::string, HostedFileData>& GetHostedFileDataList() const { return HostedFileDataList; }
 
 	bool Initialize(void);
 	void MainProcess(void);
 	void Shutdown(void);
+
+	void DeleteHostedFile(std::string fileChecksum);
 
 private:
 	void AddClient(int socketID, std::string ipAddress);
@@ -252,8 +266,10 @@ private:
 	void AddUserLoginDetails(std::string username, std::string password);
 
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
+	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
-	void AddLatestUpload(std::vector<unsigned char> newUpload);
+	void AddLatestUpload(std::vector<unsigned char> encryptedTitle);
+	bool RemoveLatestUpload(std::vector<unsigned char> encryptedTitle);
 	void LoadLatestUploadsList(void);
 	void SaveLatestUploadsList(void);
 
@@ -294,21 +310,22 @@ bool Server::Initialize(void)
 
 	//  Load all user login details into an accessible list
 	LoadUserLoginDetails();
-	//AddUserLoginDetails("Drew", "testpass1");
-	//AddUserLoginDetails("Charlie", "testpass2");
-	//AddUserLoginDetails("Emerson", "testpass3");
-	//AddUserLoginDetails("Bex", "testpass4");
+	AddUserLoginDetails("Drew", "testpass");
+	AddUserLoginDetails("Charlie", "testpass");
+	AddUserLoginDetails("Emerson", "testpass");
+	AddUserLoginDetails("Bex", "testpass");
 
 	//  Load the hosted files list
 	LoadHostedFilesData();
-	//AddHostedFileFromUnencrypted("TestImage1.png", "Test Image 1", "DESCRIPTION1");
-	//AddHostedFileFromUnencrypted("TestImage2.png", "Test Image 2", "DESCRIPTION2");
-	//AddHostedFileFromUnencrypted("TestImage3.png", "Test Image 3", "DESCRIPTION3");
-	//AddHostedFileFromUnencrypted("TestImage4.png", "Test Image 4", "DESCRIPTION4");
-	//AddHostedFileFromUnencrypted("TestImage5.png", "Test Image 5", "DESCRIPTION5");
-	//AddHostedFileFromUnencrypted("TestImage6.png", "Test Image 6", "DESCRIPTION6");
-	//AddHostedFileFromUnencrypted("TestImage7.png", "Test Image 7", "DESCRIPTION7");
-	//AddHostedFileFromUnencrypted("The Thirteenth Floor (1999 - 1080p).mp4", "The Thirteenth Floor (1999 - 1080p)", "A computer scientist running a virtual reality simulation of 1937 becomes the primary suspect when his colleague and mentor is murdered.");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage1.png", "Test Image 1", "DESCRIPTION 1");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage2.png", "Test Image 2", "DESCRIPTION 2");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage3.png", "Test Image 3", "DESCRIPTION 3");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage4.png", "Test Image 4", "DESCRIPTION 4");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage5.png", "Test Image 5", "DESCRIPTION 5");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage6.png", "Test Image 6", "DESCRIPTION 6");
+	AddHostedFileFromUnencrypted("_FilesToHost/TestImage7.png", "Test Image 7", "DESCRIPTION 7");
+	AddHostedFileFromUnencrypted("_FilesToHost/The Thirteenth Floor (1999 - 1080p).mp4", "The Thirteenth Floor (1999 - 1080p)", "A computer scientist running a virtual reality simulation of 1937 becomes the primary suspect when his colleague and mentor is murdered.");
+	AddHostedFileFromUnencrypted("_FilesToHost/Purity Ring - Lofticries.mp3", "Purity Ring - Lofticries", "From the album \"Shrines\"");
 
 	return true;
 }
@@ -334,6 +351,28 @@ void Server::Shutdown(void)
 {
 	//  Close out the server socket
 	winsockWrapper.CloseSocket(ServerSocketHandle);
+}
+
+
+void Server::DeleteHostedFile(std::string fileChecksum)
+{
+	//  If the file does not exist, exit out
+	auto iter = HostedFileDataList.find(fileChecksum);
+	assert(iter != HostedFileDataList.end());
+	if (iter == HostedFileDataList.end()) return;
+
+	//  Delete the file from the _HostedFiles folder
+	auto hostedFileName = "_HostedFiles/" + (*iter).first + ".hostedfile";
+	std::remove(hostedFileName.c_str());
+
+	//  Remove the entry from the "Latest Uploads" list
+	auto encryptedTitle = (*iter).second.EncryptedFileTitle;
+	RemoveLatestUpload(encryptedTitle);
+
+	//  Updated the Hosted File Data List
+	HostedFileDataList.erase(iter);
+	SaveHostedFileList();
+	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback(GetHostedFileDataList());
 }
 
 
@@ -655,6 +694,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	//  Set the user identifier and name
 	user->UserIdentifier = loginDataChecksum;
 	user->Username = username;
+	user->LoginStatus = UserConnection::LOGIN_STATUS_LOGGED_IN;
 	user->SetStatusIdle();
 
 	//  Read the Inbox and Notifications data for the user
@@ -671,6 +711,12 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 ////////////////////////////////////////
 void Server::LoadUserLoginDetails(void)
 {
+	//  Open the file as an ofstream to ensure it exists
+	std::ofstream uldFileCreate("UserLoginDetails.data", std::ios_base::app);
+	assert(uldFileCreate.good() && !uldFileCreate.bad());
+	uldFileCreate.close();
+
+	//  Open the file as an ifstream for reading
 	std::ifstream uldFile("UserLoginDetails.data");
 	assert(!uldFile.bad() && uldFile.good());
 
@@ -777,6 +823,10 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	//  Test that the file exists and is readable, and exit out if it is not
 	std::ifstream targetFile(fileToAdd, std::ios_base::binary);
 	if (!targetFile.good() || targetFile.bad()) return;
+	auto fileSize = int(targetFile.tellg());
+	targetFile.seekg(0, std::ios::end);
+	fileSize = int(targetFile.tellg()) - fileSize;
+	targetFile.seekg(0, std::ios::beg);
 	targetFile.close();
 
 	//  Find the file's primary name (no directories)
@@ -794,37 +844,69 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
 	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
 	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
+	newFile.FileSize = fileSize;
 	HostedFileDataList[fileTitleMD5] = newFile;
 
-	//  Add the hosted file data to the HostedFiles.data file and move to the end of it
-	std::ofstream hfFile("HostedFiles.data", std::ios_base::app);
-	assert(!hfFile.bad() && hfFile.good());
+	//  Save the new hosted file data list
+	SaveHostedFileList();
 
-	int md5Length = int(newFile.FileTitleChecksum.length());
-	int encryptedFileNameLength = int(newFile.EncryptedFileName.size());
-	int encryptedFileTitleLength = int(newFile.EncryptedFileTitle.size());
-	int encryptedFileDescLength = int(newFile.EncryptedFileDescription.size());
-	int encryptedFileUploaderLength = int(newFile.EncryptedUploader.size());
+	//  If the file is not already in /_HostedFiles then encrypt it and move it
+	auto hostedFileName = "./_HostedFiles/" + fileTitleMD5 + ".hostedfile";
+	std::ifstream uldFile(hostedFileName);
+	auto fileExists = (!uldFile.bad() && uldFile.good());
+	uldFile.close();
+	if (!fileExists) Groundfish::EncryptAndMoveFile(fileToAdd, hostedFileName);
 
-	//  Write the hosted file data into the file, then close it
-	hfFile.write((const char*)&md5Length, sizeof(md5Length));
-	hfFile.write((const char*)newFile.FileTitleChecksum.c_str(), md5Length);
-	hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
-	hfFile.write((const char*)newFile.EncryptedFileName.data(), encryptedFileNameLength);
-	hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
-	hfFile.write((const char*)newFile.EncryptedFileTitle.data(), encryptedFileTitleLength);
-	hfFile.write((const char*)&encryptedFileDescLength, sizeof(encryptedFileDescLength));
-	hfFile.write((const char*)newFile.EncryptedFileDescription.data(), encryptedFileDescLength);
-	hfFile.write((const char*)&encryptedFileUploaderLength, sizeof(encryptedFileUploaderLength));
-	hfFile.write((const char*)newFile.EncryptedUploader.data(), encryptedFileUploaderLength);
-	hfFile.close();
-
-	Groundfish::EncryptAndMoveFile(fileToAdd, "./_HostedFiles/" + fileTitleMD5 + ".hostedfile");
+	//  Add the hosted file to the latest uploads list
 	AddLatestUpload(newFile.EncryptedFileTitle);
 }
 
+
+void Server::SaveHostedFileList()
+{
+	//  Open the file as an ofstream to ensure it exists
+	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::app);
+	assert(hfFileCreate.good() && !hfFileCreate.bad());
+	hfFileCreate.close();
+
+	//  Open the file as an ifstream for reading
+	std::ofstream hfFile("HostedFiles.data", std::ios_base::trunc);
+	assert(!hfFile.bad() && hfFile.good());
+
+	//  Write the data for all hosted files
+	for (auto iter = HostedFileDataList.begin(); iter != HostedFileDataList.end(); ++iter)
+	{
+		auto fileData = (*iter).second;
+		int md5Length = int(fileData.FileTitleChecksum.length());
+		int encryptedFileNameLength = int(fileData.EncryptedFileName.size());
+		int encryptedFileTitleLength = int(fileData.EncryptedFileTitle.size());
+		int encryptedFileDescLength = int(fileData.EncryptedFileDescription.size());
+		int encryptedFileUploaderLength = int(fileData.EncryptedUploader.size());
+
+		//  Write the hosted file data into the file, then close it
+		hfFile.write((const char*)&md5Length, sizeof(md5Length));
+		hfFile.write((const char*)fileData.FileTitleChecksum.c_str(), md5Length);
+		hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
+		hfFile.write((const char*)fileData.EncryptedFileName.data(), encryptedFileNameLength);
+		hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
+		hfFile.write((const char*)fileData.EncryptedFileTitle.data(), encryptedFileTitleLength);
+		hfFile.write((const char*)&encryptedFileDescLength, sizeof(encryptedFileDescLength));
+		hfFile.write((const char*)fileData.EncryptedFileDescription.data(), encryptedFileDescLength);
+		hfFile.write((const char*)&encryptedFileUploaderLength, sizeof(encryptedFileUploaderLength));
+		hfFile.write((const char*)fileData.EncryptedUploader.data(), encryptedFileUploaderLength);
+	}
+	hfFile.close();
+}
+
+
 void Server::LoadHostedFilesData(void)
 {
+	//  Open the file as an ofstream to ensure it exists
+	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::app);
+	assert(hfFileCreate.good() && !hfFileCreate.bad());
+	hfFileCreate.close();
+
+	//  Open the file as an ifstream for reading
 	std::ifstream hfFile("HostedFiles.data");
 	assert(!hfFile.bad() && hfFile.good());
 
@@ -864,9 +946,25 @@ void Server::LoadHostedFilesData(void)
 		hfFile.read((char*)(&fileUploaderLength), sizeof(fileUploaderLength));
 		hfFile.read((char*)(encryptedFileUploader), fileUploaderLength);
 
+		fileTitleMD5[md5Length] = 0;
+		encryptedFileName[fileNameLength] = 0;
+		encryptedFileTitle[fileTitleLength] = 0;
+		encryptedFileDesc[fileDescLength] = 0;
+		encryptedFileUploader[fileUploaderLength] = 0;
+
 		//  Create a Hosted File Data struct and store it off in memory
 		auto decryptedFileTitle = Groundfish::Decrypt(encryptedFileTitle);
 		auto decryptedFileTitleString = std::string((char*)decryptedFileTitle.data(), decryptedFileTitle.size());
+
+		//  The file should exist if it is in our hosted file data list... so get the hosted file size
+		auto hostedFileName = "_HostedFiles/" + std::string((char*)fileTitleMD5, strlen((char*)fileTitleMD5)) + ".hostedfile";
+		std::ifstream hostedFile(hostedFileName);
+		assert(!hostedFile.bad() && hostedFile.good());
+		auto hostedFileSize = int(hostedFile.tellg());
+		hostedFile.seekg(0, std::ios::end);
+		hostedFileSize = int(hostedFile.tellg()) - hostedFileSize;
+		hostedFile.seekg(0, std::ios::beg);
+		hostedFile.close();
 
 		HostedFileData newFile;
 		newFile.FileTitleChecksum = std::string((char*)fileTitleMD5, md5Length);
@@ -874,21 +972,42 @@ void Server::LoadHostedFilesData(void)
 		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
 		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
 		for (auto i = 0; i < fileUploaderLength; ++i) newFile.EncryptedUploader.push_back(encryptedFileUploader[i]);
+		newFile.FileSize = hostedFileSize;
 		HostedFileDataList[newFile.FileTitleChecksum] = newFile;
 	}
 
 	hfFile.close();
 }
 
-void Server::AddLatestUpload(std::vector<unsigned char> newUpload)
+void Server::AddLatestUpload(std::vector<unsigned char> encryptedTitle)
 {
-	LatestUploadsList.push_back(newUpload);
+	LatestUploadsList.push_back(encryptedTitle);
 	while (LatestUploadsList.size() > MAX_LATEST_UPLOADS_COUNT) LatestUploadsList.erase(LatestUploadsList.begin());
 	SaveLatestUploadsList();
 }
 
+bool Server::RemoveLatestUpload(std::vector<unsigned char> encryptedTitle)
+{
+	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
+	{
+		if ((*iter) == encryptedTitle)
+		{
+			LatestUploadsList.erase(iter);
+			SaveLatestUploadsList();
+			return true;
+		}
+	}
+	return false;
+}
+
 void Server::LoadLatestUploadsList()
 {
+	//  Open the file as an ofstream to ensure it exists
+	std::ofstream lulFileCreate("LatestUploads.data", std::ios_base::app);
+	assert(lulFileCreate.good() && !lulFileCreate.bad());
+	lulFileCreate.close();
+
+	//  Open the file as an ifstream for reading
 	std::ifstream lulFile("LatestUploads.data", std::ios_base::binary);
 	assert(lulFile.good() && !lulFile.bad());
 
@@ -978,7 +1097,7 @@ void Server::UpdateFileTransferPercentage(UserConnection* user)
 {
 	auto fileTitleMD5 = md5(user->UserFileSendTask->GetFileTitle());
 	auto fileData = HostedFileDataList[fileTitleMD5];
-	user->CurrentStatus = "Downloading file " + fileData.FileTitleChecksum + " [" + std::to_string(int(user->UserFileSendTask->GetPercentageComplete() * 100.0f)) + "%, @" + std::to_string(int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f)) + " KB/s]";
+	user->SetStatusDownloading(fileData.FileTitleChecksum, user->UserFileSendTask->GetPercentageComplete(), int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f));
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 

@@ -218,6 +218,7 @@ bool Client::ReadMessages(void)
 		for (auto i = 0; i < latestUploadCount; ++i)
 		{
 			auto size = winsockWrapper.ReadInt(0);
+			assert(size != 0);
 			unsigned char* data = winsockWrapper.ReadChars(0, size);
 			auto decryptedTitle = Groundfish::Decrypt(data);
 			LatestUploadsList.push_back(std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size())));
