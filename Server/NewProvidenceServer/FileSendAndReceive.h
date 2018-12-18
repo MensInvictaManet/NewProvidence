@@ -16,15 +16,21 @@
 #endif
 
 
-void SendMessage_FileSendInitializer(std::string fileName, int fileSize, int socket, const char* ip, const int port)
+void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, int fileSize, int socket, const char* ip, const int port)
 {
-	//  Encrypt the file name string using Groundfish
-	std::vector<unsigned char> encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()) + 1, 0, rand() % 256);
+	//  Encrypt the file name, title, and description string using Groundfish
+	std::vector<unsigned char> encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()), 0, rand() % 256);
+	std::vector<unsigned char> encryptedTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
+	std::vector<unsigned char> encryptedDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
 
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_SEND_INIT, 0);
 	winsockWrapper.WriteInt(int(encryptedFilename.size()), 0);
+	winsockWrapper.WriteInt(int(encryptedTitle.size()), 0);
+	winsockWrapper.WriteInt(int(encryptedDescription.size()), 0);
 	winsockWrapper.WriteChars(encryptedFilename.data(), int(encryptedFilename.size()), 0);
+	winsockWrapper.WriteChars(encryptedTitle.data(), int(encryptedTitle.size()), 0);
+	winsockWrapper.WriteChars(encryptedDescription.data(), int(encryptedDescription.size()), 0);
 	winsockWrapper.WriteInt(fileSize, 0);
 	winsockWrapper.WriteInt(FILE_CHUNK_SIZE, 0);
 	winsockWrapper.WriteInt(FILE_CHUNK_BUFFER_COUNT, 0);
@@ -195,7 +201,7 @@ public:
 #endif
 
 		//  Send a "File Send Initializer" message
-		SendMessage_FileSendInitializer(FileName, FileSize, SocketID, IPAddress.c_str(), ConnectionPort);
+		SendMessage_FileSendInitializer(FileName, FileTitle, "FILE DESCRIPTION", FileSize, SocketID, IPAddress.c_str(), ConnectionPort);
 	}
 
 	~FileSendTask()
@@ -305,6 +311,9 @@ class FileReceiveTask
 {
 private:
 	const std::string FileName;
+	const std::string FileTitle;
+	const std::string FileDescription;
+
 	const int FileSize;
 	const int FileChunkSize;
 	const int FileChunkBufferCount;
@@ -316,6 +325,7 @@ private:
 	int FilePortionIndex;
 	bool FileTransferComplete;
 
+	bool DecryptWhenReceived;
 	int FileChunkCount;
 	int FilePortionCount;
 	std::unordered_map<int, bool> FileChunksToReceive;
@@ -329,6 +339,9 @@ private:
 
 public:
 	//  Accessors & Modifiers
+	inline std::string GetFileName() const { return FileName; }
+	inline std::string GetFileTitle() const { return FileTitle; }
+	inline std::string GetFileDescription() const { return FileDescription; }
 	inline int GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
 	inline int GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
@@ -340,6 +353,7 @@ public:
 	inline int GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
 	inline int GetEstimatedSecondsRemaining() const { return int(double(GetFilePortionsRemaining() * GetFileSendBufferSize()) / GetEstimatedTransferSpeed()); }
 
+	inline void SetDecryptWhenReceived(bool decrypt) { DecryptWhenReceived = decrypt; }
 	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
 
 	inline void CreateTemporaryFile(const std::string tempFileName, const int tempFileSize) const {
@@ -350,8 +364,10 @@ public:
 		outputFile.close();
 	}
 
-	FileReceiveTask(std::string fileName, const int fileSize, int fileChunkSize, int fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
+	FileReceiveTask(std::string fileName, std::string fileTitle, std::string fileDescription, int fileSize, int fileChunkSize, int fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
+		FileTitle(fileTitle),
+		FileDescription(fileDescription),
 		FileSize(fileSize),
 		FileChunkSize(fileChunkSize),
 		FileChunkBufferCount(fileChunkBufferCount),
@@ -382,7 +398,7 @@ public:
 		assert(FileStream.good() && !FileStream.bad());
 
 #if FILE_TRANSFER_DEBUGGING
-		debugConsole->AddDebugConsoleLine("FileRecieveTask created!");
+		debugConsole->AddDebugConsoleLine("File Receive Task created!");
 #endif
 
 		//  Send a signal to the file sender that we're ready to receive the file
@@ -466,11 +482,15 @@ public:
 			FileStream.close();
 			std::remove(FileName.c_str());
 #if FILE_TRANSFER_DEBUGGING
-			debugConsole->AddDebugConsoleLine("FileRecieveTask complete!");
+			debugConsole->AddDebugConsoleLine("File Receive Task complete!");
 #endif
 
-			std::thread decryptThread(Groundfish::DecryptAndMoveFile, TempFileName, FileName, true);
-			decryptThread.detach();
+			if (DecryptWhenReceived)
+			{
+				std::thread decryptThread(Groundfish::DecryptAndMoveFile, TempFileName, FileName, true);
+				decryptThread.detach();
+			}
+			else std::rename(TempFileName.c_str(), FileName.c_str());
 		}
 		else
 		{

@@ -64,3 +64,8 @@
 /Server/NewProvidenceServer/_FilesToHost/UserLoginDetails.data
 /Server/NewProvidenceServer/_FilesToHost
 /Server/NewProvidenceServer/_DownloadedFiles
+/Client/NewProvidence/Release
+/Client/NewProvidence/_FilesToUpload
+/Client/NewProvidence/TestDocument.txt
+/Server/NewProvidenceServer/_UserUploads
+/Server/NewProvidenceServer/Release

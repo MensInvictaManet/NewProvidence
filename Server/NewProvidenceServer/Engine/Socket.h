@@ -254,9 +254,9 @@ inline int Socket::receivemessage(SocketBuffer* destination)
 			//  Check that 2 byte message precursor has been received, and read from it the length of the incoming message.
 			//  NOTE: Peek the data in case it hasn't fully arrived.
 			if ((packetSize = recv(m_SocketID, (char*)&messageDataLength, 2, MSG_PEEK)) == SOCKET_ERROR) { return -2; }
-			//  If we recieved back a 0 from recv(), this signals a disconnect (a negative number signals no data received)
+			//  If we received back a 0 from recv(), this signals a disconnect (a negative number signals no data received)
 			if (packetSize == 0) return 0;
-			//  If the size is not 2, we didn't recieve the entire 2-byte message precursor yet, so cancel out
+			//  If the size is not 2, we didn't receive the entire 2-byte message precursor yet, so cancel out
 			if (packetSize != 2) { return -3; }
 
 

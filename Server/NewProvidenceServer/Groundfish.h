@@ -148,13 +148,19 @@ namespace Groundfish
 
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
 
-		char readByte = 0;
+		int bytesRead = 0;
+		int bytesToRead = 0;
+		unsigned char readArray[1024] = "";
 		while (targetFile.eof() == false)
 		{
-			targetFile.read(&readByte, 1);
-			if (targetFile.eof()) break;
-			readByte = (char)wordList.ReverseWordList[wordIndex++][(unsigned char)readByte];
-			newFile.write((char*)&readByte, 1);
+			bytesToRead = ((fileSize - bytesRead) > 1024) ? 1024 : fileSize - bytesRead;
+			if (bytesToRead <= 0) break;
+			targetFile.read((char*)readArray, bytesToRead);
+			bytesRead += bytesToRead;
+			for (int i = 0; i < bytesToRead; ++i)
+				readArray[i] = (char)wordList.ReverseWordList[wordIndex++][(unsigned char)readArray[i]];
+
+			newFile.write((char*)readArray, bytesToRead);
 		}
 
 		targetFile.close();

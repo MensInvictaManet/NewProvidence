@@ -265,6 +265,7 @@ private:
 	void SaveUserLoginDetails(void);
 	void AddUserLoginDetails(std::string username, std::string password);
 
+	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
@@ -320,10 +321,6 @@ bool Server::Initialize(void)
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage1.png", "Test Image 1", "DESCRIPTION 1");
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage2.png", "Test Image 2", "DESCRIPTION 2");
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage3.png", "Test Image 3", "DESCRIPTION 3");
-	AddHostedFileFromUnencrypted("_FilesToHost/TestImage4.png", "Test Image 4", "DESCRIPTION 4");
-	AddHostedFileFromUnencrypted("_FilesToHost/TestImage5.png", "Test Image 5", "DESCRIPTION 5");
-	AddHostedFileFromUnencrypted("_FilesToHost/TestImage6.png", "Test Image 6", "DESCRIPTION 6");
-	AddHostedFileFromUnencrypted("_FilesToHost/TestImage7.png", "Test Image 7", "DESCRIPTION 7");
 	AddHostedFileFromUnencrypted("_FilesToHost/The Thirteenth Floor (1999 - 1080p).mp4", "The Thirteenth Floor (1999 - 1080p)", "A computer scientist running a virtual reality simulation of 1937 becomes the primary suspect when his colleague and mentor is murdered.");
 	AddHostedFileFromUnencrypted("_FilesToHost/Purity Ring - Lofticries.mp3", "Purity Ring - Lofticries", "From the album \"Shrines\"");
 
@@ -499,7 +496,8 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_REQUEST:
 		{
-			auto fileTitle = std::string(winsockWrapper.ReadString(0));
+			auto fileNameLength = winsockWrapper.ReadInt(0);
+			auto fileTitle = std::string((char*)winsockWrapper.ReadChars(0, fileNameLength), fileNameLength);
 
 			auto hostedFileIdentifier = md5(fileTitle);
 			auto hostedFileIter = HostedFileDataList.find(hostedFileIdentifier);
@@ -526,11 +524,22 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_SEND_INIT:
 		{
-			//  Decrypt the file name using Groundfish and save it off
 			auto fileNameSize = winsockWrapper.ReadInt(0);
+			auto fileTitleSize = winsockWrapper.ReadInt(0);
+			auto fileDescriptionSize = winsockWrapper.ReadInt(0);
+
+			//  Decrypt the file name using Groundfish and save it off
 			auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
 			auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
-			auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
+			auto decryptedFileName = "./_DownloadedFiles/" + decryptedFileNamePure;
+
+			//  Decrypt the file title using Groundfish and save it off
+			auto decryptedFileTitleVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileTitleSize));
+			auto decryptedFileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+
+			//  Decrypt the file description using Groundfish and save it off
+			auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
+			auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
 			//  Grab the file size, file chunk size, and buffer count
 			auto fileSize = winsockWrapper.ReadInt(0);
@@ -541,7 +550,8 @@ void Server::ReceiveMessages(void)
 
 			//  Create a new file receive task
 			(void) _wmkdir(L"_DownloadedFiles");
-			user->UserFileReceiveTask = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
+			user->UserFileReceiveTask = new FileReceiveTask(decryptedFileName, decryptedFileTitle, decryptedFileDescription, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
+			user->UserFileReceiveTask->SetDecryptWhenReceived(false);
 		}
 		break;
 
@@ -576,20 +586,23 @@ void Server::ReceiveMessages(void)
 		case MESSAGE_ID_FILE_PORTION_COMPLETE:
 		{
 			auto portionIndex = winsockWrapper.ReadInt(0);
+			auto fileTask = user->UserFileReceiveTask;
 
-			if (user->UserFileReceiveTask == nullptr)
+			if (fileTask == nullptr)
 			{
 				SendMessage_FilePortionCompleteConfirmation(portionIndex, user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT);
 				break;
 			}
 
 			(void) _wmkdir(L"_DownloadedFiles");
-			if (user->UserFileReceiveTask->CheckFilePortionComplete(portionIndex))
+			if (fileTask->CheckFilePortionComplete(portionIndex))
 			{
 				//if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
 
-				if (user->UserFileReceiveTask->GetFileTransferComplete())
+				if (fileTask->GetFileTransferComplete())
 				{
+					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription());
+
 					delete user->UserFileReceiveTask;
 					user->UserFileReceiveTask = nullptr;
 
@@ -818,6 +831,50 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 	SaveUserLoginDetails();
 }
 
+
+void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
+{
+	//  Test that the file exists and is readable, and exit out if it is not
+	std::ifstream targetFile(fileToAdd, std::ios_base::binary);
+	if (!targetFile.good() || targetFile.bad()) return;
+	auto fileSize = int(targetFile.tellg());
+	targetFile.seekg(0, std::ios::end);
+	fileSize = int(targetFile.tellg()) - fileSize;
+	targetFile.seekg(0, std::ios::beg);
+	targetFile.close();
+
+	//  Find the file's primary name (no directories)
+	std::string pureFileName = fileToAdd;
+	if (fileToAdd.find_last_of('/') != -1) pureFileName = fileToAdd.substr(fileToAdd.find_last_of('/') + 1, fileToAdd.length() - fileToAdd.find_last_of('/') - 1);
+
+	//  If the file already exists in the Hosted File Data List, return out
+	auto fileTitleMD5 = md5(fileTitle);
+	if (HostedFileDataList.find(fileTitleMD5) != HostedFileDataList.end()) return;
+
+	//  Add the hosted file data to the hosted file data list, then save the hosted file data list
+	HostedFileData newFile;
+	newFile.FileTitleChecksum = fileTitleMD5;
+	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
+	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
+	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
+	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
+	newFile.FileSize = fileSize;
+	HostedFileDataList[fileTitleMD5] = newFile;
+	SaveHostedFileList();
+	HostedFileListChangedCallback(HostedFileDataList);
+
+	//  If the file is not already in /_HostedFiles then move it in
+	auto hostedFileName = "./_HostedFiles/" + fileTitleMD5 + ".hostedfile";
+	std::ifstream uldFile(hostedFileName);
+	auto fileExists = (!uldFile.bad() && uldFile.good());
+	uldFile.close();
+	if (!fileExists) std::rename(fileToAdd.c_str(), hostedFileName.c_str());
+
+	//  Add the hosted file to the latest uploads list
+	AddLatestUpload(newFile.EncryptedFileTitle);
+}
+
+
 void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
 {
 	//  Test that the file exists and is readable, and exit out if it is not
@@ -837,7 +894,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	auto fileTitleMD5 = md5(fileTitle);
 	if (HostedFileDataList.find(fileTitleMD5) != HostedFileDataList.end()) return;
 
-	//  Add the hosted file data to the hosted file data list
+	//  Add the hosted file data to the hosted file data list, then save the hosted file data list
 	HostedFileData newFile;
 	newFile.FileTitleChecksum = fileTitleMD5;
 	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
@@ -846,8 +903,6 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
 	newFile.FileSize = fileSize;
 	HostedFileDataList[fileTitleMD5] = newFile;
-
-	//  Save the new hosted file data list
 	SaveHostedFileList();
 
 	//  If the file is not already in /_HostedFiles then encrypt it and move it
@@ -981,6 +1036,10 @@ void Server::LoadHostedFilesData(void)
 
 void Server::AddLatestUpload(std::vector<unsigned char> encryptedTitle)
 {
+	//  If the item already exists in the list, return out
+	for (auto iter = LatestUploadsList.begin(); iter < LatestUploadsList.end(); ++iter)
+		if ((*iter) == encryptedTitle) return;
+
 	LatestUploadsList.push_back(encryptedTitle);
 	while (LatestUploadsList.size() > MAX_LATEST_UPLOADS_COUNT) LatestUploadsList.erase(LatestUploadsList.begin());
 	SaveLatestUploadsList();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include "Groundfish.h"
 #include "Engine/WinsockWrapper.h"
 #include "Engine/SimpleMD5.h"
@@ -35,7 +36,8 @@ void SendMessage_FileRequest(std::string fileID, int socket, const char* ip)
 	//  Send a "File Request" message
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_REQUEST, 0);
-	winsockWrapper.WriteString(fileID.c_str(), 0);
+	winsockWrapper.WriteInt(fileID.length(), 0);
+	winsockWrapper.WriteChars((unsigned char*)fileID.c_str(), fileID.length(), 0);
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
@@ -68,7 +70,9 @@ public:
 	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
-	void SendFileToServer(std::string filePath, std::string fileTitle);
+
+	void DetectFilesInUploadFolder(std::vector<std::string>& fileList);
+	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle);
 	void ContinueFileTransfers(void);
 
 	void Initialize(void);
@@ -86,13 +90,30 @@ bool Client::Connect(void)
 	return (ServerSocket >= 0);
 }
 
-void Client::SendFileToServer(std::string filePath, std::string fileTitle)
+
+void Client::DetectFilesInUploadFolder(std::vector<std::string>& fileList)
+{
+	auto uploadFolderPath = "/_FilesToUpload/";
+	for (const auto& entry : std::filesystem::directory_iterator(uploadFolderPath))
+	{
+		auto path = entry.path().string();
+		fileList.push_back(path);
+	}
+}
+
+
+void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle)
 {
 	if (FileSend != nullptr) return;
 
+	auto titleMD5 = md5(fileTitle);
+	auto hostedFileName = titleMD5 + ".hostedfile";
+	Groundfish::EncryptAndMoveFile(filePath, hostedFileName);
+
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSend = new FileSendTask(filePath, fileTitle, filePath, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 }
+
 
 void Client::ContinueFileTransfers(void)
 {
@@ -241,12 +262,22 @@ bool Client::ReadMessages(void)
 	case MESSAGE_ID_FILE_SEND_INIT:
 	{
 		int fileNameSize = winsockWrapper.ReadInt(0);
+		int fileTitleSize = winsockWrapper.ReadInt(0);
+		int fileDescriptionSize = winsockWrapper.ReadInt(0);
 
-		//  Decrypt using Groundfish and save as the filename
+		//  Decrypt the filename using Groundfish
 		auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
-		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size() - 1);
+		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
 		auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
 		auto tempFilename = std::string(decryptedFilename) + std::string(".tempfile");
+
+		//  Decrypt the filename using Groundfish
+		auto decryptedFileTitleVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileTitleSize));
+		auto decryptedFileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+
+		//  Decrypt the filename using Groundfish
+		auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
+		auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadInt(0);
@@ -255,7 +286,8 @@ bool Client::ReadMessages(void)
 
 		//  Create a new file receive task
 		(void)_wmkdir(L"_DownloadedFiles");
-		FileReceive = new FileReceiveTask(decryptedFilename, fileSize, fileChunkSize, FileChunkBufferSize, tempFilename, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+		FileReceive = new FileReceiveTask(decryptedFilename, decryptedFileTitle, decryptedFileDescription, fileSize, fileChunkSize, FileChunkBufferSize, tempFilename, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+		FileReceive->SetDecryptWhenReceived(true);
 
 		//  Respond to the file request success
 		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback(decryptedFileNamePure);
@@ -283,7 +315,7 @@ bool Client::ReadMessages(void)
 			FileReceive = nullptr;
 
 #if FILE_TRANSFER_DEBUGGING
-			debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+			debugConsole->AddDebugConsoleLine("File Receive Task deleted...");
 #endif
 		}
 	}
@@ -311,7 +343,7 @@ bool Client::ReadMessages(void)
 				FileReceive = nullptr;
 
 #if FILE_TRANSFER_DEBUGGING
-				debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+				debugConsole->AddDebugConsoleLine("File Receive Task deleted...");
 #endif
 				break;
 			}

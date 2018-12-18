@@ -86,7 +86,7 @@ void SetUserMenuOpen(GUIObjectNode* node)
 	//  TODO: Show User Menu in SideBar
 
 	//  DEBUG  //
-	ClientControl.SendFileToServer("TestImage8.png", "Test Image #8");
+	ClientControl.SendFileToServer("TestImage8.png", "TestImage8.png", "Test Image #8");
 	//  DEBUG  //
 }
 
