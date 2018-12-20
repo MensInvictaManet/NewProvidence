@@ -8,8 +8,8 @@ class GUILabel : public GUIObjectNode
 public:
 	enum Justifications { JUSTIFY_LEFT = 0, JUSTIFY_RIGHT, JUSTIFY_CENTER, JUSTIFICATION_COUNT };
 
-	static GUILabel* CreateLabel(const char* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0);
-	static GUILabel* CreateLabel(const Font* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0);
+	static GUILabel* CreateLabel(const char* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0, int justification = JUSTIFY_LEFT);
+	static GUILabel* CreateLabel(const Font* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0, int justification = JUSTIFY_LEFT);
 
 	explicit GUILabel(const char* text = "");
 	~GUILabel();
@@ -30,13 +30,13 @@ private:
 };
 
 
-inline GUILabel* GUILabel::CreateLabel(const char* font, const char* text, int x, int y, int w, int h)
+inline GUILabel* GUILabel::CreateLabel(const char* font, const char* text, int x, int y, int w, int h, int justification)
 {
-	return GUILabel::CreateLabel(fontManager.GetFont(font), text, x, y, w, h);
+	return GUILabel::CreateLabel(fontManager.GetFont(font), text, x, y, w, h, justification);
 }
 
 
-inline GUILabel* GUILabel::CreateLabel(const Font* font, const char* text, int x, int y, int w, int h)
+inline GUILabel* GUILabel::CreateLabel(const Font* font, const char* text, int x, int y, int w, int h, int justification)
 {
 	MANAGE_MEMORY_NEW("MenuUI_Label", sizeof(GUILabel));
 	auto newLabel = new GUILabel(text);
@@ -45,6 +45,7 @@ inline GUILabel* GUILabel::CreateLabel(const Font* font, const char* text, int x
 	newLabel->SetY(y);
 	newLabel->SetWidth(w);
 	newLabel->SetHeight(h);
+	newLabel->SetJustification(justification);
 	return newLabel;
 }
 

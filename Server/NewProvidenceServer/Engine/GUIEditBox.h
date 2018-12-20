@@ -20,6 +20,7 @@ public:
 	void SetEnterKeyCallback(const GUIFunctionCallback& callback) { m_EnterKeyCallback = callback; }
 	void SetTabKeyCallback(const GUIFunctionCallback& callback) { m_TabKeyCallback = callback; }
 
+	inline void SetFont(const char* font) { m_Font = fontManager.GetFont(font); }
 	inline void SetFont(const Font* font) { m_Font = font; }
 	inline void SetText(const std::string text) { m_Text = text; ResetHiddenText(); }
 	inline std::string GetText() const { return m_Text; }
@@ -52,7 +53,7 @@ private:
 	bool m_TextHidden = false;
 	char m_HiddenChar = '*';
 	std::string m_HiddenText;
-
+	
 	TextAlignment m_TextAlignment;
 
 	bool m_Templated;
@@ -175,8 +176,8 @@ inline void GUIEditBox::Input(int xOffset, int yOffset)
 	//  If selected, take keyboard text input
 	if (m_Selected)
 	{
-		if (inputManager.GetEnter() && m_EnterKeyCallback != nullptr) { m_EnterKeyCallback(this);		inputManager.ResetEnter(InputManager::KEY_STATE_HELD);		return; }
-		if (inputManager.GetTab() && m_TabKeyCallback != nullptr) { m_TabKeyCallback(this);		inputManager.ResetTab(InputManager::KEY_STATE_HELD);		return; }
+		if (inputManager.GetEnter() && m_EnterKeyCallback != nullptr)	{ m_EnterKeyCallback(this);		inputManager.ResetEnter(InputManager::KEY_STATE_HELD);		return; }
+		if (inputManager.GetTab() && m_TabKeyCallback != nullptr)		{ m_TabKeyCallback(this);		inputManager.ResetTab(InputManager::KEY_STATE_HELD);		return; }
 
 		if (inputManager.GetBackspace() && !m_Text.empty() && (gameSecondsF - m_LastBackspaceTime >= TIME_BETWEEN_BACKSPACES))
 		{
@@ -237,7 +238,7 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 		//  Render the font the same way regardless of templating
 		if (m_Font != nullptr)
 		{
-			auto textX = (m_TextAlignment == ALIGN_CENTER) ? (x + m_Width / 2) : x;
+			auto textX = (m_TextAlignment == ALIGN_CENTER) ? (x + m_Width / 2) : x + 4;
 			if (!m_Text.empty())
 			{
 				m_Font->RenderText(m_TextHidden ? m_HiddenText.c_str() : m_Text.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true);
@@ -246,7 +247,6 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 			{
 				m_Font->RenderText(m_EmptyText.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true, 1.0f, 1.0f, m_EmptyTextColor);
 			}
-
 		}
 	}
 

@@ -153,6 +153,7 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 		{
 			inputManager.TakeMouseButtonLeft();
 			m_Clicked = true;
+			SetRenderLast(true);
 			UpdateExpandedHeight();
 			return;
 		}
@@ -170,6 +171,7 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 		{
 			ExpandedHeight = 0;
 			m_Clicked = false;
+			SetRenderLast(false);
 			return;
 		}
 	}

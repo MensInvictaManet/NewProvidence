@@ -50,22 +50,25 @@ public:
 	inline void SetObjectName(std::string objectName) { m_ObjectName = objectName; }
 	inline void SetClickX(int clickX) { m_ClickX = clickX; }
 	inline void SetClickY(int clickY) { m_ClickY = clickY; }
+	inline void SetRenderLast(bool last) { m_RenderLast = last; }
 
-	int GetZOrder() const { return m_ZOrder; }
-	int GetX() const { return m_X; }
-	int GetY() const { return m_Y; }
-	int GetWidth() const { return m_Width; }
-	int GetHeight() const { return m_Height; }
-	int GetTextureID() const { return m_TextureID; }
-	TextureAnimation* GetTextureAnimation() const { return m_TextureAnimation; }
-	bool GetVisible() const { return m_Visible; }
+	inline int GetZOrder() const { return m_ZOrder; }
+	inline int GetX() const { return m_X; }
+	inline int GetY() const { return m_Y; }
+	inline int GetWidth() const { return m_Width; }
+	inline int GetHeight() const { return m_Height; }
+	inline int GetTextureID() const { return m_TextureID; }
+	inline TextureAnimation* GetTextureAnimation() const { return m_TextureAnimation; }
+	inline bool GetVisible() const { return m_Visible; }
 	inline const std::string& GetObjectName(void) const { return m_ObjectName; }
-	GUIObjectNode* GetParent() { return m_Parent; }
-	const GUIObjectNode* GetParent() const { return m_Parent; }
-	float getColorR() const { return m_Color.colorValues[0]; }
-	float getColorG() const { return m_Color.colorValues[1]; }
-	float getColorB() const { return m_Color.colorValues[2]; }
-	float getColorA() const { return m_Color.colorValues[3]; }
+	inline GUIObjectNode* GetParent() { return m_Parent; }
+	inline const GUIObjectNode* GetParent() const { return m_Parent; }
+	inline float getColorR() const { return m_Color.colorValues[0]; }
+	inline float getColorG() const { return m_Color.colorValues[1]; }
+	inline float getColorB() const { return m_Color.colorValues[2]; }
+	inline float getColorA() const { return m_Color.colorValues[3]; }
+	inline bool GetRenderLast() const { return m_RenderLast; }
+	
 
 	void AddChild(GUIObjectNode* child);
 	void AddChildSorted(GUIObjectNode* child);
@@ -85,6 +88,7 @@ public:
 	bool m_SetToDestroy;
 	bool m_ExplicitObject;
 	Color m_Color;
+	bool m_RenderLast;
 
 	std::string m_ObjectName;
 	int m_ClickX;
@@ -191,7 +195,17 @@ inline void GUIObjectNode::Render(int xOffset, int yOffset)
 		}
 
 		//  Pass the render call to all children
-		for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(x, y);
+		std::vector<GUIObjectNode*> lastRenders;
+		for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
+		{
+			if ((*iter)->GetRenderLast())
+			{
+				lastRenders.push_back((*iter));
+				continue;
+			}
+			(*iter)->Render(x, y);
+		}
+		for (auto iter = lastRenders.begin(); iter != lastRenders.end(); ++iter) (*iter)->Render(x, y);
 	}
 }
 

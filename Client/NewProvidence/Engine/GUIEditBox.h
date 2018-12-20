@@ -20,6 +20,7 @@ public:
 	void SetEnterKeyCallback(const GUIFunctionCallback& callback) { m_EnterKeyCallback = callback; }
 	void SetTabKeyCallback(const GUIFunctionCallback& callback) { m_TabKeyCallback = callback; }
 
+	inline void SetFont(const char* font) { m_Font = fontManager.GetFont(font); }
 	inline void SetFont(const Font* font) { m_Font = font; }
 	inline void SetText(const std::string text) { m_Text = text; ResetHiddenText(); }
 	inline std::string GetText() const { return m_Text; }
@@ -237,7 +238,7 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 		//  Render the font the same way regardless of templating
 		if (m_Font != nullptr)
 		{
-			auto textX = (m_TextAlignment == ALIGN_CENTER) ? (x + m_Width / 2) : x;
+			auto textX = (m_TextAlignment == ALIGN_CENTER) ? (x + m_Width / 2) : x + 4;
 			if (!m_Text.empty())
 			{
 				m_Font->RenderText(m_TextHidden ? m_HiddenText.c_str() : m_Text.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true);
@@ -246,7 +247,6 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 			{
 				m_Font->RenderText(m_EmptyText.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true, 1.0f, 1.0f, m_EmptyTextColor);
 			}
-				
 		}
 	}
 
