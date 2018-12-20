@@ -86,7 +86,7 @@ void SetUserMenuOpen(GUIObjectNode* node)
 	//  TODO: Show User Menu in SideBar
 
 	//  DEBUG  //
-	ClientControl.SendFileToServer("TestImage8.png", "TestImage8.png", "Test Image #8");
+	ClientControl.SendFileToServer("TestImage8.png", "_FilesToUpload/TestImage8.png", "Test Image #8");
 	//  DEBUG  //
 }
 
@@ -148,9 +148,9 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 }
 
 
-void SetTransferPercentage(float percent, double time, int fileSize, int timeRemaining, bool download)
+void SetTransferPercentage(double percent, double time, long int fileSize, int timeRemaining, bool download)
 {
-	int averageKBs = int((float(fileSize) / 1024.0f) / time);
+	int averageKBs = int((double(fileSize) / 1024.0) / time);
 
 	std::string transferType = (download ? "Download" : "Upload");
 
@@ -166,8 +166,8 @@ void SetTransferPercentage(float percent, double time, int fileSize, int timeRem
 		auto timeString = (minutesRemaining != 0) ? (std::to_string(minutesRemaining) + " minutes") : std::to_string(secondsRemaining) + " seconds";
 
 		StatusBarTransferFill->SetVisible(true);
-		StatusBarTransferFill->SetWidth(int(percent * ScreenWidth));
-		SetStatusBarMessage(transferType + " " + std::to_string(int(percent * 100.0f)) + "% complete (est. " + timeString + " remaining)", false);
+		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
+		SetStatusBarMessage(transferType + " " + std::to_string(int(float(percent) * 100.0f)) + "% complete (est. " + timeString + " remaining)", false);
 	}
 }
 

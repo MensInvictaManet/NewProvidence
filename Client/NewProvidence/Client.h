@@ -7,7 +7,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
 
-#define VERSION_NUMBER					"2018.12.16"
+#define VERSION_NUMBER					"2018.12.19"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -54,7 +54,7 @@ private:
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
-	std::function<void(float, double, int, int, bool)> TransferPercentCompleteCallback = nullptr;
+	std::function<void(double, double, long int, int, bool)> TransferPercentCompleteCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
@@ -67,7 +67,7 @@ public:
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
-	inline void SetTransferPercentCompleteCallback(const std::function<void(float, double, int, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
+	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, long int, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
 
@@ -111,7 +111,7 @@ void Client::SendFileToServer(std::string fileName, std::string filePath, std::s
 	Groundfish::EncryptAndMoveFile(filePath, hostedFileName);
 
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
 }
 
 
@@ -280,9 +280,9 @@ bool Client::ReadMessages(void)
 		auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
 		//  Grab the file size, file chunk size, and buffer count
-		auto fileSize = winsockWrapper.ReadInt(0);
-		auto fileChunkSize = winsockWrapper.ReadInt(0);
-		auto FileChunkBufferSize = winsockWrapper.ReadInt(0);
+		auto fileSize = winsockWrapper.ReadLongInt(0);
+		auto fileChunkSize = winsockWrapper.ReadLongInt(0);
+		auto FileChunkBufferSize = winsockWrapper.ReadLongInt(0);
 
 		//  Create a new file receive task
 		(void)_wmkdir(L"_DownloadedFiles");
@@ -323,7 +323,7 @@ bool Client::ReadMessages(void)
 
 	case MESSAGE_ID_FILE_PORTION_COMPLETE:
 	{
-		auto portionIndex = winsockWrapper.ReadInt(0);
+		auto portionIndex = winsockWrapper.ReadLongInt(0);
 
 		if (FileReceive == nullptr)
 		{
@@ -364,7 +364,7 @@ bool Client::ReadMessages(void)
 
 	case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
 	{
-		auto portionIndex = winsockWrapper.ReadInt(0);
+		auto portionIndex = winsockWrapper.ReadLongInt(0);
 
 		if (FileSend == nullptr) break;
 		if (FileSend->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;

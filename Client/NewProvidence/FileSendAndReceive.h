@@ -16,7 +16,7 @@
 #endif
 
 
-void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, int fileSize, int socket, const char* ip, const int port)
+void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, uint64_t fileSize, int socket, const char* ip, const int port)
 {
 	//  Encrypt the file name, title, and description string using Groundfish
 	std::vector<unsigned char> encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()), 0, rand() % 256);
@@ -31,9 +31,9 @@ void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle
 	winsockWrapper.WriteChars(encryptedFilename.data(), int(encryptedFilename.size()), 0);
 	winsockWrapper.WriteChars(encryptedTitle.data(), int(encryptedTitle.size()), 0);
 	winsockWrapper.WriteChars(encryptedDescription.data(), int(encryptedDescription.size()), 0);
-	winsockWrapper.WriteInt(fileSize, 0);
-	winsockWrapper.WriteInt(FILE_CHUNK_SIZE, 0);
-	winsockWrapper.WriteInt(FILE_CHUNK_BUFFER_COUNT, 0);
+	winsockWrapper.WriteLongInt(fileSize, 0);
+	winsockWrapper.WriteLongInt(FILE_CHUNK_SIZE, 0);
+	winsockWrapper.WriteLongInt(FILE_CHUNK_BUFFER_COUNT, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
 
 #if FILE_TRANSFER_DEBUGGING
@@ -42,29 +42,29 @@ void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle
 }
 
 
-void SendMessage_FileSendChunk(int chunkBufferIndex, int chunkIndex, int chunkSize, unsigned char* buffer, int socket, const char* ip, const int port)
+void SendMessage_FileSendChunk(uint64_t chunkBufferIndex, uint64_t chunkIndex, uint64_t chunkSize, unsigned char* buffer, int socket, const char* ip, const int port)
 {
 	//  Generate the checksum of the buffer to send before it, so the client can confirm the full, unaltered message arrived
-	auto checksum4 = sha256((char*)buffer, 1, chunkSize).substr(0, 4);
+	auto checksum4 = sha256((char*)buffer, 1, int(chunkSize)).substr(0, 4);
 
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION, 0);
-	winsockWrapper.WriteInt(chunkBufferIndex, 0);
-	winsockWrapper.WriteInt(chunkIndex, 0);
-	winsockWrapper.WriteInt(chunkSize, 0);
+	winsockWrapper.WriteLongInt(chunkBufferIndex, 0);
+	winsockWrapper.WriteLongInt(chunkIndex, 0);
+	winsockWrapper.WriteLongInt(chunkSize, 0);
 	winsockWrapper.WriteInt(4, 0);
 	winsockWrapper.WriteChars((unsigned char*)checksum4.c_str(), 4, 0);
-	winsockWrapper.WriteChars(buffer, chunkSize, 0);
+	winsockWrapper.WriteChars(buffer, int(chunkSize), 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
 }
 
 
-void SendMessage_FileTransferPortionComplete(int portionIndex, int socket, const char* ip, const int port)
+void SendMessage_FileTransferPortionComplete(uint64_t portionIndex, int socket, const char* ip, const int port)
 {
 	//  Send a "File Transfer Portion Complete" message
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE, 0);
-	winsockWrapper.WriteInt(portionIndex, 0);
+	winsockWrapper.WriteLongInt(portionIndex, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
 
 #if FILE_TRANSFER_DEBUGGING
@@ -86,12 +86,12 @@ void SendMessage_FileReceiveReady(int socket, const char* ip, const int port)
 }
 
 
-void SendMessage_FilePortionCompleteConfirmation(int portionIndex, int socket, const char* ip, const int port)
+void SendMessage_FilePortionCompleteConfirmation(uint64_t portionIndex, int socket, const char* ip, const int port)
 {
 	//  Send a "File Portion Complete Confirmation" message
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM, 0);
-	winsockWrapper.WriteInt(portionIndex, 0);
+	winsockWrapper.WriteLongInt(portionIndex, 0);
 	winsockWrapper.SendMessagePacket(socket, ip, port, 0);
 
 #if FILE_TRANSFER_DEBUGGING
@@ -100,7 +100,7 @@ void SendMessage_FilePortionCompleteConfirmation(int portionIndex, int socket, c
 }
 
 
-void SendMessage_FileChunksRemaining(std::unordered_map<int, bool>& chunksRemaining, int socket, const char* ip, const int port)
+void SendMessage_FileChunksRemaining(std::unordered_map<uint64_t, bool>& chunksRemaining, int socket, const char* ip, const int port)
 {
 	//  Send a "File Chunks Remaining" message
 	winsockWrapper.ClearBuffer(0);
@@ -129,42 +129,46 @@ public:
 private:
 	const std::string FileName;
 	const std::string FileTitle;
+	const std::string FilePath;
 	const int SocketID;
 	const std::string IPAddress;
 	const int ConnectionPort;
 
 	FileChunkSendState FileChunkTransferState;
-	int FilePortionIndex;
+	uint64_t FilePortionIndex;
 	clock_t LastMessageTime;
 
-	int FileSize;
+	uint64_t FileSize;
 	std::ifstream FileStream;
 
-	int FilePortionCount;
-	int FileChunkCount;
-	std::unordered_map<int, bool> FileChunksToSend;
+	uint64_t FilePortionCount;
+	uint64_t FileChunkCount;
+	std::unordered_map<uint64_t, bool> FileChunksToSend;
 	char FilePortionBuffer[FILE_CHUNK_BUFFER_COUNT][FILE_CHUNK_SIZE];
 
 	double TransferStartTime;
 	double TransferEndTime;
 
+	bool DeleteAfter;
+
 public:
 	//  Accessors & Modifiers
 	inline std::string GetFileName() const { return FileName; }
 	inline std::string GetFileTitle() const { return FileTitle; }
-	inline int GetFileSize() const { return FileSize; }
+	inline uint64_t GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete(void) const { return (FilePortionIndex >= FilePortionCount); }
 	inline int GetFileTransferState() const { return FileChunkTransferState; }
 	inline void SetFileTransferState(int state) { FileChunkTransferState = (FileChunkSendState)state; }
-	inline int GetFileTransferBytesCompleted() const { return (FilePortionIndex * FILE_SEND_BUFFER_SIZE); }
-	inline float GetPercentageComplete() const { return float(GetFileTransferBytesCompleted()) / float(FileSize); }
+	inline uint64_t GetFileTransferBytesCompleted() const { return (FilePortionIndex * FILE_SEND_BUFFER_SIZE); }
+	inline double GetPercentageComplete() const { return (double)(GetFileTransferBytesCompleted()) / (double)(FileSize); }
 	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 0.01f))); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
 
-	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int socketID, std::string ipAddress, const int port) :
+	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int socketID, std::string ipAddress, const int port, bool deleteAfter = false) :
 		FileName(fileName),
 		FileTitle(fileTitle),
+		FilePath(filePath),
 		SocketID(socketID),
 		IPAddress(ipAddress),
 		ConnectionPort(port),
@@ -172,19 +176,20 @@ public:
 		FilePortionIndex(0),
 		LastMessageTime(clock()),
 		TransferStartTime(gameSeconds),
-		TransferEndTime(gameSeconds + 0.1)
+		TransferEndTime(gameSeconds + 0.1),
+		DeleteAfter(deleteAfter)
 	{
 		//  Initialize the file portion buffer
 		memset(FilePortionBuffer, 0, FILE_SEND_BUFFER_SIZE);
 
 		//  Open the file we're sending and ensure the file handler is valid
-		FileStream.open(filePath, std::ios_base::binary);
+		FileStream.open(FilePath, std::ios_base::binary);
 		assert(FileStream.good() && !FileStream.bad());
 
 		//  Determine the size of the file we're sending
-		FileSize = int(FileStream.tellg());
+		FileSize = (uint64_t)(FileStream.tellg());
 		FileStream.seekg(0, std::ios::end);
-		FileSize = int(FileStream.tellg()) - FileSize;
+		FileSize = (uint64_t)(FileStream.tellg()) - FileSize;
 
 		//  Determine the file chunk count and file portion count
 		FileChunkCount = FileSize / FILE_CHUNK_SIZE;
@@ -207,9 +212,11 @@ public:
 	~FileSendTask()
 	{
 		FileStream.close();
+
+		if (DeleteAfter) std::remove(FilePath.c_str());
 	}
 
-	void BufferFilePortion(int filePortionIndex)
+	void BufferFilePortion(uint64_t filePortionIndex)
 	{
 #if FILE_TRANSFER_DEBUGGING
 		debugConsole->AddDebugConsoleLine("FileSendTask: Buffering file portion...");
@@ -271,9 +278,9 @@ public:
 		}
 
 		//  Determine the values needed to access the data (we might need less than the full buffer)
-		auto chunkIndex = (*FileChunksToSend.begin()).first;
-		auto chunkPosition = (FilePortionIndex * FILE_SEND_BUFFER_SIZE) + (FILE_CHUNK_SIZE * chunkIndex);
-		int chunkByteCount = ((chunkPosition + FILE_CHUNK_SIZE) > FileSize) ? (FileSize - chunkPosition) : FILE_CHUNK_SIZE;
+		auto chunkIndex = uint64_t((*FileChunksToSend.begin()).first);
+		auto chunkPosition = uint64_t((FilePortionIndex * FILE_SEND_BUFFER_SIZE) + (FILE_CHUNK_SIZE * chunkIndex));
+		auto chunkByteCount = uint64_t(((chunkPosition + FILE_CHUNK_SIZE) > FileSize) ? (FileSize - chunkPosition) : FILE_CHUNK_SIZE);
 
 		//  Write the chunk buffer index, the index of the chunk, the size of the chunk, and then the chunk data
 		SendMessage_FileSendChunk(FilePortionIndex, chunkIndex, chunkByteCount, (unsigned char*)FilePortionBuffer[chunkIndex], SocketID, IPAddress.c_str(), ConnectionPort);
@@ -290,7 +297,7 @@ public:
 		FileChunkTransferState = CHUNK_STATE_SENDING;
 	}
 
-	void ConfirmFilePortionSendComplete(int portionIndex)
+	void ConfirmFilePortionSendComplete(uint64_t portionIndex)
 	{
 #if FILE_TRANSFER_DEBUGGING
 		debugConsole->AddDebugConsoleLine("FileSendTask ConfirmFilePortionSendComplete");
@@ -314,21 +321,21 @@ private:
 	const std::string FileTitle;
 	const std::string FileDescription;
 
-	const int FileSize;
-	const int FileChunkSize;
-	const int FileChunkBufferCount;
+	const uint64_t FileSize;
+	const uint64_t FileChunkSize;
+	const uint64_t FileChunkBufferCount;
 	const std::string TempFileName;
 	const int SocketID;
 	const std::string IPAddress;
 	const int ConnectionPort;
 
-	int FilePortionIndex;
+	uint64_t FilePortionIndex;
 	bool FileTransferComplete;
 
 	bool DecryptWhenReceived;
-	int FileChunkCount;
-	int FilePortionCount;
-	std::unordered_map<int, bool> FileChunksToReceive;
+	uint64_t FileChunkCount;
+	uint64_t FilePortionCount;
+	std::unordered_map<uint64_t, bool> FileChunksToReceive;
 	std::ofstream FileStream;
 
 	double TransferStartTime;
@@ -342,29 +349,29 @@ public:
 	inline std::string GetFileName() const { return FileName; }
 	inline std::string GetFileTitle() const { return FileTitle; }
 	inline std::string GetFileDescription() const { return FileDescription; }
-	inline int GetFileSize() const { return FileSize; }
+	inline uint64_t GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
-	inline int GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
-	inline float GetPercentageComplete() const { return float(FilePortionIndex * GetFileSendBufferSize()) / float(FileSize); }
+	inline uint64_t GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
+	inline double GetPercentageComplete() const { return double(FilePortionIndex * GetFileSendBufferSize()) / double(FileSize); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
-	inline int GetFileTransferBytesCompleted() const { return (FilePortionIndex * GetFileSendBufferSize()); }
+	inline uint64_t GetFileTransferBytesCompleted() const { return (FilePortionIndex * GetFileSendBufferSize()); }
 	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 0.01f))); }
-	inline int GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
-	inline int GetEstimatedSecondsRemaining() const { return int(double(GetFilePortionsRemaining() * GetFileSendBufferSize()) / GetEstimatedTransferSpeed()); }
+	inline uint64_t GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
+	inline uint64_t GetEstimatedSecondsRemaining() const { return uint64_t(double(GetFilePortionsRemaining() * GetFileSendBufferSize()) / GetEstimatedTransferSpeed()); }
 
 	inline void SetDecryptWhenReceived(bool decrypt) { DecryptWhenReceived = decrypt; }
-	inline void ResetChunksToReceiveMap(int chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < chunkCount; ++i)  FileChunksToReceive[i] = true; }
+	inline void ResetChunksToReceiveMap(uint64_t chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < int(chunkCount); ++i)  FileChunksToReceive[i] = true; }
 
-	inline void CreateTemporaryFile(const std::string tempFileName, const int tempFileSize) const {
+	inline void CreateTemporaryFile(const std::string tempFileName, const uint64_t tempFileSize) const {
 		std::ofstream outputFile(TempFileName, std::ios::binary | std::ios::trunc | std::ios_base::beg);
 		assert(outputFile.good() && !outputFile.bad());
-		outputFile.seekp(FileSize - 1);
+		outputFile.seekp(tempFileSize - 1);
 		outputFile.write("", 1);
 		outputFile.close();
 	}
 
-	FileReceiveTask(std::string fileName, std::string fileTitle, std::string fileDescription, int fileSize, int fileChunkSize, int fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
+	FileReceiveTask(std::string fileName, std::string fileTitle, std::string fileDescription, uint64_t fileSize, uint64_t fileChunkSize, uint64_t fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
 		FileTitle(fileTitle),
 		FileDescription(fileDescription),
@@ -418,20 +425,20 @@ public:
 		std::string chunkChecksum;
 
 		//  Get the file chunk data from the message, as well as a checksum to check it against
-		auto filePortionIndex = winsockWrapper.ReadInt(0);
+		auto filePortionIndex = winsockWrapper.ReadLongInt(0);
 		assert(filePortionIndex >= 0);
 		assert(filePortionIndex <= FilePortionCount);
-		auto chunkIndex = winsockWrapper.ReadInt(0);
+		auto chunkIndex = winsockWrapper.ReadLongInt(0);
 		assert(chunkIndex >= 0);
 		assert(chunkIndex < FILE_CHUNK_BUFFER_COUNT);
-		auto chunkSize = winsockWrapper.ReadInt(0);
+		auto chunkSize = winsockWrapper.ReadLongInt(0);
 		assert(chunkSize >= 0);
 		assert(chunkSize <= FILE_CHUNK_SIZE);
 		auto checksumSize = winsockWrapper.ReadInt(0);
 		assert(checksumSize >= 0);
 		assert(checksumSize == 4);
 		chunkChecksum = std::string((char*)winsockWrapper.ReadChars(0, checksumSize), checksumSize);
-		memcpy(FileChunkDataBuffer, winsockWrapper.ReadChars(0, chunkSize), chunkSize);
+		memcpy(FileChunkDataBuffer, winsockWrapper.ReadChars(0, int(chunkSize)), int(chunkSize));
 
 		//  If the file transfer is already complete, return out
 		if (FileTransferComplete) return true;
@@ -444,7 +451,7 @@ public:
 		if (iter == FileChunksToReceive.end()) return false;
 
 		//  Check the checksum against the data. If they differ, return out
-		if (sha256((char*)FileChunkDataBuffer, 1, chunkSize).substr(0, 4) != chunkChecksum) return false;
+		if (sha256((char*)FileChunkDataBuffer, 1, int(chunkSize)).substr(0, 4) != chunkChecksum) return false;
 
 		//  If the data is new and valid, seek to the appropriate position and write it to the temporary file
 		FileStream.seekp((filePortionIndex * FileChunkSize * FileChunkBufferCount) + (chunkIndex * FileChunkSize));

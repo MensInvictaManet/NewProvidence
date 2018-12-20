@@ -62,6 +62,7 @@ public:
 	int WriteUnsignedShort(unsigned short val, int bufferID);
 	int WriteInt(int val, int bufferID);
 	int WriteUnsignedInt(unsigned int val, int bufferID);
+	int WriteLongInt(uint64_t val, int bufferID);
 	int WriteFloat(float val, int bufferID);
 	int WriteDouble(double val, int bufferID);
 	int WriteString(char* val, int bufferID);
@@ -74,6 +75,7 @@ public:
 	unsigned short ReadUnsignedShort(int bufferID, bool peek = false);
 	int ReadInt(int bufferID, bool peek = false);
 	unsigned int ReadUnsignedInt(int bufferID, bool peek = false);
+	uint64_t ReadLongInt(int bufferID, bool peek = false);
 	float ReadFloat(int bufferID, bool peek = false);
 	double ReadDouble(int bufferID, bool peek = false);
 	char* ReadString(int bufferID, bool peek = false);
@@ -153,7 +155,7 @@ inline void WinsockWrapper::WinsockInitialize(unsigned int bufferCount)
 
 	//  Start up the Winsock library, requesting version 2.2
 	WSADATA wsaData;
-	(void) WSAStartup(MAKEWORD(2, 2), &wsaData);
+	(void)WSAStartup(MAKEWORD(2, 2), &wsaData);
 
 	for (unsigned int i = 0; i < bufferCount; ++i)
 	{
@@ -434,6 +436,12 @@ inline int WinsockWrapper::WriteUnsignedInt(unsigned int val, int bufferID)
 	return ((buffer == nullptr) ? 0 : buffer->writeuint(val));
 }
 
+inline int WinsockWrapper::WriteLongInt(uint64_t val, int bufferID)
+{
+	auto buffer = m_BufferList[bufferID];
+	return ((buffer == nullptr) ? 0 : buffer->writelint(val));
+}
+
 inline int WinsockWrapper::WriteFloat(float val, int bufferID)
 {
 	auto buffer = m_BufferList[bufferID];
@@ -492,6 +500,12 @@ inline unsigned int WinsockWrapper::ReadUnsignedInt(int bufferID, bool peek)
 {
 	auto buffer = m_BufferList[bufferID];
 	return ((buffer == nullptr) ? 0 : buffer->readuint(peek));
+}
+
+inline uint64_t WinsockWrapper::ReadLongInt(int bufferID, bool peek)
+{
+	auto buffer = m_BufferList[bufferID];
+	return ((buffer == nullptr) ? 0 : buffer->readlint(peek));
 }
 
 inline float WinsockWrapper::ReadFloat(int bufferID, bool peek)
@@ -800,10 +814,10 @@ inline int WinsockWrapper::BinaryFileRead(HANDLE hwnd, int size, SocketBuffer* o
 	DWORD bytes_read;
 	MANAGE_MEMORY_NEW("WinsockWrapper", size);
 	auto b = new char[size];
-	(void) ReadFile(hwnd, b, size, &bytes_read, nullptr);
+	(void)ReadFile(hwnd, b, size, &bytes_read, nullptr);
 	out->StreamWrite(b, bytes_read);
 	MANAGE_MEMORY_DELETE("WinsockWrapper", size);
-	delete [] b;
+	delete[] b;
 	return int(bytes_read);
 }
 

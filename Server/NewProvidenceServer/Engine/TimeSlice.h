@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <ctime>
 
 static Uint32 gameTicksUint = 0;
 static Uint32 frameTicksUint = 0;
@@ -41,4 +42,12 @@ inline void DetermineTimeSlice()
 	DetermineAverageFPS(frameSeconds);
 	frameSecondsF = float(frameSeconds);
 	gameSecondsF = float(gameSeconds);
+}
+
+inline std::string GetCurrentTimeString()
+{
+	auto currentTime = time(nullptr);
+	char currentTimeBuffer[64];
+	ctime_s(currentTimeBuffer, sizeof(currentTimeBuffer), &currentTime);
+	return std::string(currentTimeBuffer);
 }

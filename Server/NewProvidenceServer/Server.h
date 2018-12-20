@@ -9,10 +9,11 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2018.12.16"
+#define VERSION_NUMBER					"2018.12.19"
 
 #define NEW_PROVIDENCE_PORT				2347
-#define MAX_LATEST_UPLOADS_COUNT		7
+#define MAX_LATEST_UPLOADS_COUNT		20
+#define LATEST_UPLOADS_SENT_COUNT		5
 
 #define PING_INTERVAL_TIME				5.0
 #define PINGS_BEFORE_DISCONNECT			30
@@ -24,8 +25,173 @@ struct HostedFileData
 	std::vector<unsigned char> EncryptedFileTitle;
 	std::vector<unsigned char> EncryptedFileDescription;
 	std::vector<unsigned char> EncryptedUploader;
-	int FileSize;
+	uint64_t FileSize;
+
+	HostedFileData()
+	{
+		FileTitleChecksum = "";
+		EncryptedFileName.clear();
+		EncryptedFileTitle.clear();
+		EncryptedFileDescription.clear();
+		EncryptedUploader.clear();
+		FileSize = 0;
+	}
+
+	void WriteToFile(std::ofstream& outFile)
+	{
+		//  Write the checksum length
+		int checksumSize = FileTitleChecksum.length();
+		outFile.write((char*)&checksumSize, sizeof(checksumSize));
+
+		//  Write the checksum
+		outFile.write(FileTitleChecksum.c_str(), checksumSize);
+
+		//  Write the encrypted file name length
+		int efnSize = EncryptedFileName.size();
+		outFile.write((char*)&efnSize, sizeof(efnSize));
+
+		//  Write the encrypted file name
+		outFile.write((char*)EncryptedFileName.data(), efnSize);
+
+		//  Write the encrypted file title length
+		int eftSize = EncryptedFileTitle.size();
+		outFile.write((char*)&eftSize, sizeof(eftSize));
+
+		//  Write the encrypted file title
+		outFile.write((char*)EncryptedFileTitle.data(), eftSize);
+
+		//  Write the encrypted file description length
+		int efdSize = EncryptedFileDescription.size();
+		outFile.write((char*)&efdSize, sizeof(efdSize));
+
+		//  Write the encrypted file description
+		outFile.write((char*)EncryptedFileDescription.data(), efdSize);
+
+		//  Write the encrypted file uploader length
+		int efuSize = EncryptedUploader.size();
+		outFile.write((char*)&efuSize, sizeof(efuSize));
+
+		//  Write the encrypted file uploader
+		outFile.write((char*)EncryptedUploader.data(), efuSize);
+
+		//  Write the file size
+		outFile.write((char*)&FileSize, sizeof(FileSize));
+	}
+
+	bool ReadFromFile(std::ifstream& inFile)
+	{
+		//  Read the checksum length
+		int checksumSize;
+		inFile.read((char*)&checksumSize, sizeof(checksumSize));
+		if (inFile.eof()) return false;
+
+		//  Read the checksum
+		char readInData[512];
+		inFile.read(readInData, checksumSize);
+		FileTitleChecksum = std::string(readInData, checksumSize);
+
+		//  Read the encrypted file name length
+		int efnSize;
+		inFile.read((char*)&efnSize, sizeof(efnSize));
+
+		//  Read the encrypted file name
+		inFile.read(readInData, efnSize);
+		for (auto i = 0; i < efnSize; ++i) EncryptedFileName.push_back((unsigned char)readInData[i]);
+
+		//  Read the encrypted file title length
+		int eftSize;
+		inFile.read((char*)&eftSize, sizeof(eftSize));
+
+		//  Read the encrypted file title
+		inFile.read(readInData, eftSize);
+		for (auto i = 0; i < eftSize; ++i) EncryptedFileTitle.push_back((unsigned char)readInData[i]);
+
+		//  Read the encrypted file description length
+		int efdSize;
+		inFile.read((char*)&efdSize, sizeof(efdSize));
+
+		//  Read the encrypted file name
+		inFile.read(readInData, efdSize);
+		for (auto i = 0; i < efdSize; ++i) EncryptedFileDescription.push_back((unsigned char)readInData[i]);
+
+		//  Read the encrypted file uploader length
+		int efuSize;
+		inFile.read((char*)&efuSize, sizeof(efuSize));
+
+		//  Read the encrypted file uploader
+		inFile.read(readInData, efuSize);
+		for (auto i = 0; i < efuSize; ++i) EncryptedUploader.push_back((unsigned char)readInData[i]);
+
+		inFile.read((char*)&FileSize, sizeof(FileSize));
+
+		return true;
+	}
 };
+
+
+std::unordered_map<std::string, HostedFileData> HostedFileDataList;
+
+struct LatestUploadEntry
+{
+	std::string FileTitleChecksum;
+	std::string TimeAdded;
+	std::vector<unsigned char> EncryptedTitle;
+
+	LatestUploadEntry(std::string titleChecksum, std::string timeAdded) : FileTitleChecksum(titleChecksum), TimeAdded(timeAdded)
+	{
+		EncryptedTitle.clear();
+	}
+
+	void WriteToFile(std::ofstream& outFile)
+	{
+		//  Write the checksum length
+		int checksumSize = FileTitleChecksum.length();
+		outFile.write((char*)&checksumSize, sizeof(checksumSize));
+
+		//  Write the checksum
+		outFile.write(FileTitleChecksum.c_str(), checksumSize);
+
+		//  Write the time length
+		int timeSize = TimeAdded.length();
+		outFile.write((char*)&timeSize, sizeof(timeSize));
+
+		//  Write the time
+		outFile.write(TimeAdded.c_str(), timeSize);
+	}
+
+	bool ReadFromFile(std::ifstream& inFile)
+	{
+		//  Read the checksum length
+		int checksumSize;
+		inFile.read((char*)&checksumSize, sizeof(checksumSize));
+		if (inFile.eof()) return false;
+
+		//  Read the checksum
+		char readInData[512];
+		inFile.read(readInData, checksumSize);
+		FileTitleChecksum = std::string(readInData, checksumSize);
+
+		//  Read the time length
+		int timeSize;
+		inFile.read((char*)&timeSize, sizeof(timeSize));
+
+		//  Read the time
+		inFile.read(readInData, timeSize);
+		TimeAdded = std::string(readInData, timeSize);
+
+		//  With the checksum, grab the encrypted title
+		assert(HostedFileDataList.find(FileTitleChecksum) != HostedFileDataList.end());
+		EncryptedTitle = HostedFileDataList[FileTitleChecksum].EncryptedFileTitle;
+
+		return true;
+	}
+};
+
+bool CompareLatestUploads(const LatestUploadEntry& first, const LatestUploadEntry& second)
+{
+	auto comparison = first.TimeAdded.compare(second.TimeAdded);
+	return (comparison == 1);
+}
 
 struct UserConnection
 {
@@ -129,16 +295,20 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_LatestUploads(std::vector< std::vector<unsigned char> >& latestUploads, UserConnection* user)
+void SendMessage_LatestUploads(std::list<LatestUploadEntry>& latestUploads, UserConnection* user)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
-	winsockWrapper.WriteInt(int(latestUploads.size()), 0);
+
+	int listSize = std::min(int(latestUploads.size()), LATEST_UPLOADS_SENT_COUNT);
+	winsockWrapper.WriteInt(listSize, 0);
 
 	for (auto iter = latestUploads.begin(); iter != latestUploads.end(); ++iter)
 	{
-		winsockWrapper.WriteInt(int((*iter).size()), 0);
-		winsockWrapper.WriteChars((*iter).data(), int((*iter).size()), 0);
+		if (--listSize < 0) break;
+		auto title = (*iter).EncryptedTitle;
+		winsockWrapper.WriteInt(int(title.size()), 0);
+		winsockWrapper.WriteChars(title.data(), int(title.size()), 0);
 	}
 
 	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT, 0);
@@ -225,9 +395,8 @@ private:
 
 	typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char>> UserLoginDetails;
 	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
-	std::unordered_map<std::string, HostedFileData> HostedFileDataList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
-	std::vector< std::vector<unsigned char> > LatestUploadsList;
+	std::list<LatestUploadEntry> LatestUploadsList;
 
 	inline UserConnection* FindUserByUserID(std::string userID)
 	{
@@ -269,8 +438,8 @@ private:
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
-	void AddLatestUpload(std::vector<unsigned char> encryptedTitle);
-	bool RemoveLatestUpload(std::vector<unsigned char> encryptedTitle);
+	void AddLatestUpload(std::string fileTitleChecksum, std::string currentTime = GetCurrentTimeString());
+	bool RemoveLatestUpload(std::string fileTitleChecksum);
 	void LoadLatestUploadsList(void);
 	void SaveLatestUploadsList(void);
 
@@ -306,18 +475,22 @@ bool Server::Initialize(void)
 	(void) _wmkdir(L"_UserNotifications");
 	(void) _wmkdir(L"_HostedFiles");
 
+	//  Load the hosted files list
+	LoadHostedFilesData();
+
 	//  Load the list of latest uploads to the server
 	LoadLatestUploadsList();
 
 	//  Load all user login details into an accessible list
 	LoadUserLoginDetails();
+	
+	//  Add default test users if they aren't already on the list
 	AddUserLoginDetails("Drew", "testpass");
 	AddUserLoginDetails("Charlie", "testpass");
 	AddUserLoginDetails("Emerson", "testpass");
 	AddUserLoginDetails("Bex", "testpass");
 
-	//  Load the hosted files list
-	LoadHostedFilesData();
+	//  Load the default hosted files if they aren't already loaded
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage1.png", "Test Image 1", "DESCRIPTION 1");
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage2.png", "Test Image 2", "DESCRIPTION 2");
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage3.png", "Test Image 3", "DESCRIPTION 3");
@@ -363,8 +536,7 @@ void Server::DeleteHostedFile(std::string fileChecksum)
 	std::remove(hostedFileName.c_str());
 
 	//  Remove the entry from the "Latest Uploads" list
-	auto encryptedTitle = (*iter).second.EncryptedFileTitle;
-	RemoveLatestUpload(encryptedTitle);
+	RemoveLatestUpload(fileChecksum);
 
 	//  Updated the Hosted File Data List
 	HostedFileDataList.erase(iter);
@@ -542,9 +714,9 @@ void Server::ReceiveMessages(void)
 			auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
 			//  Grab the file size, file chunk size, and buffer count
-			auto fileSize = winsockWrapper.ReadInt(0);
-			auto fileChunkSize = winsockWrapper.ReadInt(0);
-			auto fileChunkBufferCount = winsockWrapper.ReadInt(0);
+			auto fileSize = winsockWrapper.ReadLongInt(0);
+			auto fileChunkSize = winsockWrapper.ReadLongInt(0);
+			auto fileChunkBufferCount = winsockWrapper.ReadLongInt(0);
 
 			if (user->UserFileReceiveTask != nullptr) return;
 
@@ -630,7 +802,7 @@ void Server::ReceiveMessages(void)
 
 		case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
 		{
-			auto portionIndex = winsockWrapper.ReadInt(0);
+			auto portionIndex = winsockWrapper.ReadLongInt(0);
 
 			auto task = user->UserFileSendTask;
 			if (task == nullptr) break;
@@ -871,7 +1043,7 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	if (!fileExists) std::rename(fileToAdd.c_str(), hostedFileName.c_str());
 
 	//  Add the hosted file to the latest uploads list
-	AddLatestUpload(newFile.EncryptedFileTitle);
+	AddLatestUpload(fileTitleMD5);
 }
 
 
@@ -913,43 +1085,25 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	if (!fileExists) Groundfish::EncryptAndMoveFile(fileToAdd, hostedFileName);
 
 	//  Add the hosted file to the latest uploads list
-	AddLatestUpload(newFile.EncryptedFileTitle);
+	AddLatestUpload(fileTitleMD5);
 }
 
 
 void Server::SaveHostedFileList()
 {
 	//  Open the file as an ofstream to ensure it exists
-	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::app);
+	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::binary | std::ios_base::app);
 	assert(hfFileCreate.good() && !hfFileCreate.bad());
 	hfFileCreate.close();
 
 	//  Open the file as an ifstream for reading
-	std::ofstream hfFile("HostedFiles.data", std::ios_base::trunc);
+	std::ofstream hfFile("HostedFiles.data", std::ios_base::binary | std::ios_base::trunc);
 	assert(!hfFile.bad() && hfFile.good());
 
 	//  Write the data for all hosted files
 	for (auto iter = HostedFileDataList.begin(); iter != HostedFileDataList.end(); ++iter)
-	{
-		auto fileData = (*iter).second;
-		int md5Length = int(fileData.FileTitleChecksum.length());
-		int encryptedFileNameLength = int(fileData.EncryptedFileName.size());
-		int encryptedFileTitleLength = int(fileData.EncryptedFileTitle.size());
-		int encryptedFileDescLength = int(fileData.EncryptedFileDescription.size());
-		int encryptedFileUploaderLength = int(fileData.EncryptedUploader.size());
+		(*iter).second.WriteToFile(hfFile);
 
-		//  Write the hosted file data into the file, then close it
-		hfFile.write((const char*)&md5Length, sizeof(md5Length));
-		hfFile.write((const char*)fileData.FileTitleChecksum.c_str(), md5Length);
-		hfFile.write((const char*)&encryptedFileNameLength, sizeof(encryptedFileNameLength));
-		hfFile.write((const char*)fileData.EncryptedFileName.data(), encryptedFileNameLength);
-		hfFile.write((const char*)&encryptedFileTitleLength, sizeof(encryptedFileTitleLength));
-		hfFile.write((const char*)fileData.EncryptedFileTitle.data(), encryptedFileTitleLength);
-		hfFile.write((const char*)&encryptedFileDescLength, sizeof(encryptedFileDescLength));
-		hfFile.write((const char*)fileData.EncryptedFileDescription.data(), encryptedFileDescLength);
-		hfFile.write((const char*)&encryptedFileUploaderLength, sizeof(encryptedFileUploaderLength));
-		hfFile.write((const char*)fileData.EncryptedUploader.data(), encryptedFileUploaderLength);
-	}
 	hfFile.close();
 }
 
@@ -957,104 +1111,61 @@ void Server::SaveHostedFileList()
 void Server::LoadHostedFilesData(void)
 {
 	//  Open the file as an ofstream to ensure it exists
-	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::app);
+	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::binary | std::ios_base::app);
 	assert(hfFileCreate.good() && !hfFileCreate.bad());
 	hfFileCreate.close();
 
 	//  Open the file as an ifstream for reading
-	std::ifstream hfFile("HostedFiles.data");
+	std::ifstream hfFile("HostedFiles.data", std::ios_base::binary);
 	assert(!hfFile.bad() && hfFile.good());
 
-	int md5Length = 0;
-	int fileNameLength = 0;
-	int fileTitleLength = 0;
-	int fileDescLength = 0;
-	int fileUploaderLength = 0;
-	unsigned char fileTitleMD5[128];
-	unsigned char encryptedFileName[128];
-	unsigned char encryptedFileTitle[128];
-	unsigned char encryptedFileDesc[256];
-	unsigned char encryptedFileUploader[256];
-
+	//  Get the file size by reading the beginning and end memory positions
 	auto fileSize = int(hfFile.tellg());
 	hfFile.seekg(0, std::ios::end);
 	fileSize = int(hfFile.tellg()) - fileSize;
 	hfFile.seekg(0, std::ios::beg);
 
-	while ((fileSize != 0) && (!hfFile.eof()))
+	//  Read the data for all hosted files
+	while (fileSize > 0 && !hfFile.eof())
 	{
-		md5Length = 0;
-		fileNameLength = 0;
-		fileTitleLength = 0;
-		fileDescLength = 0;
-		fileUploaderLength = 0;
+		HostedFileData newEntry;
+		if (!newEntry.ReadFromFile(hfFile)) break;
+		if (hfFile.eof()) break;
 
-		//  Read in the hosted file data
-		hfFile.read((char*)(&md5Length), sizeof(md5Length)); if (md5Length == 0) break;
-		hfFile.read((char*)(fileTitleMD5), md5Length);
-		hfFile.read((char*)(&fileNameLength), sizeof(fileNameLength));
-		hfFile.read((char*)(encryptedFileName), fileNameLength);
-		hfFile.read((char*)(&fileTitleLength), sizeof(fileTitleLength));
-		hfFile.read((char*)(encryptedFileTitle), fileTitleLength);
-		hfFile.read((char*)(&fileDescLength), sizeof(fileDescLength));
-		hfFile.read((char*)(encryptedFileDesc), fileDescLength);
-		hfFile.read((char*)(&fileUploaderLength), sizeof(fileUploaderLength));
-		hfFile.read((char*)(encryptedFileUploader), fileUploaderLength);
-
-		fileTitleMD5[md5Length] = 0;
-		encryptedFileName[fileNameLength] = 0;
-		encryptedFileTitle[fileTitleLength] = 0;
-		encryptedFileDesc[fileDescLength] = 0;
-		encryptedFileUploader[fileUploaderLength] = 0;
-
-		//  Create a Hosted File Data struct and store it off in memory
-		auto decryptedFileTitle = Groundfish::Decrypt(encryptedFileTitle);
-		auto decryptedFileTitleString = std::string((char*)decryptedFileTitle.data(), decryptedFileTitle.size());
-
-		//  The file should exist if it is in our hosted file data list... so get the hosted file size
-		auto hostedFileName = "_HostedFiles/" + std::string((char*)fileTitleMD5, strlen((char*)fileTitleMD5)) + ".hostedfile";
-		std::ifstream hostedFile(hostedFileName);
-		assert(!hostedFile.bad() && hostedFile.good());
-		auto hostedFileSize = int(hostedFile.tellg());
-		hostedFile.seekg(0, std::ios::end);
-		hostedFileSize = int(hostedFile.tellg()) - hostedFileSize;
-		hostedFile.seekg(0, std::ios::beg);
-		hostedFile.close();
-
-		HostedFileData newFile;
-		newFile.FileTitleChecksum = std::string((char*)fileTitleMD5, md5Length);
-		for (auto i = 0; i < fileNameLength; ++i) newFile.EncryptedFileName.push_back(encryptedFileName[i]);
-		for (auto i = 0; i < fileTitleLength; ++i) newFile.EncryptedFileTitle.push_back(encryptedFileTitle[i]);
-		for (auto i = 0; i < fileDescLength; ++i) newFile.EncryptedFileDescription.push_back(encryptedFileDesc[i]);
-		for (auto i = 0; i < fileUploaderLength; ++i) newFile.EncryptedUploader.push_back(encryptedFileUploader[i]);
-		newFile.FileSize = hostedFileSize;
-		HostedFileDataList[newFile.FileTitleChecksum] = newFile;
+		HostedFileDataList[newEntry.FileTitleChecksum] = newEntry;
 	}
 
 	hfFile.close();
 }
 
-void Server::AddLatestUpload(std::vector<unsigned char> encryptedTitle)
+void Server::AddLatestUpload(std::string fileTitleChecksum, std::string currentTime)
 {
 	//  If the item already exists in the list, return out
-	for (auto iter = LatestUploadsList.begin(); iter < LatestUploadsList.end(); ++iter)
-		if ((*iter) == encryptedTitle) return;
+	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
+		if ((*iter).FileTitleChecksum == fileTitleChecksum) return;
 
-	LatestUploadsList.push_back(encryptedTitle);
+	LatestUploadEntry newEntry(fileTitleChecksum, currentTime);
+
+	//  With the checksum, grab the encrypted title
+	assert(HostedFileDataList.find(fileTitleChecksum) != HostedFileDataList.end());
+	newEntry.EncryptedTitle = HostedFileDataList[fileTitleChecksum].EncryptedFileTitle;
+
+
+	LatestUploadsList.push_back(newEntry);
+	LatestUploadsList.sort(CompareLatestUploads);
 	while (LatestUploadsList.size() > MAX_LATEST_UPLOADS_COUNT) LatestUploadsList.erase(LatestUploadsList.begin());
 	SaveLatestUploadsList();
 }
 
-bool Server::RemoveLatestUpload(std::vector<unsigned char> encryptedTitle)
+bool Server::RemoveLatestUpload(std::string fileTitleChecksum)
 {
 	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
 	{
-		if ((*iter) == encryptedTitle)
-		{
-			LatestUploadsList.erase(iter);
-			SaveLatestUploadsList();
-			return true;
-		}
+		if ((*iter).FileTitleChecksum != fileTitleChecksum) continue;
+
+		LatestUploadsList.erase(iter);
+		SaveLatestUploadsList();
+		return true;
 	}
 	return false;
 }
@@ -1062,7 +1173,7 @@ bool Server::RemoveLatestUpload(std::vector<unsigned char> encryptedTitle)
 void Server::LoadLatestUploadsList()
 {
 	//  Open the file as an ofstream to ensure it exists
-	std::ofstream lulFileCreate("LatestUploads.data", std::ios_base::app);
+	std::ofstream lulFileCreate("LatestUploads.data", std::ios_base::binary |std::ios_base::app);
 	assert(lulFileCreate.good() && !lulFileCreate.bad());
 	lulFileCreate.close();
 
@@ -1070,18 +1181,20 @@ void Server::LoadLatestUploadsList()
 	std::ifstream lulFile("LatestUploads.data", std::ios_base::binary);
 	assert(lulFile.good() && !lulFile.bad());
 
-	unsigned char upload[256];
-	int size = 0;
-	while (!lulFile.eof())
-	{
-		size = 0;
-		memset(upload, 0, 256);
-		lulFile.read((char*)&size, sizeof(size)); if (lulFile.eof()) break;
-		lulFile.read((char*)&upload, size);
+	//  Get the file size by reading the beginning and end memory positions
+	auto fileSize = int(lulFile.tellg());
+	lulFile.seekg(0, std::ios::end);
+	fileSize = int(lulFile.tellg()) - fileSize;
+	lulFile.seekg(0, std::ios::beg);
 
-		std::vector<unsigned char> newUpload;
-		for (auto i = 0; i < size; ++i) newUpload.push_back(upload[i]);
-		LatestUploadsList.push_back(newUpload);
+	while (fileSize > 0 && !lulFile.eof())
+	{
+		LatestUploadEntry newEntry("", "");
+		if (!newEntry.ReadFromFile(lulFile)) break;
+		if (lulFile.eof()) break;
+
+		LatestUploadsList.push_back(newEntry);
+		LatestUploadsList.sort(CompareLatestUploads);
 	}
 	
 	lulFile.close();
@@ -1092,12 +1205,7 @@ void Server::SaveLatestUploadsList(void)
 	std::ofstream lulFile("LatestUploads.data", std::ios_base::binary | std::ios_base::trunc);
 	assert(lulFile.good() && !lulFile.bad());
 
-	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
-	{
-		int size = (*iter).size();
-		lulFile.write((char*)&size, sizeof(size));
-		lulFile.write((char*)((*iter).data()), size);
-	}
+	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter) (*iter).WriteToFile(lulFile);
 
 	lulFile.close();
 }
@@ -1156,7 +1264,7 @@ void Server::UpdateFileTransferPercentage(UserConnection* user)
 {
 	auto fileTitleMD5 = md5(user->UserFileSendTask->GetFileTitle());
 	auto fileData = HostedFileDataList[fileTitleMD5];
-	user->SetStatusDownloading(fileData.FileTitleChecksum, user->UserFileSendTask->GetPercentageComplete(), int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f));
+	user->SetStatusDownloading(fileData.FileTitleChecksum, float(user->UserFileSendTask->GetPercentageComplete()), int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f));
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 

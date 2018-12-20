@@ -22,6 +22,7 @@ public:
 	int 				writeushort(unsigned short a);
 	int 				writeint(int a);
 	int 				writeuint(unsigned int a);
+	int					writelint(uint64_t a);
 	int 				writefloat(float a);
 	int 				writedouble(double a);
 	int 				writechars(char*str);
@@ -36,6 +37,7 @@ public:
 	unsigned short		readushort(bool peek = false);
 	int					readint(bool peek = false);
 	unsigned int		readuint(bool peek = false);
+	uint64_t			readlint(bool peek = false);
 	float				readfloat(bool peek = false);
 	double				readdouble(bool peek = false);
 	char*				readchars(int len, bool peek = false);
@@ -54,6 +56,7 @@ public:
 #define SIZEOF_USRT sizeof(unsigned short)
 #define SIZEOF_INTE sizeof(int)
 #define SIZEOF_UINT sizeof(unsigned int)
+#define SIZEOF_LINT sizeof(uint64_t)
 #define SIZEOF_FLOT sizeof(float)
 #define SIZEOF_DOUB sizeof(double)
 
@@ -128,6 +131,12 @@ inline int SocketBuffer::writeuint(unsigned int a)
 {
 	StreamWrite(&a, 4);
 	return SIZEOF_UINT;
+}
+
+inline int SocketBuffer::writelint(uint64_t a)
+{
+	StreamWrite(&a, 8);
+	return SIZEOF_LINT;
 }
 
 inline int SocketBuffer::writefloat(float a)
@@ -218,6 +227,13 @@ inline unsigned int SocketBuffer::readuint(bool peek)
 {
 	unsigned int b;
 	StreamRead(&b, 4, peek);
+	return b;
+}
+
+inline uint64_t SocketBuffer::readlint(bool peek)
+{
+	uint64_t b;
+	StreamRead(&b, 8, peek);
 	return b;
 }
 
