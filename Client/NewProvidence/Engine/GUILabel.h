@@ -8,6 +8,7 @@ class GUILabel : public GUIObjectNode
 public:
 	enum Justifications { JUSTIFY_LEFT = 0, JUSTIFY_RIGHT, JUSTIFY_CENTER, JUSTIFICATION_COUNT };
 
+	static GUILabel* CreateLabel(const char* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUILabel* CreateLabel(const Font* font, const char* text, int x = 0, int y = 0, int w = 0, int h = 0);
 
 	explicit GUILabel(const char* text = "");
@@ -27,6 +28,13 @@ private:
 	std::string m_Text;
 	int m_Justification;
 };
+
+
+inline GUILabel* GUILabel::CreateLabel(const char* font, const char* text, int x, int y, int w, int h)
+{
+	return GUILabel::CreateLabel(fontManager.GetFont(font), text, x, y, w, h);
+}
+
 
 inline GUILabel* GUILabel::CreateLabel(const Font* font, const char* text, int x, int y, int w, int h)
 {

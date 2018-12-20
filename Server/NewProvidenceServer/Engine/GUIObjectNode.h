@@ -46,6 +46,7 @@ public:
 	inline void SetVisible(bool visible) { m_Visible = visible; }
 	inline void SetParent(GUIObjectNode* parent) { m_Parent = parent; }
 	inline void SetColor(float r, float g, float b, float a) { m_Color.colorValues[0] = r; m_Color.colorValues[1] = g; m_Color.colorValues[2] = b; m_Color.colorValues[3] = a; }
+	inline void SetColorBytes(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) { SetColor(float(r) / 255.0f, float(g) / 255.0f, float(b) / 255.0f, float(a) / 255.0f); }
 	inline void SetObjectName(std::string objectName) { m_ObjectName = objectName; }
 	inline void SetClickX(int clickX) { m_ClickX = clickX; }
 	inline void SetClickY(int clickY) { m_ClickY = clickY; }

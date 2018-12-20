@@ -462,7 +462,7 @@ public:
 		return false;
 	}
 
-	bool CheckFilePortionComplete(int portionIndex)
+	bool CheckFilePortionComplete(uint64_t portionIndex)
 	{
 		//  If we are being requested to check a portion we're not on right now, ignore it and return out
 		if (portionIndex != FilePortionIndex)
