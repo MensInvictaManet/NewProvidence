@@ -252,6 +252,7 @@ bool Client::ReadMessages(void)
 	{
 		auto uploadsStartIndex = winsockWrapper.ReadInt(0);
 		auto latestUploadCount = winsockWrapper.ReadInt(0);
+		LatestUploadsList.clear();
 		for (auto i = 0; i < latestUploadCount; ++i)
 		{
 			auto size = winsockWrapper.ReadInt(0);

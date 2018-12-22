@@ -11,7 +11,7 @@
 
 const auto MainMenuBarHeight = 40;
 const auto LatestUploadsWidth = 600;
-const auto LatestUploadsHeight = 300;
+const auto LatestUploadsHeight = 320;
 
 //  Global UI objects
 GUIObjectNode* StatusBarBG = nullptr;
@@ -722,7 +722,7 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	latestUploadsTitle->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	latestUploadsContainer->AddChild(latestUploadsTitle);
 
-	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 60, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 24, 2);
+	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 54, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 24, 2);
 	LatestUploadsListBox->SetItemClickCallback(UpdateLatestUploadsListBoxDownloadButtons);
 	latestUploadsContainer->AddChild(LatestUploadsListBox);
 }
