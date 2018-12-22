@@ -7,7 +7,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
 
-#define VERSION_NUMBER					"2018.12.20"
+#define VERSION_NUMBER					"2018.12.21"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -28,6 +28,15 @@ void SendMessage_UserLoginRequest(std::vector<unsigned char>& encryptedUsername,
 	winsockWrapper.WriteChars(encryptedUsername.data(), int(encryptedUsername.size()), 0);
 	winsockWrapper.WriteInt(int(encryptedPassword.size()), 0);
 	winsockWrapper.WriteChars(encryptedPassword.data(), int(encryptedPassword.size()), 0);
+	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
+}
+
+void SendMessage_RequestLatestUploads(int startingIndex, int socket)
+{
+	//  Send a "Latest Uploads Request" message
+	winsockWrapper.ClearBuffer(0);
+	winsockWrapper.WriteChar(MESSAGE_ID_REQUEST_LATEST_UPLOADS, 0);
+	winsockWrapper.WriteUnsignedShort(uint16_t(startingIndex), 0);
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
@@ -250,12 +259,12 @@ bool Client::ReadMessages(void)
 
 	case MESSAGE_ID_LATEST_UPLOADS_LIST:
 	{
-		auto uploadsStartIndex = winsockWrapper.ReadInt(0);
-		auto latestUploadCount = winsockWrapper.ReadInt(0);
+		auto uploadsStartIndex = int(winsockWrapper.ReadUnsignedShort(0));
+		auto latestUploadCount = int(winsockWrapper.ReadUnsignedShort(0));
 		LatestUploadsList.clear();
 		for (auto i = 0; i < latestUploadCount; ++i)
 		{
-			auto size = winsockWrapper.ReadInt(0);
+			auto size = int(winsockWrapper.ReadChar(0));
 			assert(size != 0);
 			unsigned char* data = winsockWrapper.ReadChars(0, size);
 			auto decryptedTitle = Groundfish::Decrypt(data);

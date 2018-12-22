@@ -11,7 +11,9 @@
 
 const auto MainMenuBarHeight = 40;
 const auto LatestUploadsWidth = 600;
-const auto LatestUploadsHeight = 320;
+const auto LatestUploadsHeight = 580;
+
+int CurrentLatestUploadsStartingIndex = 0;
 
 //  Global UI objects
 GUIObjectNode* StatusBarBG = nullptr;
@@ -40,6 +42,7 @@ GUILabel* UploadFileNameLabel = nullptr;
 GUIEditBox* UploadFileTitleEditBox = nullptr;
 std::string SelectedUploadFileName = "";
 
+GUILabel* LatestUploadsTitleLabel = nullptr;
 GUIListBox* LatestUploadsListBox = nullptr;
 GUIObjectNode* CurrentTransferContainer = nullptr;
 
@@ -109,6 +112,11 @@ void UploadFileToServer(GUIObjectNode* object)
 	if (UploadFileTitleEditBox == nullptr) return;
 	auto fileToUploadTitle = UploadFileTitleEditBox->GetText();
 	if (fileToUploadTitle.length() == 0) return;
+	if (fileToUploadTitle.length() > UPLOAD_TITLE_MAX_LENGTH)
+	{
+		SetStatusBarMessage("Upload Attempt Failed! File title can not be longer than " + std::to_string(UPLOAD_TITLE_MAX_LENGTH) + " characters. Try again...", true);
+		return;
+	}
 
 	//  Attempt to start an upload of the file to the server
 	ClientControl.SendFileToServer(SelectedUploadFileName, fileToUpload, fileToUploadTitle);
@@ -271,6 +279,28 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
+}
+
+
+void ShiftLatestUploadsLeft(GUIObjectNode* object)
+{
+	if (CurrentLatestUploadsStartingIndex < 20) return;
+	CurrentLatestUploadsStartingIndex -= 20;
+	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+
+	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
+	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
+}
+
+
+void ShiftLatestUploadsRight(GUIObjectNode* object)
+{
+	if (CurrentLatestUploadsStartingIndex > 50000) return;
+	CurrentLatestUploadsStartingIndex += 20;
+	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+
+	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
+	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
 }
 
 
@@ -647,60 +677,6 @@ void PrimaryDialogue::LoadSideBarUI()
 	//  Load the main menu "Upload" button text
 	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(uploadButtonText);
-
-	return;
-
-	//  Load the side-bar user tab
-	UserSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 60, 40, 40);
-	UserSideTabButton->SetPressedSizeRatio(1.0f);
-	UserSideTabButton->SetLeftClickCallback(SetUserMenuOpen);
-	MainMenuBarUINode->AddChild(UserSideTabButton);
-
-	//  Load the side-bar user icon
-	UserIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/UserIcon.png");
-	UserIconNode->SetDimensions(24, 24);
-	UserIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
-	UserIconNode->SetPosition((UserSideTabButton->GetWidth() / 2) - (UserIconNode->GetWidth() / 2), (UserSideTabButton->GetHeight() / 2) - (UserIconNode->GetHeight() / 2));
-	UserSideTabButton->AddChild(UserIconNode);
-
-	//  Load the side-bar inbox tab
-	InboxSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 110, 40, 40);
-	InboxSideTabButton->SetPressedSizeRatio(1.0f);
-	InboxSideTabButton->SetLeftClickCallback(SetInboxOpen);
-	MainMenuBarUINode->AddChild(InboxSideTabButton);
-
-	//  Load the side-bar inbox icon
-	InboxIconNode = GUIObjectNode::CreateObjectNode("");
-	InboxIconNode->SetDimensions(24, 24);
-	InboxIconNode->SetPosition((InboxSideTabButton->GetWidth() / 2) - (InboxIconNode->GetWidth() / 2), (InboxSideTabButton->GetHeight() / 2) - (InboxIconNode->GetHeight() / 2));
-	InboxSideTabButton->AddChild(InboxIconNode);
-	SetInboxMessageCount(0);
-
-	//  Load the side-bar notifications tab
-	NotificationsSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 160, 40, 40);
-	NotificationsSideTabButton->SetPressedSizeRatio(1.0f);
-	NotificationsSideTabButton->SetLeftClickCallback(SetNotificationsOpen);
-	MainMenuBarUINode->AddChild(NotificationsSideTabButton);
-
-	//  Load the side-bar notifications icon
-	NotificationsIconNode = GUIObjectNode::CreateObjectNode("");
-	NotificationsIconNode->SetDimensions(24, 24);
-	NotificationsIconNode->SetPosition((NotificationsSideTabButton->GetWidth() / 2) - (NotificationsIconNode->GetWidth() / 2), (NotificationsSideTabButton->GetHeight() / 2) - (NotificationsIconNode->GetHeight() / 2));
-	NotificationsSideTabButton->AddChild(NotificationsIconNode);
-	SetNotificationCount(0);
-
-	//  Load the side-bar upload tab
-	UploadSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 640, 40, 40);
-	UploadSideTabButton->SetPressedSizeRatio(1.0f);
-	UploadSideTabButton->SetLeftClickCallback(SetUploadMenuOpen);
-	MainMenuBarUINode->AddChild(UploadSideTabButton);
-
-	//  Load the side-bar upload icon
-	UploadIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/UploadFileIcon.png");
-	UploadIconNode->SetDimensions(24, 24);
-	UploadIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
-	UploadIconNode->SetPosition((UploadSideTabButton->GetWidth() / 2) - (UploadIconNode->GetWidth() / 2), (UploadSideTabButton->GetHeight() / 2) - (UploadIconNode->GetHeight() / 2));
-	UploadSideTabButton->AddChild(UploadIconNode);
 }
 
 
@@ -718,13 +694,31 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	latestUploadsContainer->SetPosition(80, 70);
 	LatestUploadsUINode->AddChild(latestUploadsContainer);
 
-	auto latestUploadsTitle = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "Latest Uploaded Files:", 10, 10, LatestUploadsWidth - 20, 30);
-	latestUploadsTitle->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
-	latestUploadsContainer->AddChild(latestUploadsTitle);
+	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
+	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + "):";
+	LatestUploadsTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), latestUploadedFilesLabelString.c_str(), 10, 10, LatestUploadsWidth - 20, 30);
+	LatestUploadsTitleLabel->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
+	latestUploadsContainer->AddChild(LatestUploadsTitleLabel);
 
-	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 54, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 24, 2);
+	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 54, LatestUploadsWidth - 26, 2, 12, 12, 12, 12, 12, 24, 2);
 	LatestUploadsListBox->SetItemClickCallback(UpdateLatestUploadsListBoxDownloadButtons);
 	latestUploadsContainer->AddChild(LatestUploadsListBox);
+
+	auto listBoxLeftArrowButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/LeftArrowIcon.png");
+	listBoxLeftArrowButton->SetColorBytes(64, 64, 64, 255);
+	listBoxLeftArrowButton->SetDimensions(28, 28);
+	listBoxLeftArrowButton->SetPosition(4, LatestUploadsHeight - 26);
+	listBoxLeftArrowButton->SetLeftClickCallback(ShiftLatestUploadsLeft);
+	latestUploadsContainer->AddChild(listBoxLeftArrowButton);
+
+	auto listBoxRightArrowButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/RightArrowIcon.png");
+	listBoxRightArrowButton->SetColorBytes(64, 64, 64, 255);
+	listBoxRightArrowButton->SetDimensions(28, 28);
+	auto rightArrowWidth = listBoxRightArrowButton->GetWidth();
+	listBoxRightArrowButton->SetPosition(LatestUploadsWidth - rightArrowWidth - 4, LatestUploadsHeight - 26);
+	listBoxRightArrowButton->SetLeftClickCallback(ShiftLatestUploadsRight);
+	latestUploadsContainer->AddChild(listBoxRightArrowButton);
+
 }
 
 

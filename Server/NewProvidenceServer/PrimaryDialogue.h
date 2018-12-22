@@ -14,13 +14,13 @@ void DeleteHostedFile(GUIObjectNode* fileDeleteButton)
 	ServerControl.DeleteHostedFile(fileChecksum);
 }
 
-void UpdateHostedFileList(const std::unordered_map<std::string, HostedFileData>& hostedFileDataList)
+void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
 {
 	//  Clear the hosted file list and rebuild it using the most recent data
 	HostedFileListBox->ClearItems();
 	for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
 	{
-		auto fileData = (*iter).second;
+		auto fileData = (*iter);
 		auto newFileDataEntry = GUIObjectNode::CreateObjectNode("");
 
 		//  Create the file identifier label
@@ -42,7 +42,7 @@ void UpdateHostedFileList(const std::unordered_map<std::string, HostedFileData>&
 		newFileDataEntry->AddChild(fileTitleLabel);
 
 		//  Create the delete button
-		auto deleteButton = GUIButton::CreateTemplatedButton("Standard", 870, 6, 60, 20);
+		auto deleteButton = GUIButton::CreateTemplatedButton("Standard", 860, 6, 60, 20);
 		deleteButton->SetColor(1.0f, 0.4f, 0.4f, 1.0f);
 		deleteButton->SetFont("Arial");
 		deleteButton->SetText("delete");
@@ -155,9 +155,9 @@ void PrimaryDialogue::LoadHostedFileListUI()
 	hostedFileListContainer->AddChild(fileTitleLabel);
 
 	//  Create the hosted file listbox
-	const int listboxButtonWidth = 16;
-	const int listboxButtonHeight = 16;
-	HostedFileListBox = GUIListBox::CreateTemplatedListBox("Standard", 0, fileIDLabel->GetHeight(), listWidth, listHeight - fileIDLabel->GetHeight(), listWidth - listboxButtonWidth, fileIDLabel->GetHeight(), listboxButtonWidth, listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, fileIDLabel->GetHeight(), 2);
+	const int listboxButtonWidth = 12;
+	const int listboxButtonHeight = 12;
+	HostedFileListBox = GUIListBox::CreateTemplatedListBox("Standard", 0, fileIDLabel->GetHeight(), listWidth, listHeight - fileIDLabel->GetHeight(), listWidth - listboxButtonWidth - 2, 2, listboxButtonWidth, listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, fileIDLabel->GetHeight(), 2);
 	hostedFileListContainer->AddChild(HostedFileListBox);
 }
 
@@ -182,9 +182,9 @@ void PrimaryDialogue::LoadCurrentUserListUI()
 	currentUserListContainer->AddChild(currentUserStatusLabel);
 
 	//  Create the current user listbox
-	const int listboxButtonWidth = 16;
-	const int listboxButtonHeight = 16;
-	CurrentUserList = GUIListBox::CreateTemplatedListBox("Standard", 0, currentUserIDLabel->GetHeight(), listWidth, listHeight - currentUserIDLabel->GetHeight(), listWidth - listboxButtonWidth, currentUserIDLabel->GetHeight(), listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, listboxButtonWidth, currentUserIDLabel->GetHeight(), 2);
+	const int listboxButtonWidth = 12;
+	const int listboxButtonHeight = 12;
+	CurrentUserList = GUIListBox::CreateTemplatedListBox("Standard", 0, currentUserIDLabel->GetHeight(), listWidth, listHeight - currentUserIDLabel->GetHeight(), listWidth - listboxButtonWidth - 2, 2, listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, listboxButtonWidth, currentUserIDLabel->GetHeight(), 2);
 	currentUserListContainer->AddChild(CurrentUserList);
 }
 
