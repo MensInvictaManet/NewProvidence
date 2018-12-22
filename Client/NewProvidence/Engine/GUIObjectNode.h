@@ -311,5 +311,9 @@ inline GUIObjectNode* GUIObjectNode::GetChildByName(std::string childName)
 		if ((*iter)->GetObjectName() == childName)
 			return (*iter);
 
+	for (auto iter = m_NewChildren.begin(); iter != m_NewChildren.end(); ++iter)
+		if ((*iter)->GetObjectName() == childName)
+			return (*iter);
+
 	return nullptr;
 }

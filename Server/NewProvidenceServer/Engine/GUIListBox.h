@@ -38,6 +38,7 @@ public:
 	void SetSelectable(bool selectable) { m_Selectable = selectable; }
 	void SetSelectedIndex(int index) { SelectedIndex = index; }
 	void SetFlowToBottom(bool flowToBottom) { m_FlowToBottom = flowToBottom; }
+	const std::vector<GUIObjectNode*> GetItemList() const { return m_ItemList; }
 	unsigned int GetItemCount() const { return static_cast<unsigned int>(m_ItemList.size()); }
 	unsigned int GetItemDisplayCount() const { return ItemDisplayCount; }
 	inline int GetEntryHeight() const { return EntryHeight; }
@@ -257,8 +258,9 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 			if (inputManager.GetMouseButtonLeft() != MOUSE_BUTTON_PRESSED) return;
 
 			inputManager.TakeMouseButtonLeft();
-			if (SelectedIndex != newSelectedIndex && m_ItemClickCallback != nullptr) m_ItemClickCallback(this);
+			bool newSelection = (SelectedIndex != newSelectedIndex);
 			SelectedIndex = newSelectedIndex;
+			if (newSelection && m_ItemClickCallback != nullptr) m_ItemClickCallback(this);
 			return;
 		}
 	}
@@ -340,10 +342,10 @@ inline void GUIListBox::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 		}

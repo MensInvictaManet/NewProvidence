@@ -5,7 +5,7 @@
 #include "Engine/GUIListBox.h"
 
 Server ServerControl;
-GUIListBox* HostedFileList = nullptr;
+GUIListBox* HostedFileListBox = nullptr;
 GUIListBox* CurrentUserList = nullptr;
 
 void DeleteHostedFile(GUIObjectNode* fileDeleteButton)
@@ -17,24 +17,29 @@ void DeleteHostedFile(GUIObjectNode* fileDeleteButton)
 void UpdateHostedFileList(const std::unordered_map<std::string, HostedFileData>& hostedFileDataList)
 {
 	//  Clear the hosted file list and rebuild it using the most recent data
-	HostedFileList->ClearItems();
+	HostedFileListBox->ClearItems();
 	for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
 	{
 		auto fileData = (*iter).second;
 		auto newFileDataEntry = GUIObjectNode::CreateObjectNode("");
 
 		//  Create the file identifier label
-		auto fileIDLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "", 10, 8, 200, 24);
-		fileIDLabel->SetText(fileData.FileTitleChecksum);
+		auto fileIDLabel = GUILabel::CreateLabel("Arial", fileData.FileTitleChecksum.c_str(), 10, 8, 200, 24);
 		newFileDataEntry->AddChild(fileIDLabel);
 
 		//  Create the file size label
 		auto megabytes = fileData.FileSize / 1000000;
 		auto kilobytes = fileData.FileSize / 1000;
 		auto sizeString = (megabytes > 0) ? (std::to_string(megabytes) + " MB") : ((kilobytes > 0) ? (std::to_string(kilobytes) + " KB") : (std::to_string(fileData.FileSize) + " Bytes"));
-		auto fileSizeLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "", 360, 8, 200, 24);
-		fileSizeLabel->SetText(sizeString);
+		auto fileSizeLabel = GUILabel::CreateLabel("Arial", sizeString.c_str(), 330, 8, 200, 24);
 		newFileDataEntry->AddChild(fileSizeLabel);
+
+		//  Decrypt the file title and set the file title label
+		auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
+		auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+		auto fileTitleLimitedString = fileTitle.substr(0, std::min<int>(40, fileTitle.length()));
+		auto fileTitleLabel = GUILabel::CreateLabel("Arial", fileTitleLimitedString.c_str(), 450, 8, 200, 24);
+		newFileDataEntry->AddChild(fileTitleLabel);
 
 		//  Create the delete button
 		auto deleteButton = GUIButton::CreateTemplatedButton("Standard", 870, 6, 60, 20);
@@ -46,7 +51,7 @@ void UpdateHostedFileList(const std::unordered_map<std::string, HostedFileData>&
 		newFileDataEntry->AddChild(deleteButton);
 
 		//  Add the entry into the Current User List
-		HostedFileList->AddItem(newFileDataEntry);
+		HostedFileListBox->AddItem(newFileDataEntry);
 	}
 }
 
@@ -142,14 +147,18 @@ void PrimaryDialogue::LoadHostedFileListUI()
 	hostedFileListContainer->AddChild(fileIDLabel);
 
 	//  Load the file size column label
-	auto fileSizeLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "FILE SIZE:", 360, 4, listWidth, 24);
+	auto fileSizeLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "FILE SIZE:", 330, 4, listWidth, 24);
 	hostedFileListContainer->AddChild(fileSizeLabel);
+
+	//  Load the file size column label
+	auto fileTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "FILE TITLE:", 450, 4, listWidth, 24);
+	hostedFileListContainer->AddChild(fileTitleLabel);
 
 	//  Create the hosted file listbox
 	const int listboxButtonWidth = 16;
 	const int listboxButtonHeight = 16;
-	HostedFileList = GUIListBox::CreateTemplatedListBox("Standard", 0, fileIDLabel->GetHeight(), listWidth, listHeight - fileIDLabel->GetHeight(), listWidth - listboxButtonWidth, fileIDLabel->GetHeight(), listboxButtonWidth, listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, fileIDLabel->GetHeight(), 2);
-	hostedFileListContainer->AddChild(HostedFileList);
+	HostedFileListBox = GUIListBox::CreateTemplatedListBox("Standard", 0, fileIDLabel->GetHeight(), listWidth, listHeight - fileIDLabel->GetHeight(), listWidth - listboxButtonWidth, fileIDLabel->GetHeight(), listboxButtonWidth, listboxButtonWidth, listboxButtonWidth, listboxButtonHeight, listboxButtonHeight, fileIDLabel->GetHeight(), 2);
+	hostedFileListContainer->AddChild(HostedFileListBox);
 }
 
 

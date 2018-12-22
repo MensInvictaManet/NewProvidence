@@ -9,11 +9,11 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2018.12.19"
+#define VERSION_NUMBER					"2018.12.20"
 
 #define NEW_PROVIDENCE_PORT				2347
 #define MAX_LATEST_UPLOADS_COUNT		20
-#define LATEST_UPLOADS_SENT_COUNT		5
+#define LATEST_UPLOADS_SENT_COUNT		10
 
 #define PING_INTERVAL_TIME				5.0
 #define PINGS_BEFORE_DISCONNECT			30
@@ -187,11 +187,70 @@ struct LatestUploadEntry
 	}
 };
 
+
+struct UserLoginDetails
+{
+	std::vector<unsigned char> EncryptedUserName;
+	std::vector<unsigned char> EncryptedPassword;
+
+	UserLoginDetails()
+	{
+		EncryptedUserName.clear();
+		EncryptedPassword.clear();
+	}
+	UserLoginDetails(std::vector<unsigned char> username, std::vector<unsigned char> password) : EncryptedUserName(username), EncryptedPassword(password) {}
+
+	void WriteToFile(std::ofstream& outFile)
+	{
+		//  Write the username data length
+		int usernameSize = EncryptedUserName.size();
+		outFile.write((char*)&usernameSize, sizeof(usernameSize));
+
+		//  Write the username data
+		outFile.write((char*)EncryptedUserName.data(), usernameSize);
+
+		//  Write the password data length
+		int passwordSize = EncryptedUserName.size();
+		outFile.write((char*)&passwordSize, sizeof(passwordSize));
+
+		//  Write the password data
+		outFile.write((char*)EncryptedPassword.data(), passwordSize);
+	}
+
+	bool ReadFromFile(std::ifstream& inFile)
+	{
+		//  Read the username length
+		int usernameSize;
+		inFile.read((char*)&usernameSize, sizeof(usernameSize));
+		if (inFile.eof()) return false;
+
+		//  Read the username data
+		char readInData[512];
+		inFile.read(readInData, usernameSize);
+		EncryptedUserName.clear();
+		for (auto i = 0; i < usernameSize; ++i) EncryptedUserName.push_back((unsigned char)readInData[i]);
+
+		//  Read the password length
+		int passwordSize;
+		inFile.read((char*)&passwordSize, sizeof(passwordSize));
+		if (inFile.eof()) return false;
+
+		//  Read the username data
+		inFile.read(readInData, passwordSize);
+		EncryptedPassword.clear();
+		for (auto i = 0; i < passwordSize; ++i) EncryptedPassword.push_back((unsigned char)readInData[i]);
+
+		return true;
+	}
+};
+
+
 bool CompareLatestUploads(const LatestUploadEntry& first, const LatestUploadEntry& second)
 {
 	auto comparison = first.TimeAdded.compare(second.TimeAdded);
 	return (comparison == 1);
 }
+
 
 struct UserConnection
 {
@@ -295,16 +354,24 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 	winsockWrapper.SendMessagePacket(user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_LatestUploads(std::list<LatestUploadEntry>& latestUploads, UserConnection* user)
+
+void SendMessage_LatestUploads(std::list<LatestUploadEntry>& latestUploads, UserConnection* user, int startIndex = 0)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
 
-	int listSize = std::min(int(latestUploads.size()), LATEST_UPLOADS_SENT_COUNT);
+	//  Find out the index range we're going to send.
+	auto endIndex = std::min(int(latestUploads.size() - 1), startIndex + LATEST_UPLOADS_SENT_COUNT - 1);
+	if (endIndex < startIndex) return;
+	auto listSize = endIndex - startIndex + 1;
+
+	winsockWrapper.WriteInt(startIndex, 0);
 	winsockWrapper.WriteInt(listSize, 0);
 
+	int iterIndex = 0;
 	for (auto iter = latestUploads.begin(); iter != latestUploads.end(); ++iter)
 	{
+		if (iterIndex++ < startIndex) continue;
 		if (--listSize < 0) break;
 		auto title = (*iter).EncryptedTitle;
 		winsockWrapper.WriteInt(int(title.size()), 0);
@@ -393,7 +460,6 @@ private:
 	std::function<void(const std::unordered_map<std::string, HostedFileData >&)> HostedFileListChangedCallback = nullptr;
 	std::function<void(std::unordered_map<UserConnection*, bool>&)> UserConnectionListChangedCallback = nullptr;
 
-	typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char>> UserLoginDetails;
 	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
 	std::list<LatestUploadEntry> LatestUploadsList;
@@ -442,6 +508,7 @@ private:
 	bool RemoveLatestUpload(std::string fileTitleChecksum);
 	void LoadLatestUploadsList(void);
 	void SaveLatestUploadsList(void);
+	void SendOutLatestUploadsList(void);
 
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(HostedFileData& fileData, UserConnection* user);
@@ -489,6 +556,7 @@ bool Server::Initialize(void)
 	AddUserLoginDetails("Charlie", "testpass");
 	AddUserLoginDetails("Emerson", "testpass");
 	AddUserLoginDetails("Bex", "testpass");
+	AddUserLoginDetails("Jason", "testpass");
 
 	//  Load the default hosted files if they aren't already loaded
 	AddHostedFileFromUnencrypted("_FilesToHost/TestImage1.png", "Test Image 1", "DESCRIPTION 1");
@@ -897,53 +965,37 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 void Server::LoadUserLoginDetails(void)
 {
 	//  Open the file as an ofstream to ensure it exists
-	std::ofstream uldFileCreate("UserLoginDetails.data", std::ios_base::app);
+	std::ofstream uldFileCreate("UserLoginDetails.data", std::ios_base::binary | std::ios_base::app);
 	assert(uldFileCreate.good() && !uldFileCreate.bad());
 	uldFileCreate.close();
 
 	//  Open the file as an ifstream for reading
-	std::ifstream uldFile("UserLoginDetails.data");
+	std::ifstream uldFile("UserLoginDetails.data", std::ios_base::binary);
 	assert(!uldFile.bad() && uldFile.good());
 
-	int usernameLength = 0;
-	int passwordLength = 0;
-	unsigned char encryptedUsername[64];
-	unsigned char encryptedPassword[64];
-	std::vector<unsigned char> encryptedUsernameVector;
-	std::vector<unsigned char> encryptedPasswordVector;
 	std::vector<unsigned char> decryptedUsername;
 	std::vector<unsigned char> decryptedPassword;
 
+	//  Get the file size by reading the beginning and end memory positions
 	auto fileSize = int(uldFile.tellg());
 	uldFile.seekg(0, std::ios::end);
 	fileSize = int(uldFile.tellg()) - fileSize;
 	uldFile.seekg(0, std::ios::beg);
 
-	while ((fileSize != 0) && (!uldFile.eof()))
+	while (fileSize > 0 && !uldFile.eof())
 	{
-		usernameLength = 0;
-		passwordLength = 0;
-
-		uldFile.read((char*)(&usernameLength), sizeof(usernameLength));
-		if (usernameLength == 0) break;
-		uldFile.read((char*)(encryptedUsername), usernameLength);
-		uldFile.read((char*)(&passwordLength), sizeof(passwordLength));
-		uldFile.read((char*)(encryptedPassword), passwordLength);
+		UserLoginDetails newEntry;
+		if (!newEntry.ReadFromFile(uldFile)) break;
+		if (uldFile.eof()) break;
 
 		//  Get the MD5 of the decrypted username and password
-		decryptedUsername = Groundfish::Decrypt(encryptedUsername);
+		decryptedUsername = Groundfish::Decrypt(newEntry.EncryptedUserName.data());
 		std::string username = std::string((char*)decryptedUsername.data(), decryptedUsername.size());
-		decryptedPassword = Groundfish::Decrypt(encryptedPassword);
+		decryptedPassword = Groundfish::Decrypt(newEntry.EncryptedPassword.data());
 		std::string password = std::string((char*)decryptedPassword.data(), decryptedPassword.size());
-
-		//  Lowercase the username and password
-		std::transform(username.begin(), username.end(), username.begin(), ::tolower);
-		std::transform(password.begin(), password.end(), password.begin(), ::tolower);
-
-		for (auto i = 0; i < usernameLength; ++i) encryptedUsernameVector.push_back(encryptedUsername[i]);
-		for (auto i = 0; i < passwordLength; ++i) encryptedPasswordVector.push_back(encryptedPassword[i]);
 		auto loginDataMD5 = md5(username + password);
-		UserLoginDetailsList[loginDataMD5] = UserLoginDetails(encryptedUsernameVector, encryptedPasswordVector);
+
+		UserLoginDetailsList[loginDataMD5] = newEntry;
 	}
 
 	uldFile.close();
@@ -951,13 +1003,13 @@ void Server::LoadUserLoginDetails(void)
 
 void Server::SaveUserLoginDetails(void)
 {
-	std::ofstream uldFile("UserLoginDetails.data", std::ios_base::trunc);
+	std::ofstream uldFile("UserLoginDetails.data", std::ios_base::binary | std::ios_base::trunc);
 	assert(!uldFile.bad() && uldFile.good());
 
 	for (auto userIter = UserLoginDetailsList.begin(); userIter != UserLoginDetailsList.end(); ++userIter)
 	{
-		auto encryptedUsername = (*userIter).second.first;
-		auto encryptedPassword = (*userIter).second.second;
+		auto encryptedUsername = (*userIter).second.EncryptedUserName;
+		auto encryptedPassword = (*userIter).second.EncryptedPassword;
 		auto encryptedUsernameSize = int(encryptedUsername.size());
 		auto encryptedPasswordSize = int(encryptedPassword.size());
 
@@ -1155,6 +1207,7 @@ void Server::AddLatestUpload(std::string fileTitleChecksum, std::string currentT
 	LatestUploadsList.sort(CompareLatestUploads);
 	while (LatestUploadsList.size() > MAX_LATEST_UPLOADS_COUNT) LatestUploadsList.erase(LatestUploadsList.begin());
 	SaveLatestUploadsList();
+	SendOutLatestUploadsList();
 }
 
 bool Server::RemoveLatestUpload(std::string fileTitleChecksum)
@@ -1165,6 +1218,7 @@ bool Server::RemoveLatestUpload(std::string fileTitleChecksum)
 
 		LatestUploadsList.erase(iter);
 		SaveLatestUploadsList();
+		SendOutLatestUploadsList();
 		return true;
 	}
 	return false;
@@ -1200,6 +1254,7 @@ void Server::LoadLatestUploadsList()
 	lulFile.close();
 }
 
+
 void Server::SaveLatestUploadsList(void)
 {
 	std::ofstream lulFile("LatestUploads.data", std::ios_base::binary | std::ios_base::trunc);
@@ -1209,6 +1264,22 @@ void Server::SaveLatestUploadsList(void)
 
 	lulFile.close();
 }
+
+
+void Server::SendOutLatestUploadsList(void)
+{
+	//  Send the latest uploads list to each connected user
+	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)
+	{
+		auto user = (*userIter).first;
+
+		//  If the user isn't logged in yet, skip over them. They'll get an update when they log in
+		if (user->LoginStatus != UserConnection::LOGIN_STATUS_LOGGED_IN) continue;
+
+		SendMessage_LatestUploads(LatestUploadsList, user);
+	}
+}
+
 
 void Server::ContinueFileTransfers(void)
 {

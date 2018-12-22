@@ -9,8 +9,7 @@
 #include "Engine/TimeSlice.h"
 #include <math.h>
 
-const auto SideBarWidth = 300;
-bool SideBarOpen = false;
+const auto MainMenuBarHeight = 40;
 const auto LatestUploadsWidth = 600;
 const auto LatestUploadsHeight = 300;
 
@@ -23,24 +22,119 @@ GUIObjectNode* LoginMenuNode = nullptr;
 GUIEditBox* UsernameEditBox = nullptr;
 GUIEditBox* PasswordEditBox = nullptr;
 
-GUIObjectNode* MainProgramUINode = nullptr;
+GUIObjectNode* MainMenuBarUINode = nullptr;
+GUIObjectNode* LatestUploadsUINode = nullptr;
+GUIObjectNode* UploadMenuUINode = nullptr;
+
 GUIButton* UserSideTabButton = nullptr;
 GUIObjectNode* UserIconNode = nullptr;
 GUIButton* InboxSideTabButton = nullptr;
 GUIObjectNode* InboxIconNode = nullptr;
 GUIButton* NotificationsSideTabButton = nullptr;
 GUIObjectNode* NotificationsIconNode = nullptr;
-GUIObjectNode* SideBarBox = nullptr;
+GUIButton* UploadSideTabButton = nullptr;
+GUIObjectNode* UploadIconNode = nullptr;
+
+GUIListBox* UploadFolderItemsListBox = nullptr;
+GUILabel* UploadFileNameLabel = nullptr;
+GUIEditBox* UploadFileTitleEditBox = nullptr;
+std::string SelectedUploadFileName = "";
 
 GUIListBox* LatestUploadsListBox = nullptr;
 GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
+void UpdateUploadFolderList(void)
+{
+	if (UploadFolderItemsListBox == nullptr) return;
+	UploadFolderItemsListBox->ClearItems();
+
+	std::string uploadFolder("_FilesToUpload");
+	std::vector<std::string> fileList;
+	ClientControl.DetectFilesInUploadFolder(uploadFolder, fileList);
+
+	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
+	auto entryY = 12;
+	auto entryH = UploadFolderItemsListBox->GetEntryHeight();
+	auto entryW = UploadFolderItemsListBox->GetWidth();
+
+	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
+	{
+		auto shortName = (*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
+		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, GUILabel::JUSTIFY_CENTER);
+		itemLabel->SetObjectName(shortName);
+		UploadFolderItemsListBox->AddItem(itemLabel);
+	}
+}
+
+void SelectUploadItem(GUIObjectNode* object)
+{
+	if (object == nullptr) return;
+	auto listBox = (GUIListBox*)(object);
+	auto selectedItem = listBox->GetSelectedItem();
+	SelectedUploadFileName = selectedItem->GetObjectName();
+	UploadFileNameLabel->SetText("File Name:       " + SelectedUploadFileName);
+	UploadFileTitleEditBox->SetText("");
+}
+
+
+void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
+{
+	if (StatusBarTextLabel == nullptr) return;
+
+	StatusBarTextLabel->SetText(statusBarMessage);
+
+	if (error) StatusBarBG->SetColor(0.8f, 0.1f, 0.1f, 1.0f);
+	else StatusBarBG->SetColor(0.1f, 0.4f, 0.7f, 1.0f);
+}
+
+void UploadFileToServer(GUIObjectNode* object)
+{
+	//  If there is no currently selected file to upload, return out
+	if (SelectedUploadFileName.length() == 0) return;
+	
+	//  If the currently selected file does not exist or is not readable, return out
+	auto fileToUpload = "_FilesToUpload/" + SelectedUploadFileName;
+	std::ifstream fileCheck(fileToUpload);
+	auto fileGood = fileCheck.good() && !fileCheck.bad();
+	fileCheck.close();
+	if (!fileGood)
+	{
+		SetStatusBarMessage("Upload Attempt Failed! File selected does not exist. Did you recently delete it?", true);
+		return;
+	}
+
+	//  If there is no access to the given file title, or the title is blank, return out
+	if (UploadFileTitleEditBox == nullptr) return;
+	auto fileToUploadTitle = UploadFileTitleEditBox->GetText();
+	if (fileToUploadTitle.length() == 0) return;
+
+	//  Attempt to start an upload of the file to the server
+	ClientControl.SendFileToServer(SelectedUploadFileName, fileToUpload, fileToUploadTitle);
+}
+
 void RequestLatestUploadFile(GUIObjectNode* node)
 {
 	auto entry = LatestUploadsListBox->GetSelectedItem();
 	SendMessage_FileRequest(entry->GetObjectName(), ClientControl.GetServerSocket(), NEW_PROVIDENCE_IP);
+}
+
+
+void UpdateLatestUploadsListBoxDownloadButtons(GUIObjectNode* object)
+{
+	if (object == nullptr) return;
+	auto listBox = (GUIListBox*)(object);
+	auto listBoxItems = listBox->GetItemList();
+	auto selectedItem = listBox->GetSelectedItem();
+
+	for (auto iter = listBoxItems.begin(); iter != listBoxItems.end(); ++iter)
+	{
+		auto downloadButton = (*iter)->GetChildByName("Download Button");
+		if (downloadButton == nullptr) continue;
+		auto visible = ((*iter) == selectedItem);
+		downloadButton->SetVisible(visible);
+	}
 }
 
 
@@ -55,6 +149,7 @@ void AddLatestUploadEntry(std::string upload)
 	auto button = GUIButton::CreateTemplatedButton("Standard", LatestUploadsWidth - 100, 6, 80, 20);
 	button->SetFont("Arial");
 	button->SetText("Download");
+	button->SetObjectName("Download Button");
 	button->SetLeftClickCallback(RequestLatestUploadFile);
 	entry->AddChild(button);
 
@@ -65,41 +160,40 @@ void AddLatestUploadEntry(std::string upload)
 void SetLatestUploads(std::vector<std::string> latestUploadsList)
 {
 	if (LatestUploadsListBox == nullptr) return;
+	LatestUploadsListBox->ClearItems();
 
 	for (auto iter = latestUploadsList.begin(); iter != latestUploadsList.end(); ++iter)
-	{
 		AddLatestUploadEntry((*iter));
-	}
+
+	UpdateLatestUploadsListBoxDownloadButtons(LatestUploadsListBox);
 }
 
 
 void SetUserMenuOpen(GUIObjectNode* node)
 {
-	SideBarOpen = !SideBarOpen;
+	//SideBarOpen = !SideBarOpen;
 
-	SideBarBox->SetVisible(SideBarOpen);
-	UserSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+	//SideBarBox->SetVisible(SideBarOpen);
+	// TODO 
+	//UserSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
 
-	InboxSideTabButton->SetVisible(!SideBarOpen);
-	NotificationsSideTabButton->SetVisible(!SideBarOpen);
+	//InboxSideTabButton->SetVisible(!SideBarOpen);
+	//NotificationsSideTabButton->SetVisible(!SideBarOpen);
 
 	//  TODO: Show User Menu in SideBar
-
-	//  DEBUG  //
-	ClientControl.SendFileToServer("TestImage8.png", "_FilesToUpload/TestImage8.png", "Test Image #8");
-	//  DEBUG  //
 }
 
 
 void SetInboxOpen(GUIObjectNode* button)
 {
-	SideBarOpen = !SideBarOpen;
+	//SideBarOpen = !SideBarOpen;
 
-	SideBarBox->SetVisible(SideBarOpen);
-	InboxSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+	//SideBarBox->SetVisible(SideBarOpen);
+	//  TODO
+	//InboxSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
 
-	UserSideTabButton->SetVisible(!SideBarOpen);
-	NotificationsSideTabButton->SetVisible(!SideBarOpen);
+	//UserSideTabButton->SetVisible(!SideBarOpen);
+	//NotificationsSideTabButton->SetVisible(!SideBarOpen);
 
 	//  TODO: Show Inbox Menu in SideBar
 }
@@ -107,6 +201,8 @@ void SetInboxOpen(GUIObjectNode* button)
 
 void SetInboxMessageCount(int messageCount)
 {
+	if (InboxIconNode == nullptr) return;
+
 	auto empty = (messageCount <= 0);
 	InboxIconNode->SetTextureID(textureManager.LoadTextureGetID(empty ? "./Assets/Textures/MainProgramUI/InboxEmpty.png" : "./Assets/Textures/MainProgramUI/InboxMailReceived.png"));
 	if (empty)		InboxIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
@@ -116,13 +212,14 @@ void SetInboxMessageCount(int messageCount)
 
 void SetNotificationsOpen(GUIObjectNode* button)
 {
-	SideBarOpen = !SideBarOpen;
+	//SideBarOpen = !SideBarOpen;
 
-	SideBarBox->SetVisible(SideBarOpen);
-	NotificationsSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
+	//SideBarBox->SetVisible(SideBarOpen);
+	//  TODO
+	//NotificationsSideTabButton->SetX(SideBarOpen ? SideBarWidth : 0);
 
-	UserSideTabButton->SetVisible(!SideBarOpen);
-	InboxSideTabButton->SetVisible(!SideBarOpen);
+	//UserSideTabButton->SetVisible(!SideBarOpen);
+	//InboxSideTabButton->SetVisible(!SideBarOpen);
 
 	//  TODO: Show Notifications Menu in SideBar
 }
@@ -130,6 +227,8 @@ void SetNotificationsOpen(GUIObjectNode* button)
 
 void SetNotificationCount(int notificationCount)
 {
+	if (NotificationsSideTabButton == nullptr) return;
+
 	auto empty = (notificationCount <= 0);
 	NotificationsIconNode->SetTextureID(textureManager.LoadTextureGetID(empty ? "./Assets/Textures/MainProgramUI/NotificationsEmpty.png" : "./Assets/Textures/MainProgramUI/NotificationsReceived.png"));
 	if (empty)		NotificationsIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
@@ -137,18 +236,45 @@ void SetNotificationCount(int notificationCount)
 }
 
 
-void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
+void SetHomeMenuOpen(GUIObjectNode* button)
 {
-	if (StatusBarTextLabel == nullptr) return;
 
-	StatusBarTextLabel->SetText(statusBarMessage);
+	//  Make the latest uploads UI visible
+	LatestUploadsUINode->SetVisible(true);
 
-	if (error) StatusBarBG->SetColor(0.8f, 0.1f, 0.1f, 1.0f);
-	else StatusBarBG->SetColor(0.1f, 0.4f, 0.7f, 1.0f);
+	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
+	LoginMenuNode->SetVisible(false);
+	MainMenuBarUINode->SetVisible(true);
+
+	//  Make the upload UI invisible
+	UploadMenuUINode->SetVisible(false);
 }
 
 
-void SetTransferPercentage(double percent, double time, long int fileSize, int timeRemaining, bool download)
+void SetBrowseMenuOpen(GUIObjectNode* button)
+{
+	//  TODO: Add the browse menu UI and trigger it here
+}
+
+
+void SetUploadMenuOpen(GUIObjectNode* button)
+{
+	//  Make the upload UI visible
+	UploadMenuUINode->SetVisible(true);
+
+	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
+	LoginMenuNode->SetVisible(false);
+	MainMenuBarUINode->SetVisible(true);
+
+	//  Make the latest uploads UI invisible
+	LatestUploadsUINode->SetVisible(false);
+
+	//  Run a new detection of items in the uploads folder
+	UpdateUploadFolderList();
+}
+
+
+void SetTransferPercentage(double percent, double time, uint64_t fileSize, uint64_t timeRemaining, bool download)
 {
 	int averageKBs = int((double(fileSize) / 1024.0) / time);
 
@@ -176,7 +302,11 @@ void LoginRequestResponseCallback(int response, int inboxCount, int notification
 {
 	bool success = (response == LOGIN_RESPONSE_SUCCESS);
 	LoginMenuNode->SetVisible(!success);
-	MainProgramUINode->SetVisible(success);
+	MainMenuBarUINode->SetVisible(success);
+	LatestUploadsUINode->SetVisible(success);
+	UploadMenuUINode->SetVisible(false);
+
+	UpdateUploadFolderList();
 
 	PasswordEditBox->SetText("");
 	SetStatusBarMessage(LoginResponses[response], !success);
@@ -255,9 +385,10 @@ private:
 	void InitializeClient();
 	void LoadStatusBar();
 	void LoadLoginMenu();
-	void LoadMainProgramUI();
+	void LoadMainMenuBarUI();
 	void LoadSideBarUI();
 	void LoadLatestUploadsUI();
+	void LoadUploadMenuUI();
 
 	void UpdateUI();
 
@@ -277,7 +408,7 @@ PrimaryDialogue::PrimaryDialogue()
 {
 	LoadStatusBar();
 	LoadLoginMenu();
-	LoadMainProgramUI();
+	LoadMainMenuBarUI();
 	InitializeClient();
 }
 
@@ -443,14 +574,10 @@ void PrimaryDialogue::LoadLoginMenu()
 }
 
 
-void PrimaryDialogue::LoadMainProgramUI()
+void PrimaryDialogue::LoadMainMenuBarUI()
 {
-	if (MainProgramUINode != nullptr) return;
-	MainProgramUINode = GUIObjectNode::CreateObjectNode("");
-	MainProgramUINode->SetVisible(false);
-	AddChild(MainProgramUINode);
-
 	//  Create the individual UI pieces
+	LoadUploadMenuUI();
 	LoadLatestUploadsUI();
 	LoadSideBarUI();
 
@@ -465,19 +592,69 @@ void PrimaryDialogue::LoadMainProgramUI()
 
 void PrimaryDialogue::LoadSideBarUI()
 {
+	if (MainMenuBarUINode != nullptr) return;
+	MainMenuBarUINode = GUIObjectNode::CreateObjectNode("");
+	MainMenuBarUINode->SetVisible(false);
+	AddChild(MainMenuBarUINode);
+
 	//  Load the background strip behind the status bar
-	SideBarBox = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
-	SideBarBox->SetColor(0.25f, 0.25f, 0.25f, 1.0f);
-	SideBarBox->SetDimensions(SideBarWidth, int(ScreenHeight) - StatusBarBG->GetHeight());
-	SideBarBox->SetPosition(0, 0);
-	SideBarBox->SetVisible(false);
-	MainProgramUINode->AddChild(SideBarBox);
+	auto mainMenuBackgroundBox = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
+	mainMenuBackgroundBox->SetColor(0.25f, 0.25f, 0.25f, 1.0f);
+	mainMenuBackgroundBox->SetDimensions(int(ScreenWidth), MainMenuBarHeight);
+	mainMenuBackgroundBox->SetPosition(0, 0);
+	MainMenuBarUINode->AddChild(mainMenuBackgroundBox);
+
+	//  Load the main menu "Home" button
+	auto homeButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
+	homeButton->SetColorBytes(0, 0, 0, 1);
+	homeButton->SetPosition(31, 5);
+	homeButton->SetDimensions(60, 28);
+	homeButton->SetLeftClickCallback(SetHomeMenuOpen);
+	MainMenuBarUINode->AddChild(homeButton);
+
+	//  Load the main menu "Home" button text
+	auto homeButtonText = GUILabel::CreateLabel("Arial-12-White", "HOME", 60, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(homeButtonText);
+
+	//  Load the main menu divider text between HOME and BROWSE
+	auto dividerLabel_1 = GUILabel::CreateLabel("Arial-12-White", "||", 110, 12, 100, 20, GUILabel::JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(dividerLabel_1);
+
+	//  Load the main menu "Browse" button
+	auto browseButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
+	browseButton->SetColorBytes(0, 0, 0, 1);
+	browseButton->SetPosition(125, 5);
+	browseButton->SetDimensions(80, 28);
+	browseButton->SetLeftClickCallback(SetBrowseMenuOpen);
+	MainMenuBarUINode->AddChild(browseButton);
+
+	//  Load the main menu "Browse" button text
+	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 165, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(browseButtonText);
+
+	//  Load the main menu divider text between BROWSE and UPLOAD
+	auto dividerLabel_2 = GUILabel::CreateLabel("Arial-12-White", "||", 217, 12, 100, 20, GUILabel::JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(dividerLabel_2);
+
+	//  Load the main menu "Upload" button
+	auto uploadButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
+	uploadButton->SetColorBytes(0, 0, 0, 1);
+	uploadButton->SetPosition(232, 5);
+	uploadButton->SetDimensions(80, 28);
+	uploadButton->SetLeftClickCallback(SetUploadMenuOpen);
+	MainMenuBarUINode->AddChild(uploadButton);
+
+	//  Load the main menu "Upload" button text
+	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(uploadButtonText);
+
+	return;
 
 	//  Load the side-bar user tab
 	UserSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 60, 40, 40);
 	UserSideTabButton->SetPressedSizeRatio(1.0f);
 	UserSideTabButton->SetLeftClickCallback(SetUserMenuOpen);
-	MainProgramUINode->AddChild(UserSideTabButton);
+	MainMenuBarUINode->AddChild(UserSideTabButton);
 
 	//  Load the side-bar user icon
 	UserIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/UserIcon.png");
@@ -490,7 +667,7 @@ void PrimaryDialogue::LoadSideBarUI()
 	InboxSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 110, 40, 40);
 	InboxSideTabButton->SetPressedSizeRatio(1.0f);
 	InboxSideTabButton->SetLeftClickCallback(SetInboxOpen);
-	MainProgramUINode->AddChild(InboxSideTabButton);
+	MainMenuBarUINode->AddChild(InboxSideTabButton);
 
 	//  Load the side-bar inbox icon
 	InboxIconNode = GUIObjectNode::CreateObjectNode("");
@@ -503,32 +680,125 @@ void PrimaryDialogue::LoadSideBarUI()
 	NotificationsSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 160, 40, 40);
 	NotificationsSideTabButton->SetPressedSizeRatio(1.0f);
 	NotificationsSideTabButton->SetLeftClickCallback(SetNotificationsOpen);
-	MainProgramUINode->AddChild(NotificationsSideTabButton);
+	MainMenuBarUINode->AddChild(NotificationsSideTabButton);
 
-	//  Load the side-bar inbox icon
+	//  Load the side-bar notifications icon
 	NotificationsIconNode = GUIObjectNode::CreateObjectNode("");
 	NotificationsIconNode->SetDimensions(24, 24);
 	NotificationsIconNode->SetPosition((NotificationsSideTabButton->GetWidth() / 2) - (NotificationsIconNode->GetWidth() / 2), (NotificationsSideTabButton->GetHeight() / 2) - (NotificationsIconNode->GetHeight() / 2));
 	NotificationsSideTabButton->AddChild(NotificationsIconNode);
 	SetNotificationCount(0);
+
+	//  Load the side-bar upload tab
+	UploadSideTabButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/SideBarTab.png", 0, 640, 40, 40);
+	UploadSideTabButton->SetPressedSizeRatio(1.0f);
+	UploadSideTabButton->SetLeftClickCallback(SetUploadMenuOpen);
+	MainMenuBarUINode->AddChild(UploadSideTabButton);
+
+	//  Load the side-bar upload icon
+	UploadIconNode = GUIObjectNode::CreateObjectNode("./Assets/Textures/MainProgramUI/UploadFileIcon.png");
+	UploadIconNode->SetDimensions(24, 24);
+	UploadIconNode->SetColor(0.6f, 0.6f, 0.6f, 1.0f);
+	UploadIconNode->SetPosition((UploadSideTabButton->GetWidth() / 2) - (UploadIconNode->GetWidth() / 2), (UploadSideTabButton->GetHeight() / 2) - (UploadIconNode->GetHeight() / 2));
+	UploadSideTabButton->AddChild(UploadIconNode);
 }
 
 
 void PrimaryDialogue::LoadLatestUploadsUI()
 {
+	if (LatestUploadsUINode != nullptr) return;
+	LatestUploadsUINode = GUIObjectNode::CreateObjectNode("");
+	LatestUploadsUINode->SetVisible(false);
+	AddChild(LatestUploadsUINode);
+
 	//  Load the background strip behind the status bar
 	auto latestUploadsContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
 	latestUploadsContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
 	latestUploadsContainer->SetDimensions(LatestUploadsWidth, LatestUploadsHeight);
-	latestUploadsContainer->SetPosition(80, 40);
-	MainProgramUINode->AddChild(latestUploadsContainer);
+	latestUploadsContainer->SetPosition(80, 70);
+	LatestUploadsUINode->AddChild(latestUploadsContainer);
 
 	auto latestUploadsTitle = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "Latest Uploaded Files:", 10, 10, LatestUploadsWidth - 20, 30);
 	latestUploadsTitle->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	latestUploadsContainer->AddChild(latestUploadsTitle);
 
 	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 60, LatestUploadsWidth - 22, 2, 12, 12, 12, 12, 12, 24, 2);
+	LatestUploadsListBox->SetItemClickCallback(UpdateLatestUploadsListBoxDownloadButtons);
 	latestUploadsContainer->AddChild(LatestUploadsListBox);
+}
+
+
+void PrimaryDialogue::LoadUploadMenuUI()
+{
+	if (UploadMenuUINode != nullptr) return;
+	UploadMenuUINode = GUIObjectNode::CreateObjectNode("");
+	UploadMenuUINode->SetVisible(false);
+	AddChild(UploadMenuUINode);
+
+	auto filesInUploadFolderLabel = GUILabel::CreateLabel("Arial-12-White", "Files In The Upload Folder:", 34, 92, 200, 20);
+	filesInUploadFolderLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(filesInUploadFolderLabel);
+
+	UploadFolderItemsListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 108, 432, 568, 414, 0, 18, 18, 18, 18, 18, 32, 2);
+	UploadFolderItemsListBox->SetColorBytes(87, 28, 87, 255);
+	UploadFolderItemsListBox->SetItemClickCallback(SelectUploadItem);
+	UploadMenuUINode->AddChild(UploadFolderItemsListBox);
+
+	UploadFileNameLabel = GUILabel::CreateLabel("Arial-12-White", "File Name:       NO FILE SELECTED", 530, 126, 200, 20);
+	UploadFileNameLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(UploadFileNameLabel);
+
+	auto fileTitleLabel = GUILabel::CreateLabel("Arial-12-White", "File Title:", 530, 160, 200, 20);
+	fileTitleLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(fileTitleLabel);
+
+	UploadFileTitleEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 640, 150, 600, 32);
+	UploadFileTitleEditBox->SetFont("Arial");
+	UploadFileTitleEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
+	UploadFileTitleEditBox->SetColorBytes(230, 230, 230, 255);
+	UploadMenuUINode->AddChild(UploadFileTitleEditBox);
+
+	auto fileDescriptionLabel = GUILabel::CreateLabel("Arial-12-White", "File Description:", 530, 196, 200, 20);
+	fileDescriptionLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(fileDescriptionLabel);
+
+	auto fileDescriptionEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 528, 218, 712, 110);
+	fileDescriptionEditBox->SetFont("Arial");
+	fileDescriptionEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
+	fileDescriptionEditBox->SetColorBytes(230, 230, 230, 255);
+	UploadMenuUINode->AddChild(fileDescriptionEditBox);
+
+	auto fileTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 344, 200, 20);
+	fileTypeLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(fileTypeLabel);
+
+	auto fileTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 338, 420, 40, 386, 10, 16, 16);
+	auto fileTypeX = fileTypeDropDown->GetWidth() / 2;
+	auto fileTypeY = fileTypeDropDown->GetHeight() / 2 - 6;
+	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "MUSIC", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "MOVIES", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "GAMES", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+	UploadMenuUINode->AddChild(fileTypeDropDown);
+
+	auto fileSubTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 386, 200, 20);
+	fileSubTypeLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(fileSubTypeLabel);
+
+	auto fileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
+	auto fileSubTypeX = fileSubTypeDropDown->GetWidth() / 2;
+	auto fileSubTypeY = fileSubTypeDropDown->GetHeight() / 2 - 6;
+	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "ROCK", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "EDM/DANCE", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "JAZZ", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "LHHRBTRST", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	UploadMenuUINode->AddChild(fileSubTypeDropDown);
+
+	auto fileUploadButton = GUIButton::CreateTemplatedButton("Standard", 824, 470, 420, 50);
+	fileUploadButton->SetColorBytes(120, 215, 120, 255);
+	fileUploadButton->SetFont("Arial");
+	fileUploadButton->SetText("UPLOAD FILE");
+	fileUploadButton->SetLeftClickCallback(UploadFileToServer);
+	UploadMenuUINode->AddChild(fileUploadButton);
 }
 
 

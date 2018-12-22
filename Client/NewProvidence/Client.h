@@ -7,7 +7,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
 
-#define VERSION_NUMBER					"2018.12.19"
+#define VERSION_NUMBER					"2018.12.20"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -54,7 +54,7 @@ private:
 	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
-	std::function<void(double, double, long int, int, bool)> TransferPercentCompleteCallback = nullptr;
+	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
 	std::vector<std::string> LatestUploadsList;
 
 public:
@@ -67,11 +67,12 @@ public:
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
-	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, long int, int, bool)>& callback) { TransferPercentCompleteCallback = callback; }
+	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
 
-	void DetectFilesInUploadFolder(std::vector<std::string>& fileList);
+	void AddLatestUpload(int index, std::string upload);
+	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle);
 	void ContinueFileTransfers(void);
 
@@ -91,10 +92,24 @@ bool Client::Connect(void)
 }
 
 
-void Client::DetectFilesInUploadFolder(std::vector<std::string>& fileList)
+void Client::AddLatestUpload(int index, std::string upload)
 {
-	auto uploadFolderPath = "/_FilesToUpload/";
-	for (const auto& entry : std::filesystem::directory_iterator(uploadFolderPath))
+	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
+		if ((*iter).compare(upload) == 0) return;
+
+	if (int(LatestUploadsList.size()) > index)
+	{
+		auto iter = LatestUploadsList.begin();
+		for (int i = 0; i < index; ++i) iter++;
+		LatestUploadsList.insert(iter, upload);
+	}
+	else LatestUploadsList.push_back(upload);
+}
+
+
+void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList)
+{
+	for (const auto& entry : std::filesystem::directory_iterator(folder))
 	{
 		auto path = entry.path().string();
 		fileList.push_back(path);
@@ -124,7 +139,7 @@ void Client::ContinueFileTransfers(void)
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
 
 	FileSend->SetFileTransferEndTime(gameSeconds);
-	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), 0, false);
+	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), false);
 
 	if (FileSend->GetFileTransferComplete())
 	{
@@ -235,6 +250,7 @@ bool Client::ReadMessages(void)
 
 	case MESSAGE_ID_LATEST_UPLOADS_LIST:
 	{
+		auto uploadsStartIndex = winsockWrapper.ReadInt(0);
 		auto latestUploadCount = winsockWrapper.ReadInt(0);
 		for (auto i = 0; i < latestUploadCount; ++i)
 		{
@@ -242,7 +258,8 @@ bool Client::ReadMessages(void)
 			assert(size != 0);
 			unsigned char* data = winsockWrapper.ReadChars(0, size);
 			auto decryptedTitle = Groundfish::Decrypt(data);
-			LatestUploadsList.push_back(std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size())));
+			auto decryptedTitleString = std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size()));
+			AddLatestUpload(uploadsStartIndex++, decryptedTitleString);
 		}
 
 		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(LatestUploadsList);

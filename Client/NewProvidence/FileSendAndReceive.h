@@ -164,6 +164,8 @@ public:
 	inline double GetEstimatedTransferSpeed() const { return (float(GetFileTransferBytesCompleted()) / (std::max<float>(float(gameSeconds - TransferStartTime), 0.01f))); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
+	inline uint64_t GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
+	inline uint64_t GetEstimatedSecondsRemaining() const { auto estimate = GetEstimatedTransferSpeed(); return ((estimate == 0) ? 100 : uint64_t(double(GetFilePortionsRemaining() * FILE_SEND_BUFFER_SIZE) / GetEstimatedTransferSpeed())); }
 
 	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int socketID, std::string ipAddress, const int port, bool deleteAfter = false) :
 		FileName(fileName),

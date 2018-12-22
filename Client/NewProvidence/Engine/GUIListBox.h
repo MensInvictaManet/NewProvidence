@@ -38,6 +38,7 @@ public:
 	void SetSelectable(bool selectable) { m_Selectable = selectable; }
 	void SetSelectedIndex(int index) { SelectedIndex = index; }
 	void SetFlowToBottom(bool flowToBottom) { m_FlowToBottom = flowToBottom; }
+	const std::vector<GUIObjectNode*> GetItemList() const { return m_ItemList; }
 	unsigned int GetItemCount() const { return static_cast<unsigned int>(m_ItemList.size()); }
 	unsigned int GetItemDisplayCount() const { return ItemDisplayCount; }
 	inline int GetEntryHeight() const { return EntryHeight; }
@@ -257,8 +258,9 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 			if (inputManager.GetMouseButtonLeft() != MOUSE_BUTTON_PRESSED) return;
 
 			inputManager.TakeMouseButtonLeft();
-			if (SelectedIndex != newSelectedIndex && m_ItemClickCallback != nullptr) m_ItemClickCallback(this);
+			bool newSelection = (SelectedIndex != newSelectedIndex);
 			SelectedIndex = newSelectedIndex;
+			if (newSelection && m_ItemClickCallback != nullptr) m_ItemClickCallback(this);
 			return;
 		}
 	}
