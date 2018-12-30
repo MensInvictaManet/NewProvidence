@@ -34,15 +34,29 @@ void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
 		auto fileSizeLabel = GUILabel::CreateLabel("Arial", sizeString.c_str(), 330, 8, 200, 24);
 		newFileDataEntry->AddChild(fileSizeLabel);
 
+		auto fileType = fileData.FileType;
+		auto fileTypeImage = GetFileTypeIconFromID(fileType);
+		fileTypeImage->SetDimensions(20, 20);
+		fileTypeImage->SetColorBytes(64, 64, 128, 255);
+		fileTypeImage->SetPosition(450, 8);
+		newFileDataEntry->AddChild(fileTypeImage);
+
+		auto fileSubType = fileData.FileSubType;
+		auto fileSubTypeImage = GetFileSubTypeIconFromID(fileSubType);
+		fileSubTypeImage->SetDimensions(20, 20);
+		fileSubTypeImage->SetColorBytes(255, 255, 255, 255);
+		fileSubTypeImage->SetPosition(470, 8);
+		newFileDataEntry->AddChild(fileSubTypeImage);
+
 		//  Decrypt the file title and set the file title label
 		auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
 		auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
 		auto fileTitleLimitedString = fileTitle.substr(0, std::min<int>(40, fileTitle.length()));
-		auto fileTitleLabel = GUILabel::CreateLabel("Arial", fileTitleLimitedString.c_str(), 450, 8, 200, 24);
+		auto fileTitleLabel = GUILabel::CreateLabel("Arial", fileTitleLimitedString.c_str(), 520, 8, 200, 24);
 		newFileDataEntry->AddChild(fileTitleLabel);
 
 		//  Create the delete button
-		auto deleteButton = GUIButton::CreateTemplatedButton("Standard", 860, 6, 60, 20);
+		auto deleteButton = GUIButton::CreateTemplatedButton("Standard", 940, 6, 60, 20);
 		deleteButton->SetColor(1.0f, 0.4f, 0.4f, 1.0f);
 		deleteButton->SetFont("Arial");
 		deleteButton->SetText("delete");
@@ -134,12 +148,12 @@ void PrimaryDialogue::LoadMainProgramUI()
 void PrimaryDialogue::LoadHostedFileListUI()
 {
 	//  Load the container
-	const int listWidth = 940;
+	const int listWidth = 1020;
 	const int listHeight = 500;
 	auto hostedFileListContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
 	hostedFileListContainer->SetColor(0.5f, 0.25f, 0.25f, 1.0f);
 	hostedFileListContainer->SetDimensions(listWidth, listHeight);
-	hostedFileListContainer->SetPosition(340, 5);
+	hostedFileListContainer->SetPosition(260, 5);
 	MainProgramUINode->AddChild(hostedFileListContainer);
 
 	//  Load the file ID column label
@@ -150,8 +164,12 @@ void PrimaryDialogue::LoadHostedFileListUI()
 	auto fileSizeLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "FILE SIZE:", 330, 4, listWidth, 24);
 	hostedFileListContainer->AddChild(fileSizeLabel);
 
-	//  Load the file size column label
-	auto fileTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "FILE TITLE:", 450, 4, listWidth, 24);
+	//  Load the file type column label
+	auto fileTypeLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "TYPE:", 450, 4, listWidth, 24);
+	hostedFileListContainer->AddChild(fileTypeLabel);
+
+	//  Load the file title column label
+	auto fileTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "TITLE:", 520, 4, listWidth, 24);
 	hostedFileListContainer->AddChild(fileTitleLabel);
 
 	//  Create the hosted file listbox

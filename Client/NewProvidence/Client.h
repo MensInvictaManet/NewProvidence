@@ -82,7 +82,7 @@ public:
 
 	void AddLatestUpload(int index, std::string upload);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
-	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle);
+	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileTransfers(void);
 
 	void Initialize(void);
@@ -126,7 +126,7 @@ void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::stri
 }
 
 
-void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle)
+void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID)
 {
 	if (FileSend != nullptr) return;
 
@@ -135,7 +135,7 @@ void Client::SendFileToServer(std::string fileName, std::string filePath, std::s
 	Groundfish::EncryptAndMoveFile(filePath, hostedFileName);
 
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
+	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, fileTypeID, fileSubTypeID, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
 }
 
 
@@ -306,6 +306,10 @@ bool Client::ReadMessages(void)
 		auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
 		auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
+		//  Grab the file type and sub-type
+		auto fileTypeID = winsockWrapper.ReadShort(0);
+		auto fileSubTypeID = winsockWrapper.ReadShort(0);
+
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadLongInt(0);
 		auto fileChunkSize = winsockWrapper.ReadLongInt(0);
@@ -313,7 +317,7 @@ bool Client::ReadMessages(void)
 
 		//  Create a new file receive task
 		(void)_wmkdir(L"_DownloadedFiles");
-		FileReceive = new FileReceiveTask(decryptedFilename, decryptedFileTitle, decryptedFileDescription, fileSize, fileChunkSize, FileChunkBufferSize, tempFilename, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
+		FileReceive = new FileReceiveTask(decryptedFilename, decryptedFileTitle, decryptedFileDescription, fileTypeID, fileSubTypeID, fileSize, fileChunkSize, FileChunkBufferSize, tempFilename, 0, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT);
 		FileReceive->SetDecryptWhenReceived(true);
 
 		//  Respond to the file request success

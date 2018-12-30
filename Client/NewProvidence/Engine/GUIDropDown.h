@@ -169,6 +169,7 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 		//  If we click anywhere, close the drop-down box
 		if (leftButtonState == MOUSE_BUTTON_PRESSED)
 		{
+			inputManager.TakeMouseButtonLeft();
 			ExpandedHeight = 0;
 			m_Clicked = false;
 			SetRenderLast(false);

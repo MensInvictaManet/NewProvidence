@@ -165,6 +165,9 @@
     <ClInclude Include="MessageIdentifiers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HostedFileData.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt">

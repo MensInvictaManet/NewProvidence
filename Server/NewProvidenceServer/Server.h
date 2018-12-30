@@ -5,6 +5,7 @@
 #include "Engine/SimpleSHA256.h"
 #include "Groundfish.h"
 #include "FileSendAndReceive.h"
+#include "HostedFileData.h"
 
 #include <fstream>
 #include <ctime>
@@ -17,136 +18,6 @@
 
 #define PING_INTERVAL_TIME				5.0
 #define PINGS_BEFORE_DISCONNECT			30
-
-struct HostedFileData
-{
-	std::string FileTitleChecksum;
-	std::vector<unsigned char> EncryptedFileName;
-	std::vector<unsigned char> EncryptedFileTitle;
-	std::vector<unsigned char> EncryptedFileDescription;
-	std::vector<unsigned char> EncryptedUploader;
-	uint64_t FileSize;
-	std::string FileUploadTime;
-
-	HostedFileData()
-	{
-		FileTitleChecksum = "";
-		EncryptedFileName.clear();
-		EncryptedFileTitle.clear();
-		EncryptedFileDescription.clear();
-		EncryptedUploader.clear();
-		FileSize = 0;
-		FileUploadTime = "2018-01-01 - 12:00:00";
-	}
-
-	void WriteToFile(std::ofstream& outFile)
-	{
-		//  Write the checksum length
-		int checksumSize = FileTitleChecksum.length();
-		outFile.write((char*)&checksumSize, sizeof(checksumSize));
-
-		//  Write the checksum
-		outFile.write(FileTitleChecksum.c_str(), checksumSize);
-
-		//  Write the encrypted file name length
-		int efnSize = EncryptedFileName.size();
-		outFile.write((char*)&efnSize, sizeof(efnSize));
-
-		//  Write the encrypted file name
-		outFile.write((char*)EncryptedFileName.data(), efnSize);
-
-		//  Write the encrypted file title length
-		int eftSize = EncryptedFileTitle.size();
-		outFile.write((char*)&eftSize, sizeof(eftSize));
-
-		//  Write the encrypted file title
-		outFile.write((char*)EncryptedFileTitle.data(), eftSize);
-
-		//  Write the encrypted file description length
-		int efdSize = EncryptedFileDescription.size();
-		outFile.write((char*)&efdSize, sizeof(efdSize));
-
-		//  Write the encrypted file description
-		outFile.write((char*)EncryptedFileDescription.data(), efdSize);
-
-		//  Write the encrypted file uploader length
-		int efuSize = EncryptedUploader.size();
-		outFile.write((char*)&efuSize, sizeof(efuSize));
-
-		//  Write the encrypted file uploader
-		outFile.write((char*)EncryptedUploader.data(), efuSize);
-
-		//  Write the file size
-		outFile.write((char*)&FileSize, sizeof(FileSize));
-
-		//  Write the file upload time string size
-		int uploadTimeLength = int(FileUploadTime.length());
-		outFile.write((char*)(&uploadTimeLength), sizeof(uploadTimeLength));
-
-		//  Write the file upload time string
-		outFile.write((char*)FileUploadTime.c_str(), uploadTimeLength);
-	}
-
-	bool ReadFromFile(std::ifstream& inFile)
-	{
-		//  Read the checksum length
-		int checksumSize;
-		inFile.read((char*)&checksumSize, sizeof(checksumSize));
-		if (inFile.eof()) return false;
-
-		//  Read the checksum
-		char readInData[512];
-		inFile.read(readInData, checksumSize);
-		FileTitleChecksum = std::string(readInData, checksumSize);
-
-		//  Read the encrypted file name length
-		int efnSize;
-		inFile.read((char*)&efnSize, sizeof(efnSize));
-
-		//  Read the encrypted file name
-		inFile.read(readInData, efnSize);
-		for (auto i = 0; i < efnSize; ++i) EncryptedFileName.push_back((unsigned char)readInData[i]);
-
-		//  Read the encrypted file title length
-		int eftSize;
-		inFile.read((char*)&eftSize, sizeof(eftSize));
-
-		//  Read the encrypted file title
-		inFile.read(readInData, eftSize);
-		for (auto i = 0; i < eftSize; ++i) EncryptedFileTitle.push_back((unsigned char)readInData[i]);
-
-		//  Read the encrypted file description length
-		int efdSize;
-		inFile.read((char*)&efdSize, sizeof(efdSize));
-
-		//  Read the encrypted file name
-		inFile.read(readInData, efdSize);
-		for (auto i = 0; i < efdSize; ++i) EncryptedFileDescription.push_back((unsigned char)readInData[i]);
-
-		//  Read the encrypted file uploader length
-		int efuSize;
-		inFile.read((char*)&efuSize, sizeof(efuSize));
-
-		//  Read the encrypted file uploader
-		inFile.read(readInData, efuSize);
-		for (auto i = 0; i < efuSize; ++i) EncryptedUploader.push_back((unsigned char)readInData[i]);
-
-		//  Read the file size
-		inFile.read((char*)&FileSize, sizeof(FileSize));
-
-		//  Read the file upload time length
-		int futLength;
-		inFile.read((char*)&futLength, sizeof(futLength));
-
-		//  Read the encrypted file uploader
-		inFile.read(readInData, futLength);
-		FileUploadTime.clear();
-		for (auto i = 0; i < futLength; ++i) FileUploadTime += readInData[i];
-
-		return true;
-	}
-};
-
 
 std::list<HostedFileData> HostedFileDataList;
 
@@ -481,7 +352,7 @@ private:
 	void SaveUserLoginDetails(void);
 	void AddUserLoginDetails(std::string username, std::string password);
 
-	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
+	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
@@ -761,6 +632,10 @@ void Server::ReceiveMessages(void)
 			auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
 			auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
 
+			//  grab the file type and sub type
+			auto fileTypeID = winsockWrapper.ReadShort(0);
+			auto fileSubTypeID = winsockWrapper.ReadShort(0);
+
 			//  Grab the file size, file chunk size, and buffer count
 			auto fileSize = winsockWrapper.ReadLongInt(0);
 			auto fileChunkSize = winsockWrapper.ReadLongInt(0);
@@ -770,7 +645,7 @@ void Server::ReceiveMessages(void)
 
 			//  Create a new file receive task
 			(void) _wmkdir(L"_DownloadedFiles");
-			user->UserFileReceiveTask = new FileReceiveTask(decryptedFileName, decryptedFileTitle, decryptedFileDescription, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
+			user->UserFileReceiveTask = new FileReceiveTask(decryptedFileName, decryptedFileTitle, decryptedFileDescription, fileTypeID, fileSubTypeID, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
 			user->UserFileReceiveTask->SetDecryptWhenReceived(false);
 		}
 		break;
@@ -821,7 +696,7 @@ void Server::ReceiveMessages(void)
 
 				if (fileTask->GetFileTransferComplete())
 				{
-					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription());
+					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription(), fileTask->GetFileTypeID(), fileTask->GetFileSubTypeID());
 
 					delete user->UserFileReceiveTask;
 					user->UserFileReceiveTask = nullptr;
@@ -866,7 +741,8 @@ void Server::ReceiveMessages(void)
 		break;
 
 		default:
-			assert(false);
+			debugConsole->AddDebugConsoleLine("Unknown message ID received: " + std::to_string(messageID));
+			//assert(false);
 			break;
 		}
 	}
@@ -1036,7 +912,7 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 }
 
 
-void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription)
+void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID)
 {
 	assert(fileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
@@ -1068,6 +944,8 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
 	newFile.FileSize = fileSize;
 	newFile.FileUploadTime = GetCurrentTimeString();
+	newFile.FileType = HostedFileType(fileTypeID);
+	newFile.FileSubType = HostedFileSubtype(fileSubTypeID);
 
 	HostedFileDataList.push_back(newFile);
 	HostedFileDataList.sort(CompareUploadsByTimeAdded);
@@ -1235,12 +1113,16 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 	auto fileName = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
 	auto filePath = "./_HostedFiles/" + fileData.FileTitleChecksum + ".hostedfile";
 
+	//  Get the file type and sub-type
+	auto fileTypeID = fileData.FileType;
+	auto fileSubTypeID = fileData.FileSubType;
+
 	//  Decrypt the file title
 	auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
 	auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
 
 	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSendTask* newTask = new FileSendTask(fileName, fileTitle, filePath, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
+	FileSendTask* newTask = new FileSendTask(fileName, fileTitle, filePath, fileTypeID, fileSubTypeID, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
 	user->UserFileSendTask = newTask;
 	UpdateFileTransferPercentage(user);
 }

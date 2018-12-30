@@ -7,6 +7,7 @@
 #include "Engine/GUIListBox.h"
 #include "Engine/FontManager.h"
 #include "Engine/TimeSlice.h"
+#include "HostedFileData.h"
 #include <math.h>
 
 const auto MainMenuBarHeight = 40;
@@ -40,6 +41,8 @@ GUIObjectNode* UploadIconNode = nullptr;
 GUIListBox* UploadFolderItemsListBox = nullptr;
 GUILabel* UploadFileNameLabel = nullptr;
 GUIEditBox* UploadFileTitleEditBox = nullptr;
+GUIDropDown* UploadFileTypeDropDown = nullptr;
+GUIDropDown* UploadFileSubTypeDropDown = nullptr;
 std::string SelectedUploadFileName = "";
 
 GUILabel* LatestUploadsTitleLabel = nullptr;
@@ -118,8 +121,14 @@ void UploadFileToServer(GUIObjectNode* object)
 		return;
 	}
 
+	//  Get the file type and sub-type, ensuring they match
+	auto fileTypeString = ((GUILabel*)(UploadFileTypeDropDown->GetSelectedItem()))->GetText();
+	auto fileSubTypeString = ((GUILabel*)(UploadFileSubTypeDropDown->GetSelectedItem()))->GetText();
+	int fileTypeID = GetFileTypeIDFromName(fileTypeString);
+	int fileSubTypeID = GetFileSubTypeIDFromName(fileSubTypeString);
+
 	//  Attempt to start an upload of the file to the server
-	ClientControl.SendFileToServer(SelectedUploadFileName, fileToUpload, fileToUploadTitle);
+	ClientControl.SendFileToServer(SelectedUploadFileName, fileToUpload, fileToUploadTitle, fileTypeID, fileSubTypeID);
 }
 
 void RequestLatestUploadFile(GUIObjectNode* node)
@@ -766,33 +775,33 @@ void PrimaryDialogue::LoadUploadMenuUI()
 	fileTypeLabel->SetColorBytes(160, 160, 160, 255);
 	UploadMenuUINode->AddChild(fileTypeLabel);
 
-	auto fileTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 338, 420, 40, 386, 10, 16, 16);
-	auto fileTypeX = fileTypeDropDown->GetWidth() / 2;
-	auto fileTypeY = fileTypeDropDown->GetHeight() / 2 - 6;
-	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "MUSIC", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
-	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "MOVIES", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
-	fileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "GAMES", fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
-	UploadMenuUINode->AddChild(fileTypeDropDown);
-
-	auto fileSubTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 386, 200, 20);
-	fileSubTypeLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(fileSubTypeLabel);
-
-	auto fileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
-	auto fileSubTypeX = fileSubTypeDropDown->GetWidth() / 2;
-	auto fileSubTypeY = fileSubTypeDropDown->GetHeight() / 2 - 6;
-	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "ROCK", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
-	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "EDM/DANCE", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
-	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "JAZZ", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
-	fileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", "LHHRBTRST", fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
-	UploadMenuUINode->AddChild(fileSubTypeDropDown);
-
+	//  Note: Create the upload button before the drop-downs, as they overlap it and the click will otherwise go through
 	auto fileUploadButton = GUIButton::CreateTemplatedButton("Standard", 824, 470, 420, 50);
 	fileUploadButton->SetColorBytes(120, 215, 120, 255);
 	fileUploadButton->SetFont("Arial");
 	fileUploadButton->SetText("UPLOAD FILE");
 	fileUploadButton->SetLeftClickCallback(UploadFileToServer);
 	UploadMenuUINode->AddChild(fileUploadButton);
+
+	UploadFileTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 338, 420, 40, 386, 10, 16, 16);
+	auto fileTypeX = UploadFileTypeDropDown->GetWidth() / 2;
+	auto fileTypeY = UploadFileTypeDropDown->GetHeight() / 2 - 6;
+	auto fileTypeList = GetListOfFileTypes();
+	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
+		UploadFileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+	UploadMenuUINode->AddChild(UploadFileTypeDropDown);
+
+	auto fileSubTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 386, 200, 20);
+	fileSubTypeLabel->SetColorBytes(160, 160, 160, 255);
+	UploadMenuUINode->AddChild(fileSubTypeLabel);
+
+	UploadFileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
+	auto fileSubTypeX = UploadFileSubTypeDropDown->GetWidth() / 2;
+	auto fileSubTypeY = UploadFileSubTypeDropDown->GetHeight() / 2 - 6;
+	auto fileSubTypeList = GetListOfFileSubTypes();
+	for (auto iter = fileSubTypeList.begin(); iter != fileSubTypeList.end(); ++iter)
+		UploadFileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	UploadMenuUINode->AddChild(UploadFileSubTypeDropDown);
 }
 
 
