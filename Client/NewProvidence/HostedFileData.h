@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <functional>
 
 enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_OTHER, FILE_TYPE_COUNT };
 enum HostedFileSubtype
@@ -11,13 +12,20 @@ enum HostedFileSubtype
 	FILE_SUBTYPE_COUNT
 };
 
+constexpr unsigned int hash(const char* str, int h = 0)
+{
+	return !str[h] ? 5381 : (hash(str, h + 1) * 33) ^ str[h];
+}
+
 inline std::string GetFileTypeNameFromID(int32_t id)
 {
-	std::unordered_map<int32_t, std::string> dataMap;
-	dataMap[FILETYPE_MUSIC] = "MUSIC";
-	dataMap[FILETYPE_VIDEO] = "VIDEO";
-	dataMap[FILETYPE_OTHER] = "OTHER";
-	return (dataMap.find(id) == dataMap.end() ? "UNKNOWN" : dataMap[id]);
+	switch (id)
+	{
+	case FILETYPE_MUSIC:		return "MUSIC";
+	case FILETYPE_VIDEO:		return "VIDEO";
+	case FILETYPE_OTHER:		return "OTHER";
+	default:					return "UNKNOWN";
+	}
 }
 
 inline int32_t GetFileTypeIDFromName(std::string name)
@@ -31,15 +39,17 @@ inline int32_t GetFileTypeIDFromName(std::string name)
 
 inline std::string GetFileSubTypeNameFromID(int32_t id)
 {
-	std::unordered_map<int32_t, std::string> dataMap;
-	dataMap[FILETYPE_MUSIC_LFHHRBTRST] = "MUSIC: LFHHRBTRST";
-	dataMap[FILETYPE_MUSIC_EDM_DANCE] = "MUSIC: EDM/DANCE";
-	dataMap[FILETYPE_MUSIC_OTHER] = "MUSIC:OTHER";
-	dataMap[FILETYPE_VIDEO_TV] = "MUSIC: TELEVISION";
-	dataMap[FILETYPE_VIDEO_MOVIE] = "VIDEO: MOVIE";
-	dataMap[FILETYPE_VIDEO_OTHER] = "VIDEO: OTHER";
-	dataMap[FILETYPE_OTHER_MISCELLANEOUS] = "OTHER:MISCELANEOUS";
-	return (dataMap.find(id) == dataMap.end() ? "UNKNOWN" : dataMap[id]);
+	switch (id)
+	{
+	case FILETYPE_MUSIC_LFHHRBTRST:		return "MUSIC: LFHHRBTRST";
+	case FILETYPE_MUSIC_EDM_DANCE:		return "MUSIC: EDM/DANCE";
+	case FILETYPE_MUSIC_OTHER:			return "MUSIC: OTHER";
+	case FILETYPE_VIDEO_TV:				return "MUSIC: TELEVISION";
+	case FILETYPE_VIDEO_MOVIE:			return "VIDEO: MOVIE";
+	case FILETYPE_VIDEO_OTHER:			return "VIDEO: OTHER";
+	case FILETYPE_OTHER_MISCELLANEOUS:	return "OTHER: MISCELANEOUS";
+	default:							return "UNKNOWN";
+	}
 }
 
 inline int32_t GetFileSubTypeIDFromName(std::string name)
@@ -55,20 +65,30 @@ inline int32_t GetFileSubTypeIDFromName(std::string name)
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
 
-inline std::vector<std::string> GetListOfFileTypes()
+inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
 {
-	std::vector<std::string> fileTypeList;
-	for (auto i = 0; i < FILE_TYPE_COUNT; ++i)
-		fileTypeList.push_back(GetFileTypeNameFromID(i));
-	return fileTypeList;
+	switch (id)
+	{
+	case FILETYPE_MUSIC:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/MusicIcon.png");
+	case FILETYPE_VIDEO:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/VideoIcon.png");
+	case FILETYPE_OTHER:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	default:					return nullptr;
+	}
 }
 
-inline std::vector<std::string> GetListOfFileSubTypes()
+inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 {
-	std::vector<std::string> fileSubTypeList;
-	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
-		fileSubTypeList.push_back(GetFileSubTypeNameFromID(i));
-	return fileSubTypeList;
+	switch (id)
+	{
+	case FILETYPE_MUSIC_LFHHRBTRST:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/LHHRBTRSTIcon.png");
+	case FILETYPE_MUSIC_EDM_DANCE:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_MUSIC_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_VIDEO_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_OTHER_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	default:								return nullptr;
+	}
 }
 
 struct HostedFileData

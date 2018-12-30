@@ -10,7 +10,7 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2018.12.21"
+#define VERSION_NUMBER					"2018.12.30"
 
 #define NEW_PROVIDENCE_PORT				2347
 
