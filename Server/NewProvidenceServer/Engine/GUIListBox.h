@@ -253,7 +253,7 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 		if (newSelectedIndex >= MovementIndex && newSelectedIndex < int(m_ItemList.size()) && newSelectedIndex < MovementIndex + int(ItemDisplayCount))
 		{
 			//  If this index is already selected, check for input inside of the entry node first
-			auto selected_y_offset = (EntryHeight + SpaceBetweenEntries) * SelectedIndex;
+			auto selected_y_offset = (EntryHeight + SpaceBetweenEntries) * (SelectedIndex - MovementIndex);
 			if (newSelectedIndex == SelectedIndex) m_ItemList[SelectedIndex]->Input(x, y + selected_y_offset);
 			if (inputManager.GetMouseButtonLeft() != MOUSE_BUTTON_PRESSED) return;
 
