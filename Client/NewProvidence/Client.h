@@ -6,8 +6,9 @@
 #include "Engine/SimpleMD5.h"
 #include "Engine/SimpleSHA256.h"
 #include "FileSendAndReceive.h"
+#include "HostedFileData.h"
 
-#define VERSION_NUMBER					"2018.12.30"
+#define VERSION_NUMBER					"2019.01.01"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -50,6 +51,19 @@ void SendMessage_FileRequest(std::string fileID, int socket, const char* ip)
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
+struct HostedFileEntry
+{
+	HostedFileType FileType;
+	HostedFileSubtype FileSubType;
+	std::string FileTitle;
+
+	HostedFileEntry(HostedFileType type, HostedFileSubtype subType, std::string title) :
+		FileType(type),
+		FileSubType(subType),
+		FileTitle(title)
+	{}
+};
+
 class Client
 {
 private:
@@ -60,11 +74,11 @@ private:
 
 	std::function<void(int, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
-	std::function<void(std::vector<std::string>)> LatestUploadsCallback = nullptr;
+	std::function<void(std::vector<HostedFileEntry>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
-	std::vector<std::string> LatestUploadsList;
+	std::vector<HostedFileEntry> HostedFilesList;
 
 public:
 	Client()	{}
@@ -73,14 +87,14 @@ public:
 	inline int GetServerSocket(void) const { return ServerSocket; }
 	inline void SetLoginResponseCallback(const std::function<void(int, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
-	inline void SetLatestUploadsCallback(const std::function<void(std::vector<std::string>)>& callback) { LatestUploadsCallback = callback; }
+	inline void SetLatestUploadsCallback(const std::function<void(std::vector<HostedFileEntry>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 
 	bool Connect(void);
 
-	void AddLatestUpload(int index, std::string upload);
+	void AddLatestUpload(int index, std::string upload, HostedFileType type, HostedFileSubtype subType);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileTransfers(void);
@@ -101,18 +115,20 @@ bool Client::Connect(void)
 }
 
 
-void Client::AddLatestUpload(int index, std::string upload)
+void Client::AddLatestUpload(int index, std::string upload, HostedFileType type, HostedFileSubtype subType)
 {
-	for (auto iter = LatestUploadsList.begin(); iter != LatestUploadsList.end(); ++iter)
-		if ((*iter).compare(upload) == 0) return;
+	for (auto iter = HostedFilesList.begin(); iter != HostedFilesList.end(); ++iter)
+		if ((*iter).FileTitle.compare(upload) == 0) return;
 
-	if (int(LatestUploadsList.size()) > index)
+	auto newEntry = HostedFileEntry(type, subType, upload);
+
+	if (int(HostedFilesList.size()) > index)
 	{
-		auto iter = LatestUploadsList.begin();
+		auto iter = HostedFilesList.begin();
 		for (int i = 0; i < index; ++i) iter++;
-		LatestUploadsList.insert(iter, upload);
+		HostedFilesList.insert(iter, newEntry);
 	}
-	else LatestUploadsList.push_back(upload);
+	else HostedFilesList.push_back(newEntry);
 }
 
 
@@ -261,18 +277,23 @@ bool Client::ReadMessages(void)
 	{
 		auto uploadsStartIndex = int(winsockWrapper.ReadUnsignedShort(0));
 		auto latestUploadCount = int(winsockWrapper.ReadUnsignedShort(0));
-		LatestUploadsList.clear();
+		HostedFilesList.clear();
 		for (auto i = 0; i < latestUploadCount; ++i)
 		{
+			//  The file type and subtype
+			auto type = HostedFileType(winsockWrapper.ReadChar(0));
+			auto subType = HostedFileSubtype(winsockWrapper.ReadChar(0));
+
+			//  The encrypted file title
 			auto size = int(winsockWrapper.ReadChar(0));
 			assert(size != 0);
 			unsigned char* data = winsockWrapper.ReadChars(0, size);
 			auto decryptedTitle = Groundfish::Decrypt(data);
 			auto decryptedTitleString = std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size()));
-			AddLatestUpload(uploadsStartIndex++, decryptedTitleString);
+			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, type, subType);
 		}
 
-		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(LatestUploadsList);
+		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(HostedFilesList);
 	}
 	break;
 

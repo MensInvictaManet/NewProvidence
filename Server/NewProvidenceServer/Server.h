@@ -10,7 +10,7 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2018.12.30"
+#define VERSION_NUMBER					"2019.01.01"
 
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -207,6 +207,14 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 
 void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0)
 {
+	//  Message composition:
+	//  - (1 byte) unsigned char reprenting the message ID
+	//  - (2 bytes) unsigned short representing the starting index
+	//  - (2 bytes) unsigned short representing the list size (max 20)
+	//  - (1040 bytes) (1 + 1 + 1 + 49) x [list max (20)]
+	//
+	//  Max message size = 1045 bytes
+
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
 
@@ -226,6 +234,8 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 			if (--listSize < 0) break;
 			auto title = (*iter).EncryptedFileTitle;
 			assert(title.size() <= ENCRYPTED_TITLE_MAX_SIZE);
+			winsockWrapper.WriteChar((unsigned char)((*iter).FileType), 0);
+			winsockWrapper.WriteChar((unsigned char)((*iter).FileSubType), 0);
 			winsockWrapper.WriteChar((unsigned char)(title.size()), 0);
 			winsockWrapper.WriteChars(title.data(), int(title.size()), 0);
 		}

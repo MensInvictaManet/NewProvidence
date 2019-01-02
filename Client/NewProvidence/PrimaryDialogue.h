@@ -155,12 +155,24 @@ void UpdateLatestUploadsListBoxDownloadButtons(GUIObjectNode* object)
 }
 
 
-void AddLatestUploadEntry(std::string upload)
+void AddLatestUploadEntry(HostedFileEntry fileEntryData)
 {
 	auto entry = GUIObjectNode::CreateObjectNode("");
-	entry->SetObjectName(upload);
+	entry->SetObjectName(fileEntryData.FileTitle);
 
-	auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), upload.c_str(), 6, 9, 100, 20);
+	auto fileTypeImage = GetFileTypeIconFromID(fileEntryData.FileType);
+	fileTypeImage->SetDimensions(20, 20);
+	fileTypeImage->SetColorBytes(64, 64, 128, 255);
+	fileTypeImage->SetPosition(6, 8);
+	entry->AddChild(fileTypeImage);
+
+	auto fileSubTypeImage = GetFileSubTypeIconFromID(fileEntryData.FileSubType);
+	fileSubTypeImage->SetDimensions(20, 20);
+	fileSubTypeImage->SetColorBytes(255, 255, 255, 255);
+	fileSubTypeImage->SetPosition(26, 8);
+	entry->AddChild(fileSubTypeImage);
+
+	auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileTitle.c_str(), 56, 9, 100, 20);
 	entry->AddChild(label);
 
 	auto button = GUIButton::CreateTemplatedButton("Standard", LatestUploadsWidth - 100, 6, 80, 20);
@@ -174,7 +186,7 @@ void AddLatestUploadEntry(std::string upload)
 }
 
 
-void SetLatestUploads(std::vector<std::string> latestUploadsList)
+void SetLatestUploads(std::vector<HostedFileEntry> latestUploadsList)
 {
 	if (LatestUploadsListBox == nullptr) return;
 	LatestUploadsListBox->ClearItems();

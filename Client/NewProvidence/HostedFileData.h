@@ -91,6 +91,22 @@ inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 	}
 }
 
+std::vector<std::string> GetListOfFileTypes(void)
+{
+	std::vector<std::string> typeList;
+	for (auto i = 0; i < FILE_TYPE_COUNT; ++i)
+		typeList.push_back(GetFileTypeNameFromID(i));
+	return typeList;
+}
+
+std::vector<std::string> GetListOfFileSubTypes(void)
+{
+	std::vector<std::string> typeList;
+	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
+		typeList.push_back(GetFileSubTypeNameFromID(i));
+	return typeList;
+}
+
 struct HostedFileData
 {
 
