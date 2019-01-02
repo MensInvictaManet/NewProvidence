@@ -32,7 +32,6 @@ public:
 
 	void AddItem(GUIObjectNode* item) { item->m_Created = true; m_ItemList.push_back(item); UpdateMover(m_FlowToBottom ? std::max<int>(int(m_ItemList.size()) - ItemDisplayCount, 0) : -1); }
 	void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); SelectedIndex = -1; }
-	void SelectItem(unsigned int index) { SelectedIndex = std::min<int>(index, static_cast<unsigned int>(m_ItemList.size() - 1)); }
 	GUIObjectNode* GetSelectedItem() { return (SelectedIndex == -1) ? nullptr : m_ItemList[SelectedIndex]; }
 	int GetSelectedIndex() const { return SelectedIndex; }
 	void SetSelectable(bool selectable) { m_Selectable = selectable; }

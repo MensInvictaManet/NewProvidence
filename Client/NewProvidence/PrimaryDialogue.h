@@ -74,6 +74,17 @@ void UpdateUploadFolderList(void)
 	}
 }
 
+void UpdateUploadSubTypeList(GUIObjectNode* object)
+{
+	UploadFileSubTypeDropDown->ClearItems();
+	auto fileTypeNameSelected = ((GUILabel*)(UploadFileTypeDropDown->GetSelectedItem()))->GetText();
+	auto fileSubTypeX = UploadFileSubTypeDropDown->GetWidth() / 2;
+	auto fileSubTypeY = UploadFileSubTypeDropDown->GetHeight() / 2 - 6;
+	auto fileSubTypeList = GetListOfSpecificFileSubTypes(fileTypeNameSelected);
+	for (auto iter = fileSubTypeList.begin(); iter != fileSubTypeList.end(); ++iter)
+		UploadFileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+}
+
 void SelectUploadItem(GUIObjectNode* object)
 {
 	if (object == nullptr) return;
@@ -801,6 +812,7 @@ void PrimaryDialogue::LoadUploadMenuUI()
 	auto fileTypeList = GetListOfFileTypes();
 	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
 		UploadFileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+	UploadFileTypeDropDown->SetItemSelectCallback(UpdateUploadSubTypeList);
 	UploadMenuUINode->AddChild(UploadFileTypeDropDown);
 
 	auto fileSubTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 386, 200, 20);
@@ -808,11 +820,7 @@ void PrimaryDialogue::LoadUploadMenuUI()
 	UploadMenuUINode->AddChild(fileSubTypeLabel);
 
 	UploadFileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
-	auto fileSubTypeX = UploadFileSubTypeDropDown->GetWidth() / 2;
-	auto fileSubTypeY = UploadFileSubTypeDropDown->GetHeight() / 2 - 6;
-	auto fileSubTypeList = GetListOfFileSubTypes();
-	for (auto iter = fileSubTypeList.begin(); iter != fileSubTypeList.end(); ++iter)
-		UploadFileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+	UpdateUploadSubTypeList(UploadFileSubTypeDropDown);
 	UploadMenuUINode->AddChild(UploadFileSubTypeDropDown);
 }
 

@@ -24,8 +24,7 @@ public:
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
 
 	inline void AddItem(GUIObjectNode* item) { item->m_Created = true;  m_ItemList.push_back(item); if (m_Clicked) UpdateExpandedHeight(); }
-	inline void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); }
-	inline void SelectItem(unsigned int index) { SelectedIndex = std::min<int>(index, static_cast<unsigned int>(m_ItemList.size() - 1)); }
+	inline void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); SelectedIndex = 0; }
 	inline const GUIObjectNode* GetSelectedItem() const { return (SelectedIndex == -1) ? nullptr : m_ItemList[SelectedIndex]; }
 	inline int GetSelectedIndex() const { return SelectedIndex; }
 
@@ -163,7 +162,9 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 		//  If we are inside of the drop-down box, select an index based on height
 		if ((mx > x) && (mx < x + m_Width) && (my > y + m_Height) && (my < y + int(ExpandedHeight)))
 		{
+			auto oldSelection = SelectedIndex;
 			SelectedIndex = static_cast<unsigned int>((my - y - m_Height) / m_Height);
+			if ((oldSelection != SelectedIndex) && (m_ItemSelectCallback != nullptr)) m_ItemSelectCallback(this);
 		}
 
 		//  If we click anywhere, close the drop-down box

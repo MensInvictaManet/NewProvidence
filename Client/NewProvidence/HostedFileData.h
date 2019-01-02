@@ -3,11 +3,12 @@
 #include <unordered_map>
 #include <functional>
 
-enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_OTHER, FILE_TYPE_COUNT };
+enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_GAMES, FILETYPE_OTHER, FILE_TYPE_COUNT };
 enum HostedFileSubtype
 {
 	FILETYPE_MUSIC_LFHHRBTRST, FILETYPE_MUSIC_EDM_DANCE, FILETYPE_MUSIC_OTHER,
 	FILETYPE_VIDEO_TV, FILETYPE_VIDEO_MOVIE, FILETYPE_VIDEO_OTHER,
+	FILETYPE_GAMES_MISCELLANEOUS,
 	FILETYPE_OTHER_MISCELLANEOUS,
 	FILE_SUBTYPE_COUNT
 };
@@ -23,6 +24,7 @@ inline std::string GetFileTypeNameFromID(int32_t id)
 	{
 	case FILETYPE_MUSIC:		return "MUSIC";
 	case FILETYPE_VIDEO:		return "VIDEO";
+	case FILETYPE_GAMES:		return "GAMES";
 	case FILETYPE_OTHER:		return "OTHER";
 	default:					return "UNKNOWN";
 	}
@@ -33,6 +35,7 @@ inline int32_t GetFileTypeIDFromName(std::string name)
 	std::unordered_map<std::string, int32_t> dataMap;
 	dataMap["MUSIC"] = FILETYPE_MUSIC;
 	dataMap["VIDEO"] = FILETYPE_VIDEO;
+	dataMap["GAMES"] = FILETYPE_GAMES;
 	dataMap["OTHER"] = FILETYPE_OTHER;
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
@@ -44,9 +47,10 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 	case FILETYPE_MUSIC_LFHHRBTRST:		return "MUSIC: LFHHRBTRST";
 	case FILETYPE_MUSIC_EDM_DANCE:		return "MUSIC: EDM/DANCE";
 	case FILETYPE_MUSIC_OTHER:			return "MUSIC: OTHER";
-	case FILETYPE_VIDEO_TV:				return "MUSIC: TELEVISION";
+	case FILETYPE_VIDEO_TV:				return "VIDEO: TELEVISION";
 	case FILETYPE_VIDEO_MOVIE:			return "VIDEO: MOVIE";
 	case FILETYPE_VIDEO_OTHER:			return "VIDEO: OTHER";
+	case FILETYPE_GAMES_MISCELLANEOUS:	return "GAMES: MISCELANEOUS";
 	case FILETYPE_OTHER_MISCELLANEOUS:	return "OTHER: MISCELANEOUS";
 	default:							return "UNKNOWN";
 	}
@@ -55,13 +59,14 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 inline int32_t GetFileSubTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, int32_t> dataMap;
-	dataMap["MUSIC: LFHHRBTRST"] = FILETYPE_MUSIC_LFHHRBTRST;
-	dataMap["MUSIC: EDM/DANCE"] = FILETYPE_MUSIC_EDM_DANCE;
-	dataMap["MUSIC:OTHER"] = FILETYPE_MUSIC_OTHER;
-	dataMap["MUSIC: TELEVISION"] = FILETYPE_VIDEO_TV;
-	dataMap["VIDEO: MOVIE"] = FILETYPE_VIDEO_MOVIE;
-	dataMap["VIDEO: OTHER"] = FILETYPE_VIDEO_OTHER;
-	dataMap["OTHER:MISCELANEOUS"] = FILETYPE_OTHER_MISCELLANEOUS;
+	dataMap["MUSIC: LFHHRBTRST"]	= FILETYPE_MUSIC_LFHHRBTRST;
+	dataMap["MUSIC: EDM/DANCE"]		= FILETYPE_MUSIC_EDM_DANCE;
+	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
+	dataMap["VIDEO: TELEVISION"]	= FILETYPE_VIDEO_TV;
+	dataMap["VIDEO: MOVIE"]			= FILETYPE_VIDEO_MOVIE;
+	dataMap["VIDEO: OTHER"]			= FILETYPE_VIDEO_OTHER;
+	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
+	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
 
@@ -71,6 +76,7 @@ inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
 	{
 	case FILETYPE_MUSIC:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/MusicIcon.png");
 	case FILETYPE_VIDEO:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/VideoIcon.png");
+	case FILETYPE_GAMES:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/GamesIcon.png");
 	case FILETYPE_OTHER:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	default:					return nullptr;
 	}
@@ -86,6 +92,7 @@ inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_VIDEO_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_GAMES_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_OTHER_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	default:								return nullptr;
 	}
@@ -104,6 +111,15 @@ std::vector<std::string> GetListOfFileSubTypes(void)
 	std::vector<std::string> typeList;
 	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
 		typeList.push_back(GetFileSubTypeNameFromID(i));
+	return typeList;
+}
+
+std::vector<std::string> GetListOfSpecificFileSubTypes(std::string typeName)
+{
+	std::vector<std::string> typeList;
+	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
+		if (GetFileSubTypeNameFromID(i).compare(0, typeName.length(), typeName.c_str()) == 0)
+			typeList.push_back(GetFileSubTypeNameFromID(i));
 	return typeList;
 }
 
