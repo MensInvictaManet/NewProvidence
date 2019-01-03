@@ -125,6 +125,12 @@ namespace Groundfish
 		return decryptedData;
 	}
 
+	std::string DecryptToString(const unsigned char* encrypted)
+	{
+		auto decryptedVector = Decrypt(encrypted);
+		return std::string((char*)decryptedVector.data(), decryptedVector.size());
+	}
+
 	void DecryptAndMoveFile(std::string targetFileName, std::string newFileName, bool deleteOld)
 	{
 		std::ifstream targetFile(targetFileName, std::ios_base::binary);

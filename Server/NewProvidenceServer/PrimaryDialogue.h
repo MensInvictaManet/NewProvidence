@@ -37,20 +37,17 @@ void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
 		auto fileType = fileData.FileType;
 		auto fileTypeImage = GetFileTypeIconFromID(fileType);
 		fileTypeImage->SetDimensions(20, 20);
-		fileTypeImage->SetColorBytes(64, 64, 128, 255);
 		fileTypeImage->SetPosition(450, 8);
 		newFileDataEntry->AddChild(fileTypeImage);
 
 		auto fileSubType = fileData.FileSubType;
 		auto fileSubTypeImage = GetFileSubTypeIconFromID(fileSubType);
 		fileSubTypeImage->SetDimensions(20, 20);
-		fileSubTypeImage->SetColorBytes(255, 255, 255, 255);
 		fileSubTypeImage->SetPosition(470, 8);
 		newFileDataEntry->AddChild(fileSubTypeImage);
 
 		//  Decrypt the file title and set the file title label
-		auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
-		auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+		auto fileTitle = Groundfish::DecryptToString(fileData.EncryptedFileTitle.data());
 		auto fileTitleLimitedString = fileTitle.substr(0, std::min<int>(40, fileTitle.length()));
 		auto fileTitleLabel = GUILabel::CreateLabel("Arial", fileTitleLimitedString.c_str(), 520, 8, 200, 24);
 		newFileDataEntry->AddChild(fileTitleLabel);

@@ -78,7 +78,7 @@ inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
 	case FILETYPE_VIDEO:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/VideoIcon.png");
 	case FILETYPE_GAMES:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/GamesIcon.png");
 	case FILETYPE_OTHER:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	default:					return nullptr;
+	default:					assert(false); return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");;
 	}
 }
 
@@ -89,8 +89,8 @@ inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 	case FILETYPE_MUSIC_LFHHRBTRST:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/LHHRBTRSTIcon.png");
 	case FILETYPE_MUSIC_EDM_DANCE:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_MUSIC_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/TelevisionIcon.png");
+	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/MovieIcon.png");
 	case FILETYPE_VIDEO_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_GAMES_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_OTHER_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
@@ -121,6 +121,20 @@ std::vector<std::string> GetListOfSpecificFileSubTypes(std::string typeName)
 		if (GetFileSubTypeNameFromID(i).compare(0, typeName.length(), typeName.c_str()) == 0)
 			typeList.push_back(GetFileSubTypeNameFromID(i));
 	return typeList;
+}
+
+inline int CompareTwoEncryptedStrings(std::vector<unsigned char>& vec1, std::vector<unsigned char>& vec2, bool caseSensitive = true)
+{
+	auto string1 = Groundfish::DecryptToString(vec1.data());
+	auto string2 = Groundfish::DecryptToString(vec2.data());
+
+	if (caseSensitive == false)
+	{
+		std::transform(string1.begin(), string1.end(), string1.begin(), ::tolower);
+		std::transform(string2.begin(), string2.end(), string2.begin(), ::tolower);
+	}
+
+	return string1.compare(string2);
 }
 
 struct HostedFileData
@@ -245,6 +259,7 @@ struct HostedFileData
 		//  Read the encrypted file uploader
 		inFile.read(readInData, efuSize);
 		for (auto i = 0; i < efuSize; ++i) EncryptedUploader.push_back((unsigned char)readInData[i]);
+		EncryptedUploader = Groundfish::Encrypt("drew", 4);
 
 		//  Read the file size
 		inFile.read((char*)&FileSize, sizeof(FileSize));

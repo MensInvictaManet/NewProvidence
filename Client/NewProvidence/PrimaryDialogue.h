@@ -173,13 +173,11 @@ void AddLatestUploadEntry(HostedFileEntry fileEntryData)
 
 	auto fileTypeImage = GetFileTypeIconFromID(fileEntryData.FileType);
 	fileTypeImage->SetDimensions(20, 20);
-	fileTypeImage->SetColorBytes(64, 64, 128, 255);
 	fileTypeImage->SetPosition(6, 8);
 	entry->AddChild(fileTypeImage);
 
 	auto fileSubTypeImage = GetFileSubTypeIconFromID(fileEntryData.FileSubType);
 	fileSubTypeImage->SetDimensions(20, 20);
-	fileSubTypeImage->SetColorBytes(255, 255, 255, 255);
 	fileSubTypeImage->SetPosition(26, 8);
 	entry->AddChild(fileSubTypeImage);
 
@@ -276,8 +274,16 @@ void SetNotificationCount(int notificationCount)
 }
 
 
+void UpdateUploadsRangeString(void)
+{
+	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
+	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
+}
+
+
 void SetHomeMenuOpen(GUIObjectNode* button)
 {
+	//  TODO: Set up the "HOME" menu (inbox, notifications, hot files, etc)
 
 	//  Make the latest uploads UI visible
 	LatestUploadsUINode->SetVisible(true);
@@ -288,12 +294,34 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 
 	//  Make the upload UI invisible
 	UploadMenuUINode->SetVisible(false);
+
+	//  Request the latest uploads from "Charlie"
+	//auto username = Groundfish::Encrypt("Charlie", 7);
+	//SendMessage_RequestLatestUploadsByUser(0, ClientControl.GetServerSocket(), username.size(), username.data());
+
+	//  Request a new hosted file list
+	CurrentLatestUploadsStartingIndex = 0;
+	UpdateUploadsRangeString();
+	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
 }
 
 
 void SetBrowseMenuOpen(GUIObjectNode* button)
 {
-	//  TODO: Add the browse menu UI and trigger it here
+	//  Make the latest uploads UI visible
+	LatestUploadsUINode->SetVisible(true);
+
+	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
+	LoginMenuNode->SetVisible(false);
+	MainMenuBarUINode->SetVisible(true);
+
+	//  Make the upload UI invisible
+	UploadMenuUINode->SetVisible(false);
+
+	//  Request a new hosted file list
+	CurrentLatestUploadsStartingIndex = 0;
+	UpdateUploadsRangeString();
+	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
 }
 
 
@@ -318,10 +346,9 @@ void ShiftLatestUploadsLeft(GUIObjectNode* object)
 {
 	if (CurrentLatestUploadsStartingIndex < 20) return;
 	CurrentLatestUploadsStartingIndex -= 20;
+	auto usernameSize = ClientControl.GetUsername().size();
 	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
-
-	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
-	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
+	UpdateUploadsRangeString();
 }
 
 
@@ -329,10 +356,9 @@ void ShiftLatestUploadsRight(GUIObjectNode* object)
 {
 	if (CurrentLatestUploadsStartingIndex > 50000) return;
 	CurrentLatestUploadsStartingIndex += 20;
+	auto usernameSize = ClientControl.GetUsername().size();
 	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
-
-	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
-	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
+	UpdateUploadsRangeString();
 }
 
 
@@ -407,6 +433,8 @@ void LoginButtonLeftClickCallback(GUIObjectNode* button)
 	//  Encrypt the username and password
 	std::vector<unsigned char> encryptedUsernameVector = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), int(UsernameEditBox->GetText().length()), rand() % 256);
 	std::vector<unsigned char> encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
+
+	ClientControl.SetUsername(encryptedUsernameVector);
 
 	SendMessage_UserLoginRequest(encryptedUsernameVector, encryptedPasswordVector, ClientControl.GetServerSocket());
 }
@@ -673,6 +701,9 @@ void PrimaryDialogue::LoadSideBarUI()
 	homeButton->SetDimensions(60, 28);
 	homeButton->SetLeftClickCallback(SetHomeMenuOpen);
 	MainMenuBarUINode->AddChild(homeButton);
+#ifdef _DEBUG //  Show the button area in debug mode
+	homeButton->SetColorBytes(0, 0, 0, 50);
+#endif
 
 	//  Load the main menu "Home" button text
 	auto homeButtonText = GUILabel::CreateLabel("Arial-12-White", "HOME", 60, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
@@ -689,6 +720,9 @@ void PrimaryDialogue::LoadSideBarUI()
 	browseButton->SetDimensions(80, 28);
 	browseButton->SetLeftClickCallback(SetBrowseMenuOpen);
 	MainMenuBarUINode->AddChild(browseButton);
+#ifdef _DEBUG //  Show the button area in debug mode
+	browseButton->SetColorBytes(0, 0, 0, 50);
+#endif
 
 	//  Load the main menu "Browse" button text
 	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 165, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
@@ -705,6 +739,9 @@ void PrimaryDialogue::LoadSideBarUI()
 	uploadButton->SetDimensions(80, 28);
 	uploadButton->SetLeftClickCallback(SetUploadMenuOpen);
 	MainMenuBarUINode->AddChild(uploadButton);
+#ifdef _DEBUG //  Show the button area in debug mode
+	uploadButton->SetColorBytes(0, 0, 0, 50);
+#endif
 
 	//  Load the main menu "Upload" button text
 	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, GUILabel::JUSTIFY_CENTER);

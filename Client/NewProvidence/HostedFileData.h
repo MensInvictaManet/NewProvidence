@@ -78,7 +78,7 @@ inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
 	case FILETYPE_VIDEO:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/VideoIcon.png");
 	case FILETYPE_GAMES:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/GamesIcon.png");
 	case FILETYPE_OTHER:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	default:					return nullptr;
+	default:					assert(false); return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");;
 	}
 }
 
@@ -89,8 +89,8 @@ inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 	case FILETYPE_MUSIC_LFHHRBTRST:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/LHHRBTRSTIcon.png");
 	case FILETYPE_MUSIC_EDM_DANCE:			return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_MUSIC_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
-	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
+	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/TelevisionIcon.png");
+	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/MovieIcon.png");
 	case FILETYPE_VIDEO_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_GAMES_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_OTHER_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
