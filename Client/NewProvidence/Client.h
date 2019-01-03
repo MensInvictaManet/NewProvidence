@@ -8,7 +8,7 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-#define VERSION_NUMBER					"2019.01.01"
+#define VERSION_NUMBER					"2019.01.03"
 #define NEW_PROVIDENCE_IP				"98.181.188.165"
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -41,6 +41,20 @@ void SendMessage_RequestLatestUploads(int startingIndex, int socket)
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
+void SendMessage_RequestLatestUploadsByUser(int startingIndex, int socket, int usernameSize, unsigned char* encryptedUsername)
+{
+	//  Send a "Latest Uploads Request" message
+	winsockWrapper.ClearBuffer(0);
+	winsockWrapper.WriteChar(MESSAGE_ID_REQUEST_LATEST_UPLOADS_USER, 0);
+
+	//  Define the user to request uploads from
+	winsockWrapper.WriteUnsignedShort(usernameSize, 0);
+	winsockWrapper.WriteChars(encryptedUsername, usernameSize, 0);
+
+	winsockWrapper.WriteUnsignedShort(uint16_t(startingIndex), 0);
+	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
+}
+
 void SendMessage_FileRequest(std::string fileID, int socket, const char* ip)
 {
 	//  Send a "File Request" message
@@ -67,10 +81,10 @@ struct HostedFileEntry
 class Client
 {
 private:
-	int					ServerSocket = -1;
-	std::string			UserName;
-	FileReceiveTask*	FileReceive = NULL;
-	FileSendTask*		FileSend = NULL;
+	int							ServerSocket = -1;
+	FileReceiveTask*			FileReceive = NULL;
+	FileSendTask*				FileSend = NULL;
+	std::vector<unsigned char>	EncryptedUsername;
 
 	std::function<void(int, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
@@ -78,6 +92,7 @@ private:
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
+
 	std::vector<HostedFileEntry> HostedFilesList;
 
 public:
@@ -85,12 +100,14 @@ public:
 	~Client()	{ Shutdown(); }
 
 	inline int GetServerSocket(void) const { return ServerSocket; }
+	inline std::vector<unsigned char>  GetUsername(void) const { return EncryptedUsername; }
 	inline void SetLoginResponseCallback(const std::function<void(int, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<HostedFileEntry>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
+	inline void SetUsername(const std::vector<unsigned char>& username) { EncryptedUsername = username; }
 
 	bool Connect(void);
 
@@ -237,9 +254,8 @@ bool Client::ReadMessages(void)
 		//  Decrypt using Groundfish
 		unsigned char encryptedChatString[256];
 		memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
-		std::vector<unsigned char> descryptedChatString = Groundfish::Decrypt(encryptedChatString);
-		std::string decryptedString((char*)descryptedChatString.data(), descryptedChatString.size());
-		//NewLine(decryptedString);
+		auto chatString = Groundfish::DecryptToString(encryptedChatString);
+		//NewLine(chatString);
 	}
 	break;
 
@@ -287,9 +303,9 @@ bool Client::ReadMessages(void)
 			//  The encrypted file title
 			auto size = int(winsockWrapper.ReadChar(0));
 			assert(size != 0);
-			unsigned char* data = winsockWrapper.ReadChars(0, size);
-			auto decryptedTitle = Groundfish::Decrypt(data);
-			auto decryptedTitleString = std::string((char*)(decryptedTitle.data()), int(decryptedTitle.size()));
+			auto data = winsockWrapper.ReadChars(0, size);
+			auto dataVector = std::vector<unsigned char>(data, data + size);
+			auto decryptedTitleString = Groundfish::DecryptToString(dataVector.data());
 			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, type, subType);
 		}
 
@@ -314,22 +330,19 @@ bool Client::ReadMessages(void)
 		int fileDescriptionSize = winsockWrapper.ReadInt(0);
 
 		//  Decrypt the filename using Groundfish
-		auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
-		auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+		auto decryptedFileNamePure = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileNameSize));
 		auto decryptedFilename = "./_DownloadedFiles/" + decryptedFileNamePure;
 		auto tempFilename = std::string(decryptedFilename) + std::string(".tempfile");
 
 		//  Decrypt the filename using Groundfish
-		auto decryptedFileTitleVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileTitleSize));
-		auto decryptedFileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+		auto decryptedFileTitle = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileTitleSize));
 
 		//  Decrypt the filename using Groundfish
-		auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
-		auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
+		auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
 
 		//  Grab the file type and sub-type
-		auto fileTypeID = winsockWrapper.ReadShort(0);
-		auto fileSubTypeID = winsockWrapper.ReadShort(0);
+		auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
+		auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadLongInt(0);

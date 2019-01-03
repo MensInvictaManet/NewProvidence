@@ -10,7 +10,7 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2019.01.01"
+#define VERSION_NUMBER					"2019.01.03"
 
 #define NEW_PROVIDENCE_PORT				2347
 
@@ -205,7 +205,7 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 }
 
 
-void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0)
+void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0, int usernameSize = 0, unsigned char* encryptedUsername = (unsigned char*)(""))
 {
 	//  Message composition:
 	//  - (1 byte) unsigned char reprenting the message ID
@@ -215,12 +215,25 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 	//
 	//  Max message size = 1045 bytes
 
+	std::vector<unsigned char> encryptedUsernameVec = std::vector<unsigned char>();
+	if (usernameSize != 0) encryptedUsernameVec = std::vector<unsigned char>(encryptedUsername, encryptedUsername + usernameSize);
+
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
 
 	//  Find out the index range we're going to send.
 	auto endIndex = std::min(int(hostedFileDataList.size() - 1), startIndex + LATEST_UPLOADS_SENT_COUNT - 1);
 	auto listSize = std::max(0, endIndex - startIndex + 1);
+
+	//  Determine if we have enough uploads by the given user to fill the list size. If not, decrement the list size
+	if (usernameSize != 0)
+	{
+		auto uploadCount = 0;
+		for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
+			if (CompareTwoEncryptedStrings(encryptedUsernameVec, (*iter).EncryptedUploader, false) == 0)
+				++uploadCount;
+		listSize = std::max<int>(std::min<int>(listSize, (uploadCount - startIndex)), 0);
+	}
 
 	winsockWrapper.WriteUnsignedShort(uint16_t(startIndex), 0);
 	winsockWrapper.WriteUnsignedShort(uint16_t(listSize), 0);
@@ -231,6 +244,7 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 		for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
 		{
 			if (iterIndex++ < startIndex) continue;
+			if ((usernameSize != 0) && (CompareTwoEncryptedStrings(encryptedUsernameVec, (*iter).EncryptedUploader, false) != 0)) continue;
 			if (--listSize < 0) break;
 			auto title = (*iter).EncryptedFileTitle;
 			assert(title.size() <= ENCRYPTED_TITLE_MAX_SIZE);
@@ -362,7 +376,7 @@ private:
 	void SaveUserLoginDetails(void);
 	void AddUserLoginDetails(std::string username, std::string password);
 
-	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID);
+	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
@@ -545,8 +559,7 @@ void Server::ReceiveMessages(void)
 			//  Decrypt using Groundfish
 			unsigned char encryptedChatString[256];
 			memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
-			std::vector<unsigned char> descryptedChatString = Groundfish::Decrypt(encryptedChatString);
-			std::string decryptedString((char*)descryptedChatString.data(), descryptedChatString.size());
+			std::string decryptedString = Groundfish::DecryptToString(encryptedChatString);
 
 			SendChatString(decryptedString.c_str());
 		}
@@ -562,20 +575,14 @@ void Server::ReceiveMessages(void)
 			//  Grab the current client version number to ensure they have the up-to-date version
 			std::string versionString = winsockWrapper.ReadString(0);
 
-			//  Grab the username size and encrypted username, then the password size and encrypted password
+			//  Grab the username size and encrypted username, and decrypt it, then the password size and encrypted password, and decrypt it
 			auto usernameSize = winsockWrapper.ReadInt(0);
-			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
-			auto encryptedUsernameVector = std::vector<unsigned char>(encryptedUsername, encryptedUsername + usernameSize);
+			auto usernameArray = winsockWrapper.ReadChars(0, usernameSize);
+			std::string username = Groundfish::DecryptToString(usernameArray);
 
 			auto passwordSize = winsockWrapper.ReadInt(0);
-			auto encryptedPassword = winsockWrapper.ReadChars(0, passwordSize);
-			auto encryptedPasswordVector = std::vector<unsigned char>(encryptedPassword, encryptedPassword + passwordSize);
-
-			//  Decrypt the username and password
-			std::vector<unsigned char> decryptedUsername = Groundfish::Decrypt(encryptedUsernameVector.data());
-			std::string username = std::string((char*)decryptedUsername.data(), decryptedUsername.size());
-			std::vector<unsigned char> decryptedPassword = Groundfish::Decrypt(encryptedPasswordVector.data());
-			std::string password = std::string((char*)decryptedPassword.data(), decryptedPassword.size());
+			auto passwordArray = winsockWrapper.ReadChars(0, passwordSize);
+			std::string password = Groundfish::DecryptToString(passwordArray);
 
 			if (versionString.compare(VERSION_NUMBER) != 0)
 			{
@@ -591,6 +598,18 @@ void Server::ReceiveMessages(void)
 		{
 			auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
 			SendMessage_LatestUploads(HostedFileDataList, user, startingIndex);
+		}
+		break;
+
+		case MESSAGE_ID_REQUEST_LATEST_UPLOADS_USER:
+		{
+			auto usernameSize = winsockWrapper.ReadUnsignedShort(0);
+			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
+			auto encryptedUsernameVector = std::vector<unsigned char>(encryptedUsername, encryptedUsername + usernameSize);
+			std::string username = Groundfish::DecryptToString(encryptedUsernameVector.data());
+
+			auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
+			SendMessage_LatestUploads(HostedFileDataList, user, startingIndex, usernameSize, encryptedUsername);
 		}
 		break;
 
@@ -629,22 +648,19 @@ void Server::ReceiveMessages(void)
 			auto fileDescriptionSize = winsockWrapper.ReadInt(0);
 
 			//  Decrypt the file name using Groundfish and save it off
-			auto decryptedFileNameVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileNameSize));
-			auto decryptedFileNamePure = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+			auto decryptedFileNamePure = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileNameSize));
 			auto decryptedFileName = "./_DownloadedFiles/" + decryptedFileNamePure;
 
 			//  Decrypt the file title using Groundfish and save it off
-			auto decryptedFileTitleVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileTitleSize));
-			auto decryptedFileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
+			auto decryptedFileTitle = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileTitleSize));
 			assert(decryptedFileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
 			//  Decrypt the file description using Groundfish and save it off
-			auto decryptedFileDescriptionVector = Groundfish::Decrypt(winsockWrapper.ReadChars(0, fileDescriptionSize));
-			auto decryptedFileDescription = std::string((char*)decryptedFileDescriptionVector.data(), decryptedFileDescriptionVector.size());
+			auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
 
 			//  grab the file type and sub type
-			auto fileTypeID = winsockWrapper.ReadShort(0);
-			auto fileSubTypeID = winsockWrapper.ReadShort(0);
+			auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
+			auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
 
 			//  Grab the file size, file chunk size, and buffer count
 			auto fileSize = winsockWrapper.ReadLongInt(0);
@@ -706,7 +722,7 @@ void Server::ReceiveMessages(void)
 
 				if (fileTask->GetFileTransferComplete())
 				{
-					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription(), fileTask->GetFileTypeID(), fileTask->GetFileSubTypeID());
+					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription(), fileTask->GetFileTypeID(), fileTask->GetFileSubTypeID(), user);
 
 					delete user->UserFileReceiveTask;
 					user->UserFileReceiveTask = nullptr;
@@ -855,10 +871,8 @@ void Server::LoadUserLoginDetails(void)
 		if (uldFile.eof()) break;
 
 		//  Get the MD5 of the decrypted username and password
-		decryptedUsername = Groundfish::Decrypt(newEntry.EncryptedUserName.data());
-		std::string username = std::string((char*)decryptedUsername.data(), decryptedUsername.size());
-		decryptedPassword = Groundfish::Decrypt(newEntry.EncryptedPassword.data());
-		std::string password = std::string((char*)decryptedPassword.data(), decryptedPassword.size());
+		auto username = Groundfish::DecryptToString(newEntry.EncryptedUserName.data());
+		auto password = Groundfish::DecryptToString(newEntry.EncryptedPassword.data());
 		auto loginDataMD5 = md5(username + password);
 
 		UserLoginDetailsList[loginDataMD5] = newEntry;
@@ -922,7 +936,7 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 }
 
 
-void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID)
+void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user)
 {
 	assert(fileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
@@ -951,7 +965,7 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	newFile.EncryptedFileName = Groundfish::Encrypt(pureFileName.c_str(), int(pureFileName.length()), 0, rand() % 256);
 	newFile.EncryptedFileTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
 	newFile.EncryptedFileDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
-	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
+	newFile.EncryptedUploader = Groundfish::Encrypt(user->Username.c_str(), strlen(user->Username.c_str()), 0, rand() % 256);
 	newFile.FileSize = fileSize;
 	newFile.FileUploadTime = GetCurrentTimeString();
 	newFile.FileType = HostedFileType(fileTypeID);
@@ -1118,18 +1132,14 @@ void Server::ContinueFileTransfers(void)
 
 void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 {
-	//  Decrypt the file name and hosted file path
-	auto decryptedFileNameVector = Groundfish::Decrypt(fileData.EncryptedFileName.data());
-	auto fileName = std::string((char*)decryptedFileNameVector.data(), decryptedFileNameVector.size());
+	//  Decrypt the file name, the hosted file path, and the file title
+	auto fileName = Groundfish::DecryptToString(fileData.EncryptedFileName.data());
 	auto filePath = "./_HostedFiles/" + fileData.FileTitleChecksum + ".hostedfile";
+	auto fileTitle = Groundfish::DecryptToString(fileData.EncryptedFileTitle.data());
 
 	//  Get the file type and sub-type
 	auto fileTypeID = fileData.FileType;
 	auto fileSubTypeID = fileData.FileSubType;
-
-	//  Decrypt the file title
-	auto decryptedFileTitleVector = Groundfish::Decrypt(fileData.EncryptedFileTitle.data());
-	auto fileTitle = std::string((char*)decryptedFileTitleVector.data(), decryptedFileTitleVector.size());
 
 	//  Add a new FileSendTask to our list, so it can manage itself
 	FileSendTask* newTask = new FileSendTask(fileName, fileTitle, filePath, fileTypeID, fileSubTypeID, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);

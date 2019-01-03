@@ -34,8 +34,8 @@ void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle
 	winsockWrapper.WriteChars(encryptedFilename.data(), int(encryptedFilename.size()), 0);
 	winsockWrapper.WriteChars(encryptedTitle.data(), int(encryptedTitle.size()), 0);
 	winsockWrapper.WriteChars(encryptedDescription.data(), int(encryptedDescription.size()), 0);
-	winsockWrapper.WriteShort((short)(fileTypeID), 0);
-	winsockWrapper.WriteShort((short)(fileSubTypeID), 0);
+	winsockWrapper.WriteUnsignedShort((short)(fileTypeID), 0);
+	winsockWrapper.WriteUnsignedShort((short)(fileSubTypeID), 0);
 	winsockWrapper.WriteLongInt(fileSize, 0);
 	winsockWrapper.WriteLongInt(FILE_CHUNK_SIZE, 0);
 	winsockWrapper.WriteLongInt(FILE_CHUNK_BUFFER_COUNT, 0);
