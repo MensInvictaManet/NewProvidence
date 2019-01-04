@@ -170,6 +170,7 @@
     <ClInclude Include="Groundfish.h" />
     <ClInclude Include="MessageIdentifiers.h" />
     <ClInclude Include="PrimaryDialogue.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt" />
@@ -177,6 +178,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\ProgramIcon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="NewProvidence.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
