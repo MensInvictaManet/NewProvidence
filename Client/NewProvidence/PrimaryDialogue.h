@@ -277,7 +277,7 @@ void SetNotificationCount(int notificationCount)
 void UpdateUploadsRangeString(void)
 {
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
-	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + "):");
+	LatestUploadsTitleLabel->SetText("Latest Uploaded Files (" + rangeString + ")");
 }
 
 
@@ -303,6 +303,9 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
 	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
+
+	//  Set the status bar back to default
+	SetStatusBarMessage("", false);
 }
 
 
@@ -322,6 +325,9 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
 	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
+
+	//  Set the status bar back to default
+	SetStatusBarMessage("", false);
 }
 
 
@@ -339,6 +345,9 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
+
+	//  Set the status bar back to default
+	SetStatusBarMessage("", false);
 }
 
 
@@ -764,8 +773,8 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	LatestUploadsUINode->AddChild(latestUploadsContainer);
 
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
-	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + "):";
-	LatestUploadsTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), latestUploadedFilesLabelString.c_str(), 10, 10, LatestUploadsWidth - 20, 30);
+	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + ")";
+	LatestUploadsTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), latestUploadedFilesLabelString.c_str(), latestUploadsContainer->GetWidth() / 2, latestUploadsContainer->GetHeight() - 20, LatestUploadsWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
 	LatestUploadsTitleLabel->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	latestUploadsContainer->AddChild(LatestUploadsTitleLabel);
 
