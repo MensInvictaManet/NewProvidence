@@ -8,9 +8,9 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-#define VERSION_NUMBER					"2019.01.03"
-#define NEW_PROVIDENCE_IP				"98.181.188.165"
-#define NEW_PROVIDENCE_PORT				2347
+constexpr auto VERSION_NUMBER			= "2019.01.03";
+constexpr auto NEW_PROVIDENCE_IP		= "98.181.188.165";
+constexpr auto NEW_PROVIDENCE_PORT		= 2347;
 
 //  Outgoing message send functions
 void SendMessage_PingResponse(int socket)

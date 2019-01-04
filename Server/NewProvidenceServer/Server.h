@@ -10,14 +10,13 @@
 #include <fstream>
 #include <ctime>
 
-#define VERSION_NUMBER					"2019.01.03"
+constexpr auto VERSION_NUMBER				= "2019.01.03";
 
-#define NEW_PROVIDENCE_PORT				2347
+constexpr auto NEW_PROVIDENCE_PORT			= 2347;
 
-#define LATEST_UPLOADS_SENT_COUNT		20
-
-#define PING_INTERVAL_TIME				5.0
-#define PINGS_BEFORE_DISCONNECT			30
+constexpr auto LATEST_UPLOADS_SENT_COUNT	= 20;
+constexpr auto PING_INTERVAL_TIME			= 5.0;
+constexpr auto PINGS_BEFORE_DISCONNECT		= 30;
 
 std::list<HostedFileData> HostedFileDataList;
 
