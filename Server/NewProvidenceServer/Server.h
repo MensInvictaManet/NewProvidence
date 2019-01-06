@@ -244,12 +244,12 @@ void SendMessage_HostedFileList(std::list<HostedFileData>& hostedFileDataList, U
 		int iterIndex = 0;
 		for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
 		{
-			if (iterIndex++ < startIndex) continue;
-
 			//  Filter any entries that don't match our filter specifications
 			if ((encryptedUsername.size() != 0) && CompareEncryptedData(encryptedUsername, (*iter).EncryptedUploader, false) != 0) continue;
 			if ((type != FILE_TYPE_COUNT) && ((*iter).FileType != type)) continue;
 			if ((subtype != FILE_SUBTYPE_COUNT) && ((*iter).FileSubType != subtype)) continue;
+
+			if (iterIndex++ < startIndex) continue;
 
 			if (--listSize < 0) break;
 			auto title = (*iter).EncryptedFileTitle;

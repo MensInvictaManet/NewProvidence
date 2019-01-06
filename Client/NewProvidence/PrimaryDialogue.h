@@ -218,8 +218,10 @@ void SetLatestUploads(std::vector<HostedFileEntry> latestUploadsList)
 }
 
 
-void ApplySearchFilter(GUIObjectNode* object)
+void RequestHostedFileList(int searchIndex = 0)
 {
+	CurrentLatestUploadsStartingIndex = searchIndex;
+
 	if (FilterByUserEditBox == nullptr) return;
 	if (FilterByTypeDropDown == nullptr) return;
 	if (FilterBySubtypeDropDown == nullptr) return;
@@ -231,7 +233,13 @@ void ApplySearchFilter(GUIObjectNode* object)
 	auto filterType = HostedFileType(GetFileTypeIDFromName(FilterByTypeDropDown->GetSelectedItem()->GetObjectName()));
 	auto filterSubtype = HostedFileSubtype(GetFileSubTypeIDFromName(FilterBySubtypeDropDown->GetSelectedItem()->GetObjectName()));
 
-	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), encryptedUser, filterType, filterSubtype);
+	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket(), encryptedUser, filterType, filterSubtype);
+}
+
+
+void ApplySearchFilter(GUIObjectNode* object)
+{
+	RequestHostedFileList();
 }
 
 
@@ -327,7 +335,7 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket());
+	RequestHostedFileList(0);
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -350,7 +358,7 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket());
+	RequestHostedFileList(0);
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -381,9 +389,8 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 void ShiftLatestUploadsLeft(GUIObjectNode* object)
 {
 	if (CurrentLatestUploadsStartingIndex < 20) return;
-	CurrentLatestUploadsStartingIndex -= 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+	RequestHostedFileList(CurrentLatestUploadsStartingIndex - 20);
 	UpdateUploadsRangeString();
 }
 
@@ -391,9 +398,8 @@ void ShiftLatestUploadsLeft(GUIObjectNode* object)
 void ShiftLatestUploadsRight(GUIObjectNode* object)
 {
 	if (CurrentLatestUploadsStartingIndex > 50000) return;
-	CurrentLatestUploadsStartingIndex += 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+	RequestHostedFileList(CurrentLatestUploadsStartingIndex + 20);
 	UpdateUploadsRangeString();
 }
 
