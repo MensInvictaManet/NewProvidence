@@ -10,7 +10,7 @@
 #include <fstream>
 #include <ctime>
 
-constexpr auto VERSION_NUMBER				= "2019.01.03";
+constexpr auto VERSION_NUMBER				= "2019.01.05";
 
 constexpr auto NEW_PROVIDENCE_PORT			= 2347;
 
@@ -218,7 +218,7 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 	if (usernameSize != 0) encryptedUsernameVec = EncryptedData(encryptedUsername, encryptedUsername + usernameSize);
 
 	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_LATEST_UPLOADS_LIST, 0);
+	winsockWrapper.WriteChar(MESSAGE_ID_HOSTED_FILE_LIST, 0);
 
 	//  Find out the index range we're going to send.
 	auto endIndex = std::min(int(hostedFileDataList.size() - 1), startIndex + LATEST_UPLOADS_SENT_COUNT - 1);
@@ -251,6 +251,8 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 			winsockWrapper.WriteChar((unsigned char)((*iter).FileSubType), 0);
 			winsockWrapper.WriteChar((unsigned char)(title.size()), 0);
 			winsockWrapper.WriteChars(title.data(), int(title.size()), 0);
+			winsockWrapper.WriteChar(uint8_t((*iter).EncryptedUploader.size()), 0);
+			winsockWrapper.WriteChars((*iter).EncryptedUploader.data(), (*iter).EncryptedUploader.size(), 0);
 		}
 	}
 

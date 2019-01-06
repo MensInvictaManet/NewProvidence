@@ -181,8 +181,11 @@ void AddLatestUploadEntry(HostedFileEntry fileEntryData)
 	fileSubTypeImage->SetPosition(26, 8);
 	entry->AddChild(fileSubTypeImage);
 
-	auto label = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileTitle.c_str(), 56, 9, 100, 20);
-	entry->AddChild(label);
+	auto titleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileTitle.c_str(), 56, 9, 100, 20);
+	entry->AddChild(titleLabel);
+
+	auto uploaderLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileUploader.c_str(), 456, 9, 100, 20);
+	entry->AddChild(uploaderLabel);
 
 	auto button = GUIButton::CreateTemplatedButton("Standard", LatestUploadsWidth - 100, 6, 80, 20);
 	button->SetFont("Arial");
@@ -644,7 +647,7 @@ void PrimaryDialogue::LoadLoginMenu()
 	UsernameEditBox->SetFont(fontManager.GetFont("Arial-12-White"));
 	UsernameEditBox->SetColor(0.8f, 0.8f, 0.8f, 1.0f);
 	UsernameEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
-	UsernameEditBox->SetEmptyText("Username");
+	UsernameEditBox->SetEmptyText(" Username");
 	UsernameEditBox->SetEmptyTextColor(Color(1.0f, 1.0f, 1.0f, 0.15f));
 	UsernameEditBox->SetMaxStringLength(18);
 	LoginMenuNode->AddChild(UsernameEditBox);
@@ -654,7 +657,7 @@ void PrimaryDialogue::LoadLoginMenu()
 	PasswordEditBox->SetFont(fontManager.GetFont("Arial-12-White"));
 	PasswordEditBox->SetColor(0.8f, 0.8f, 0.8f, 1.0f);
 	PasswordEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
-	PasswordEditBox->SetEmptyText("Password");
+	PasswordEditBox->SetEmptyText(" Password");
 	PasswordEditBox->SetEmptyTextColor(Color(1.0f, 1.0f, 1.0f, 0.15f));
 	PasswordEditBox->SetMaxStringLength(18);
 	PasswordEditBox->SetTextHidden(true);
@@ -782,8 +785,11 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	hostedFileListContainer->SetPosition(80, 70);
 	LatestUploadsUINode->AddChild(hostedFileListContainer);
 
-	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 64, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 62, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
 	hostedFileListContainer->AddChild(fileTitleLabel);
+
+	auto fileUploaderLabel = GUILabel::CreateLabel("Arial", "File Uploader:", 462, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	hostedFileListContainer->AddChild(fileUploaderLabel);
 
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
 	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + ")";

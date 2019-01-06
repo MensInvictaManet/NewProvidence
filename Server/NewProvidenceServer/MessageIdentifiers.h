@@ -10,7 +10,7 @@ enum MessageIDs
 	MESSAGE_ID_USER_LOGIN_RESPONSE				= 4,	// User Login Response (server to client)
 	MESSAGE_ID_USER_INBOX_AND_NOTIFICATIONS		= 5,	// User's inbox and notification data (server to client)
 	MESSAGE_ID_REQUEST_HOSTED_FILE_LIST			= 6,	// The request for the list of the latest uploads on the server (client to server)
-	MESSAGE_ID_LATEST_UPLOADS_LIST				= 7,	// The list of the latest uploads on the server (server to client)
+	MESSAGE_ID_HOSTED_FILE_LIST					= 7,	// The list of the latest uploads on the server (server to client)
 	MESSAGE_ID_FILE_REQUEST						= 8,	// File Request (client to server)
 	MESSAGE_ID_FILE_REQUEST_FAILED				= 9,	// File Request Failure message (server to client)
 	MESSAGE_ID_FILE_SEND_INIT					= 10,	// File Send Initializer (two-way)

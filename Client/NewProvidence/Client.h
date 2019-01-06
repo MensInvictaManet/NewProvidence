@@ -8,7 +8,7 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-constexpr auto VERSION_NUMBER			= "2019.01.03";
+constexpr auto VERSION_NUMBER			= "2019.01.05";
 constexpr auto NEW_PROVIDENCE_IP		= "98.181.188.165";
 constexpr auto NEW_PROVIDENCE_PORT		= 2347;
 
@@ -63,11 +63,13 @@ struct HostedFileEntry
 	HostedFileType FileType;
 	HostedFileSubtype FileSubType;
 	std::string FileTitle;
+	std::string FileUploader;
 
-	HostedFileEntry(HostedFileType type, HostedFileSubtype subType, std::string title) :
+	HostedFileEntry(HostedFileType type, HostedFileSubtype subType, std::string title, std::string uploader) :
 		FileType(type),
 		FileSubType(subType),
-		FileTitle(title)
+		FileTitle(title),
+		FileUploader(uploader)
 	{}
 };
 
@@ -106,7 +108,7 @@ public:
 
 	bool Connect(void);
 
-	void AddLatestUpload(int index, std::string upload, HostedFileType type, HostedFileSubtype subType);
+	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subType);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileTransfers(void);
@@ -128,12 +130,12 @@ bool Client::Connect(void)
 }
 
 
-void Client::AddLatestUpload(int index, std::string upload, HostedFileType type, HostedFileSubtype subType)
+void Client::AddLatestUpload(int index, std::string fileTitle, std::string uploader, HostedFileType type, HostedFileSubtype subType)
 {
 	for (auto iter = HostedFilesList.begin(); iter != HostedFilesList.end(); ++iter)
-		if ((*iter).FileTitle.compare(upload) == 0) return;
+		if ((*iter).FileTitle.compare(fileTitle) == 0) return;
 
-	auto newEntry = HostedFileEntry(type, subType, upload);
+	auto newEntry = HostedFileEntry(type, subType, fileTitle, uploader);
 
 	if (int(HostedFilesList.size()) > index)
 	{
@@ -292,7 +294,7 @@ bool Client::ReadMessages(void)
 	}
 	break;
 
-	case MESSAGE_ID_LATEST_UPLOADS_LIST:
+	case MESSAGE_ID_HOSTED_FILE_LIST:
 	{
 		auto uploadsStartIndex = int(winsockWrapper.ReadUnsignedShort(0));
 		auto latestUploadCount = int(winsockWrapper.ReadUnsignedShort(0));
@@ -304,12 +306,20 @@ bool Client::ReadMessages(void)
 			auto subType = HostedFileSubtype(winsockWrapper.ReadChar(0));
 
 			//  The encrypted file title
-			auto size = int(winsockWrapper.ReadChar(0));
-			assert(size != 0);
-			auto data = winsockWrapper.ReadChars(0, size);
-			auto dataVector = EncryptedData(data, data + size);
-			auto decryptedTitleString = Groundfish::DecryptToString(dataVector.data());
-			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, type, subType);
+			auto ftSize = int(winsockWrapper.ReadChar(0));
+			assert(ftSize != 0);
+			auto ftData = winsockWrapper.ReadChars(0, ftSize);
+			auto ftDataVector = EncryptedData(ftData, ftData + ftSize);
+			auto decryptedTitleString = Groundfish::DecryptToString(ftDataVector.data());
+
+			//  The encrypted file uploader
+			auto fuSize = int(winsockWrapper.ReadChar(0));
+			assert(fuSize != 0);
+			auto fuData = winsockWrapper.ReadChars(0, fuSize);
+			auto fuDataVector = EncryptedData(fuData, fuData + fuSize);
+			auto decryptedUploaderString = Groundfish::DecryptToString(fuDataVector.data());
+
+			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, decryptedUploaderString, type, subType);
 		}
 
 		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(HostedFilesList);
