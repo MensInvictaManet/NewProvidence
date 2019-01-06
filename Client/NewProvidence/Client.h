@@ -20,7 +20,7 @@ void SendMessage_PingResponse(int socket)
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_UserLoginRequest(std::vector<unsigned char>& encryptedUsername, std::vector<unsigned char>& encryptedPassword, int socket)
+void SendMessage_UserLoginRequest(EncryptedData& encryptedUsername, EncryptedData& encryptedPassword, int socket)
 {
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_USER_LOGIN_REQUEST, 0);
@@ -32,26 +32,19 @@ void SendMessage_UserLoginRequest(std::vector<unsigned char>& encryptedUsername,
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_RequestLatestUploads(int startingIndex, int socket)
+void SendMessage_RequestHostedFileList(int startingIndex, int socket, EncryptedData username)
 {
-	//  Send a "Latest Uploads Request" message
+	//  Send a "Hosted File List Request" message
 	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_REQUEST_LATEST_UPLOADS, 0);
-	winsockWrapper.WriteUnsignedShort(uint16_t(startingIndex), 0);
-	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
-}
-
-void SendMessage_RequestLatestUploadsByUser(int startingIndex, int socket, int usernameSize, unsigned char* encryptedUsername)
-{
-	//  Send a "Latest Uploads Request" message
-	winsockWrapper.ClearBuffer(0);
-	winsockWrapper.WriteChar(MESSAGE_ID_REQUEST_LATEST_UPLOADS_USER, 0);
+	winsockWrapper.WriteChar(MESSAGE_ID_REQUEST_HOSTED_FILE_LIST, 0);
 
 	//  Define the user to request uploads from
-	winsockWrapper.WriteUnsignedShort(usernameSize, 0);
-	winsockWrapper.WriteChars(encryptedUsername, usernameSize, 0);
+	winsockWrapper.WriteUnsignedShort((uint16_t)(username.size()), 0);
+	winsockWrapper.WriteChars(username.data(), username.size(), 0);
 
+	//  Define the starting index to begin the list at
 	winsockWrapper.WriteUnsignedShort(uint16_t(startingIndex), 0);
+
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
@@ -81,15 +74,16 @@ struct HostedFileEntry
 class Client
 {
 private:
-	int							ServerSocket = -1;
-	FileReceiveTask*			FileReceive = NULL;
-	FileSendTask*				FileSend = NULL;
-	std::vector<unsigned char>	EncryptedUsername;
+	int						ServerSocket = -1;
+	FileReceiveTask*		FileReceive = NULL;
+	FileSendTask*			FileSend = NULL;
+	EncryptedData			EncryptedUsername;
 
 	std::function<void(int, int, int)> LoginResponseCallback = nullptr;
 	std::function<void(int, int)> InboxAndNotificationCountCallback = nullptr;
 	std::function<void(std::vector<HostedFileEntry>)> LatestUploadsCallback = nullptr;
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
+	std::function<void(std::string)> FileSendFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
 
@@ -100,14 +94,15 @@ public:
 	~Client()	{ Shutdown(); }
 
 	inline int GetServerSocket(void) const { return ServerSocket; }
-	inline std::vector<unsigned char>  GetUsername(void) const { return EncryptedUsername; }
+	inline EncryptedData GetUsername(void) const { return EncryptedUsername; }
 	inline void SetLoginResponseCallback(const std::function<void(int, int, int)>& callback) { LoginResponseCallback = callback; }
 	inline void SetInboxAndNotificationCountCallback(const std::function<void(int, int)>& callback) { InboxAndNotificationCountCallback = callback; }
 	inline void SetLatestUploadsCallback(const std::function<void(std::vector<HostedFileEntry>)>& callback) { LatestUploadsCallback = callback; }
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
+	inline void SetFileSendFailureCallback(const std::function<void(std::string)>& callback) { FileSendFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
-	inline void SetUsername(const std::vector<unsigned char>& username) { EncryptedUsername = username; }
+	inline void SetUsername(const EncryptedData& username) { EncryptedUsername = username; }
 
 	bool Connect(void);
 
@@ -115,6 +110,7 @@ public:
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileTransfers(void);
+	void CancelFileSend(void);
 
 	void Initialize(void);
 	bool MainProcess(void);
@@ -197,6 +193,13 @@ void Client::ContinueFileTransfers(void)
 
 	//  If we get this far, we have data to send. Send it and continue out
 	FileSend->SendFileChunk();
+}
+
+
+void Client::CancelFileSend(void)
+{
+	delete FileSend;
+	FileSend = nullptr;
 }
 
 
@@ -304,7 +307,7 @@ bool Client::ReadMessages(void)
 			auto size = int(winsockWrapper.ReadChar(0));
 			assert(size != 0);
 			auto data = winsockWrapper.ReadChars(0, size);
-			auto dataVector = std::vector<unsigned char>(data, data + size);
+			auto dataVector = EncryptedData(data, data + size);
 			auto decryptedTitleString = Groundfish::DecryptToString(dataVector.data());
 			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, type, subType);
 		}
@@ -356,6 +359,13 @@ bool Client::ReadMessages(void)
 
 		//  Respond to the file request success
 		if (FileRequestSuccessCallback != nullptr) FileRequestSuccessCallback(decryptedFileNamePure);
+	}
+	break;
+
+	case MESSAGE_ID_FILE_SEND_FAILED:
+	{
+		auto failureReason = std::string(winsockWrapper.ReadString(0));
+		if (FileSendFailureCallback != nullptr) FileSendFailureCallback(failureReason);
 	}
 	break;
 

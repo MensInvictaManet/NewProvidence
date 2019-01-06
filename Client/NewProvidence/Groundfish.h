@@ -8,6 +8,8 @@
 #include <string>			/* string */
 #include <unordered_map>	/* unordered_map */
 
+typedef std::vector<unsigned char> EncryptedData;
+
 namespace Groundfish
 {
 	struct GroundfishWordlist
@@ -20,9 +22,9 @@ namespace Groundfish
 	GroundfishWordlist CurrentWordList;
 	unsigned int CurrentVersion = 0;
 
-	std::vector<unsigned char> Encrypt(const char* data, const int dataLength, const int wordListVersion = 0, unsigned char wordIndex = 0)
+	EncryptedData Encrypt(const char* data, const int dataLength, const int wordListVersion = 0, unsigned char wordIndex = 0)
 	{
-		std::vector<unsigned char> encryptedData;
+		EncryptedData encryptedData;
 
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
 		unsigned int encryptionIndex = 0;
@@ -92,9 +94,9 @@ namespace Groundfish
 		return true;
 	}
 
-	std::vector<unsigned char> Decrypt(const unsigned char* encrypted)
+	EncryptedData Decrypt(const unsigned char* encrypted)
 	{
-		std::vector<unsigned char> decryptedData;
+		EncryptedData decryptedData;
 
 		unsigned int encryptionIndex = 0;
 		unsigned int wordListVersion = 0;

@@ -22,9 +22,9 @@ constexpr auto ENCRYPTED_TITLE_MAX_SIZE		= (UPLOAD_TITLE_MAX_LENGTH + 9);
 void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, uint64_t fileSize, int socket, const char* ip, const int port)
 {
 	//  Encrypt the file name, title, and description string using Groundfish
-	std::vector<unsigned char> encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()), 0, rand() % 256);
-	std::vector<unsigned char> encryptedTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
-	std::vector<unsigned char> encryptedDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
+	EncryptedData encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()), 0, rand() % 256);
+	EncryptedData encryptedTitle = Groundfish::Encrypt(fileTitle.c_str(), int(fileTitle.length()), 0, rand() % 256);
+	EncryptedData encryptedDescription = Groundfish::Encrypt(fileDescription.c_str(), int(fileDescription.length()), 0, rand() % 256);
 
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_FILE_SEND_INIT, 0);
@@ -367,6 +367,7 @@ public:
 	inline uint64_t GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
 	inline uint64_t GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
+	inline std::string GetTemporaryFileName() const { return TempFileName; }
 	inline double GetPercentageComplete() const { return double(FilePortionIndex * GetFileSendBufferSize()) / double(FileSize); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
@@ -379,7 +380,7 @@ public:
 	inline void ResetChunksToReceiveMap(uint64_t chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < int(chunkCount); ++i)  FileChunksToReceive[i] = true; }
 
 	inline void CreateTemporaryFile(const std::string tempFileName, const uint64_t tempFileSize) const {
-		std::ofstream outputFile(TempFileName, std::ios::binary | std::ios::trunc | std::ios_base::beg);
+		std::ofstream outputFile(tempFileName, std::ios::binary | std::ios::trunc | std::ios_base::beg);
 		assert(outputFile.good() && !outputFile.bad());
 		outputFile.seekp(tempFileSize - 1);
 		outputFile.write("", 1);

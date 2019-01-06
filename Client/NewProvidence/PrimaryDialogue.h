@@ -11,7 +11,7 @@
 #include <math.h>
 
 const auto MainMenuBarHeight = 40;
-const auto LatestUploadsWidth = 600;
+const auto LatestUploadsWidth = 1120;
 const auto LatestUploadsHeight = 580;
 
 int CurrentLatestUploadsStartingIndex = 0;
@@ -297,12 +297,12 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 
 	//  Request the latest uploads from "Charlie"
 	//auto username = Groundfish::Encrypt("Charlie", 7);
-	//SendMessage_RequestLatestUploadsByUser(0, ClientControl.GetServerSocket(), username.size(), username.data());
+	//SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), username.size(), username.data());
 
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
+	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), EncryptedData());
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -324,7 +324,7 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestLatestUploads(0, ClientControl.GetServerSocket());
+	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), EncryptedData());
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -356,7 +356,7 @@ void ShiftLatestUploadsLeft(GUIObjectNode* object)
 	if (CurrentLatestUploadsStartingIndex < 20) return;
 	CurrentLatestUploadsStartingIndex -= 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket(), EncryptedData());
 	UpdateUploadsRangeString();
 }
 
@@ -366,7 +366,7 @@ void ShiftLatestUploadsRight(GUIObjectNode* object)
 	if (CurrentLatestUploadsStartingIndex > 50000) return;
 	CurrentLatestUploadsStartingIndex += 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestLatestUploads(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
+	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket(), EncryptedData());
 	UpdateUploadsRangeString();
 }
 
@@ -431,6 +431,15 @@ void FileRequestFailureCallback(std::string fileID, std::string failureReason)
 	SetStatusBarMessage(fullString, true);
 }
 
+void FileSendFailureCallback(std::string failureReason)
+{
+	//  Generate the full string and set the status bar message
+	auto fullString = "File upload initialization failed: " + failureReason;
+	SetStatusBarMessage(fullString, true);
+
+	ClientControl.CancelFileSend();
+}
+
 void InboxAndNotificationsCountCallback(int inboxCount, int notificationCount)
 {
 	SetInboxMessageCount(inboxCount);
@@ -440,8 +449,8 @@ void InboxAndNotificationsCountCallback(int inboxCount, int notificationCount)
 void LoginButtonLeftClickCallback(GUIObjectNode* button)
 {
 	//  Encrypt the username and password
-	std::vector<unsigned char> encryptedUsernameVector = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), int(UsernameEditBox->GetText().length()), rand() % 256);
-	std::vector<unsigned char> encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
+	EncryptedData encryptedUsernameVector = Groundfish::Encrypt(UsernameEditBox->GetText().c_str(), int(UsernameEditBox->GetText().length()), rand() % 256);
+	EncryptedData encryptedPasswordVector = Groundfish::Encrypt(PasswordEditBox->GetText().c_str(), int(PasswordEditBox->GetText().length()), rand() % 256);
 
 	ClientControl.SetUsername(encryptedUsernameVector);
 
@@ -685,6 +694,7 @@ void PrimaryDialogue::LoadMainMenuBarUI()
 	ClientControl.SetInboxAndNotificationCountCallback(InboxAndNotificationsCountCallback);
 	ClientControl.SetLatestUploadsCallback(SetLatestUploads);
 	ClientControl.SetFileRequestFailureCallback(FileRequestFailureCallback);
+	ClientControl.SetFileSendFailureCallback(FileSendFailureCallback);
 	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
 	ClientControl.SetTransferPercentCompleteCallback(SetTransferPercentage);
 }
@@ -766,28 +776,31 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	AddChild(LatestUploadsUINode);
 
 	//  Load the background strip behind the status bar
-	auto latestUploadsContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
-	latestUploadsContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
-	latestUploadsContainer->SetDimensions(LatestUploadsWidth, LatestUploadsHeight);
-	latestUploadsContainer->SetPosition(80, 70);
-	LatestUploadsUINode->AddChild(latestUploadsContainer);
+	auto hostedFileListContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
+	hostedFileListContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
+	hostedFileListContainer->SetDimensions(LatestUploadsWidth, LatestUploadsHeight);
+	hostedFileListContainer->SetPosition(80, 70);
+	LatestUploadsUINode->AddChild(hostedFileListContainer);
+
+	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 64, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	hostedFileListContainer->AddChild(fileTitleLabel);
 
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
 	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + ")";
-	LatestUploadsTitleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), latestUploadedFilesLabelString.c_str(), latestUploadsContainer->GetWidth() / 2, latestUploadsContainer->GetHeight() - 20, LatestUploadsWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
+	LatestUploadsTitleLabel = GUILabel::CreateLabel("Arial", latestUploadedFilesLabelString.c_str(), hostedFileListContainer->GetWidth() / 2, hostedFileListContainer->GetHeight() - 20, LatestUploadsWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
 	LatestUploadsTitleLabel->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
-	latestUploadsContainer->AddChild(LatestUploadsTitleLabel);
+	hostedFileListContainer->AddChild(LatestUploadsTitleLabel);
 
 	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 54, LatestUploadsWidth - 26, 2, 12, 12, 12, 12, 12, 24, 2);
 	LatestUploadsListBox->SetItemClickCallback(UpdateLatestUploadsListBoxDownloadButtons);
-	latestUploadsContainer->AddChild(LatestUploadsListBox);
+	hostedFileListContainer->AddChild(LatestUploadsListBox);
 
 	auto listBoxLeftArrowButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/LeftArrowIcon.png");
 	listBoxLeftArrowButton->SetColorBytes(64, 64, 64, 255);
 	listBoxLeftArrowButton->SetDimensions(28, 28);
 	listBoxLeftArrowButton->SetPosition(4, LatestUploadsHeight - 26);
 	listBoxLeftArrowButton->SetLeftClickCallback(ShiftLatestUploadsLeft);
-	latestUploadsContainer->AddChild(listBoxLeftArrowButton);
+	hostedFileListContainer->AddChild(listBoxLeftArrowButton);
 
 	auto listBoxRightArrowButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/RightArrowIcon.png");
 	listBoxRightArrowButton->SetColorBytes(64, 64, 64, 255);
@@ -795,7 +808,7 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	auto rightArrowWidth = listBoxRightArrowButton->GetWidth();
 	listBoxRightArrowButton->SetPosition(LatestUploadsWidth - rightArrowWidth - 4, LatestUploadsHeight - 26);
 	listBoxRightArrowButton->SetLeftClickCallback(ShiftLatestUploadsRight);
-	latestUploadsContainer->AddChild(listBoxRightArrowButton);
+	hostedFileListContainer->AddChild(listBoxRightArrowButton);
 
 }
 

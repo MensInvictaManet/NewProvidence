@@ -123,7 +123,7 @@ std::vector<std::string> GetListOfSpecificFileSubTypes(std::string typeName)
 	return typeList;
 }
 
-inline int CompareTwoEncryptedStrings(std::vector<unsigned char>& vec1, std::vector<unsigned char>& vec2, bool caseSensitive = true)
+inline int CompareEncryptedData(EncryptedData& vec1, EncryptedData& vec2, bool caseSensitive = true)
 {
 	auto string1 = Groundfish::DecryptToString(vec1.data());
 	auto string2 = Groundfish::DecryptToString(vec2.data());
@@ -141,10 +141,10 @@ struct HostedFileData
 {
 
 	std::string FileTitleChecksum;
-	std::vector<unsigned char> EncryptedFileName;
-	std::vector<unsigned char> EncryptedFileTitle;
-	std::vector<unsigned char> EncryptedFileDescription;
-	std::vector<unsigned char> EncryptedUploader;
+	EncryptedData EncryptedFileName;
+	EncryptedData EncryptedFileTitle;
+	EncryptedData EncryptedFileDescription;
+	EncryptedData EncryptedUploader;
 	uint64_t FileSize;
 	std::string FileUploadTime;
 	HostedFileType FileType;
@@ -259,7 +259,6 @@ struct HostedFileData
 		//  Read the encrypted file uploader
 		inFile.read(readInData, efuSize);
 		for (auto i = 0; i < efuSize; ++i) EncryptedUploader.push_back((unsigned char)readInData[i]);
-		EncryptedUploader = Groundfish::Encrypt("drew", 4);
 
 		//  Read the file size
 		inFile.read((char*)&FileSize, sizeof(FileSize));

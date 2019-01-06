@@ -59,14 +59,14 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 inline int32_t GetFileSubTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, int32_t> dataMap;
-	dataMap["MUSIC: LFHHRBTRST"]	= FILETYPE_MUSIC_LFHHRBTRST;
-	dataMap["MUSIC: EDM/DANCE"]		= FILETYPE_MUSIC_EDM_DANCE;
-	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
-	dataMap["VIDEO: TELEVISION"]	= FILETYPE_VIDEO_TV;
-	dataMap["VIDEO: MOVIE"]			= FILETYPE_VIDEO_MOVIE;
-	dataMap["VIDEO: OTHER"]			= FILETYPE_VIDEO_OTHER;
-	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
-	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
+	dataMap["MUSIC: LFHHRBTRST"] = FILETYPE_MUSIC_LFHHRBTRST;
+	dataMap["MUSIC: EDM/DANCE"] = FILETYPE_MUSIC_EDM_DANCE;
+	dataMap["MUSIC: OTHER"] = FILETYPE_MUSIC_OTHER;
+	dataMap["VIDEO: TELEVISION"] = FILETYPE_VIDEO_TV;
+	dataMap["VIDEO: MOVIE"] = FILETYPE_VIDEO_MOVIE;
+	dataMap["VIDEO: OTHER"] = FILETYPE_VIDEO_OTHER;
+	dataMap["GAMES: MISCELANEOUS"] = FILETYPE_GAMES_MISCELLANEOUS;
+	dataMap["OTHER: MISCELANEOUS"] = FILETYPE_OTHER_MISCELLANEOUS;
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
 
@@ -123,14 +123,28 @@ std::vector<std::string> GetListOfSpecificFileSubTypes(std::string typeName)
 	return typeList;
 }
 
+inline int CompareEncryptedData(EncryptedData& vec1, EncryptedData& vec2, bool caseSensitive = true)
+{
+	auto string1 = Groundfish::DecryptToString(vec1.data());
+	auto string2 = Groundfish::DecryptToString(vec2.data());
+
+	if (caseSensitive == false)
+	{
+		std::transform(string1.begin(), string1.end(), string1.begin(), ::tolower);
+		std::transform(string2.begin(), string2.end(), string2.begin(), ::tolower);
+	}
+
+	return string1.compare(string2);
+}
+
 struct HostedFileData
 {
 
 	std::string FileTitleChecksum;
-	std::vector<unsigned char> EncryptedFileName;
-	std::vector<unsigned char> EncryptedFileTitle;
-	std::vector<unsigned char> EncryptedFileDescription;
-	std::vector<unsigned char> EncryptedUploader;
+	EncryptedData EncryptedFileName;
+	EncryptedData EncryptedFileTitle;
+	EncryptedData EncryptedFileDescription;
+	EncryptedData EncryptedUploader;
 	uint64_t FileSize;
 	std::string FileUploadTime;
 	HostedFileType FileType;
