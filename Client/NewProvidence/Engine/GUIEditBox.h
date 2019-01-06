@@ -5,6 +5,8 @@
 #include "FontManager.h"
 #include "TimeSlice.h"
 
+constexpr Uint32 ticksPerCursorSwitch = 500;
+
 class GUIEditBox : public GUIObjectNode
 {
 public:
@@ -239,14 +241,18 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 		if (m_Font != nullptr)
 		{
 			auto textX = (m_TextAlignment == ALIGN_CENTER) ? (x + m_Width / 2) : x + 4;
-			if (!m_Text.empty())
-			{
-				m_Font->RenderText(m_TextHidden ? m_HiddenText.c_str() : m_Text.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true);
-			}
-			else if (!m_EmptyText.empty() && !m_Selected)
-			{
+
+			auto showingCursor = m_Selected && ((gameTicksUint % (ticksPerCursorSwitch * 2)) < ticksPerCursorSwitch);
+			auto textString = (m_TextHidden ? m_HiddenText : m_Text);
+			auto textDisplay = showingCursor ? (textString + "|") : textString;
+
+			//  If our text is empty and we have an "empty" setting text, show it in the empty text color
+			if (m_Text.empty() && !m_EmptyText.empty())
 				m_Font->RenderText(m_EmptyText.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true, 1.0f, 1.0f, m_EmptyTextColor);
-			}
+
+			//  We can have a text to display even if our text is empty (because of the cursor) so display it if it exists
+			if (!textDisplay.empty())
+				m_Font->RenderText(textDisplay.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true);
 		}
 	}
 
