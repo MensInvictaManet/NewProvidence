@@ -399,7 +399,7 @@ private:
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
 	void SaveHostedFileList();
 	void LoadHostedFilesData(void);
-	void SendOutLatestUploadsList(void);
+	void SendOutHostedFileList(void);
 
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(HostedFileData& fileData, UserConnection* user);
@@ -495,7 +495,7 @@ void Server::DeleteHostedFile(std::string fileChecksum)
 	HostedFileDataList.erase(iter);
 	SaveHostedFileList();
 	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback(GetHostedFileDataList());
-	SendOutLatestUploadsList();
+	SendOutHostedFileList();
 }
 
 
@@ -515,6 +515,9 @@ void Server::RemoveClient(UserConnection* user)
 {
 	auto userIter = UserConnectionsList.find(user);
 	assert(userIter != UserConnectionsList.end());
+
+	if (user->LoginStatus == UserConnection::LOGIN_STATUS_LOGGED_IN)
+		debugConsole->AddDebugConsoleLine(GetCurrentTimeString() + " - User logged out: " + user->Username);
 
 	delete user;
 	UserConnectionsList.erase(userIter);
@@ -860,6 +863,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	user->Username = username;
 	user->LoginStatus = UserConnection::LOGIN_STATUS_LOGGED_IN;
 	user->SetStatusIdle();
+	debugConsole->AddDebugConsoleLine(GetCurrentTimeString() + " - User logged in: " + user->Username);
 
 	//  Read the Inbox and Notifications data for the user
 	ReadUserInbox(user);
@@ -1019,7 +1023,7 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	uldFile.close();
 	if (!fileExists) std::rename(fileToAdd.c_str(), hostedFileName.c_str());
 
-	SendOutLatestUploadsList();
+	SendOutHostedFileList();
 }
 
 
@@ -1064,7 +1068,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	uldFile.close();
 	if (!fileExists) Groundfish::EncryptAndMoveFile(fileToAdd, hostedFileName);
 
-	SendOutLatestUploadsList();
+	SendOutHostedFileList();
 }
 
 
@@ -1119,7 +1123,7 @@ void Server::LoadHostedFilesData(void)
 }
 
 
-void Server::SendOutLatestUploadsList(void)
+void Server::SendOutHostedFileList(void)
 {
 	//  Send the latest uploads list to each connected user
 	for (auto userIter = UserConnectionsList.begin(); userIter != UserConnectionsList.end(); ++userIter)

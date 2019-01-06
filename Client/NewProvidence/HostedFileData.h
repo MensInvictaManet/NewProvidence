@@ -7,7 +7,7 @@ enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_GAMES, FILETYPE_O
 enum HostedFileSubtype
 {
 	FILETYPE_MUSIC_LFHHRBTRST, FILETYPE_MUSIC_EDM_DANCE, FILETYPE_MUSIC_OTHER,
-	FILETYPE_VIDEO_TV, FILETYPE_VIDEO_MOVIE, FILETYPE_VIDEO_OTHER,
+	FILETYPE_VIDEO_TV, FILETYPE_VIDEO_MOVIE, FILETYPE_VIDEO_PORN, FILETYPE_VIDEO_OTHER,
 	FILETYPE_GAMES_MISCELLANEOUS,
 	FILETYPE_OTHER_MISCELLANEOUS,
 	FILE_SUBTYPE_COUNT
@@ -51,6 +51,7 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 	case FILETYPE_MUSIC_OTHER:			return "MUSIC: OTHER";
 	case FILETYPE_VIDEO_TV:				return "VIDEO: TELEVISION";
 	case FILETYPE_VIDEO_MOVIE:			return "VIDEO: MOVIE";
+	case FILETYPE_VIDEO_PORN:			return "VIDEO: PORN";
 	case FILETYPE_VIDEO_OTHER:			return "VIDEO: OTHER";
 	case FILETYPE_GAMES_MISCELLANEOUS:	return "GAMES: MISCELANEOUS";
 	case FILETYPE_OTHER_MISCELLANEOUS:	return "OTHER: MISCELANEOUS";
@@ -67,6 +68,7 @@ inline int32_t GetFileSubTypeIDFromName(std::string name)
 	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
 	dataMap["VIDEO: TELEVISION"]	= FILETYPE_VIDEO_TV;
 	dataMap["VIDEO: MOVIE"]			= FILETYPE_VIDEO_MOVIE;
+	dataMap["VIDEO: PORN"]			= FILETYPE_VIDEO_PORN;
 	dataMap["VIDEO: OTHER"]			= FILETYPE_VIDEO_OTHER;
 	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
 	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
@@ -95,6 +97,7 @@ inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
 	case FILETYPE_MUSIC_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_VIDEO_TV:					return GUIObjectNode::CreateObjectNode("./Assets/Textures/TelevisionIcon.png");
 	case FILETYPE_VIDEO_MOVIE:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/MovieIcon.png");
+	case FILETYPE_VIDEO_PORN:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/PornIcon.png");
 	case FILETYPE_VIDEO_OTHER:				return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_GAMES_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
 	case FILETYPE_OTHER_MISCELLANEOUS:		return GUIObjectNode::CreateObjectNode("./Assets/Textures/UnknownIcon.png");
