@@ -26,6 +26,7 @@ inline std::string GetFileTypeNameFromID(int32_t id)
 	case FILETYPE_VIDEO:		return "VIDEO";
 	case FILETYPE_GAMES:		return "GAMES";
 	case FILETYPE_OTHER:		return "OTHER";
+	case FILE_TYPE_COUNT:		return "NO TYPE";
 	default:					return "UNKNOWN";
 	}
 }
@@ -33,10 +34,11 @@ inline std::string GetFileTypeNameFromID(int32_t id)
 inline int32_t GetFileTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, int32_t> dataMap;
-	dataMap["MUSIC"] = FILETYPE_MUSIC;
-	dataMap["VIDEO"] = FILETYPE_VIDEO;
-	dataMap["GAMES"] = FILETYPE_GAMES;
-	dataMap["OTHER"] = FILETYPE_OTHER;
+	dataMap["MUSIC"]	= FILETYPE_MUSIC;
+	dataMap["VIDEO"]	= FILETYPE_VIDEO;
+	dataMap["GAMES"]	= FILETYPE_GAMES;
+	dataMap["OTHER"]	= FILETYPE_OTHER;
+	dataMap["NO TYPE"]	= FILE_TYPE_COUNT;
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
 
@@ -52,6 +54,7 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 	case FILETYPE_VIDEO_OTHER:			return "VIDEO: OTHER";
 	case FILETYPE_GAMES_MISCELLANEOUS:	return "GAMES: MISCELANEOUS";
 	case FILETYPE_OTHER_MISCELLANEOUS:	return "OTHER: MISCELANEOUS";
+	case FILE_SUBTYPE_COUNT:			return "NO SUBTYPE";
 	default:							return "UNKNOWN";
 	}
 }
@@ -59,14 +62,15 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 inline int32_t GetFileSubTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, int32_t> dataMap;
-	dataMap["MUSIC: LFHHRBTRST"] = FILETYPE_MUSIC_LFHHRBTRST;
-	dataMap["MUSIC: EDM/DANCE"] = FILETYPE_MUSIC_EDM_DANCE;
-	dataMap["MUSIC: OTHER"] = FILETYPE_MUSIC_OTHER;
-	dataMap["VIDEO: TELEVISION"] = FILETYPE_VIDEO_TV;
-	dataMap["VIDEO: MOVIE"] = FILETYPE_VIDEO_MOVIE;
-	dataMap["VIDEO: OTHER"] = FILETYPE_VIDEO_OTHER;
-	dataMap["GAMES: MISCELANEOUS"] = FILETYPE_GAMES_MISCELLANEOUS;
-	dataMap["OTHER: MISCELANEOUS"] = FILETYPE_OTHER_MISCELLANEOUS;
+	dataMap["MUSIC: LFHHRBTRST"]	= FILETYPE_MUSIC_LFHHRBTRST;
+	dataMap["MUSIC: EDM/DANCE"]		= FILETYPE_MUSIC_EDM_DANCE;
+	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
+	dataMap["VIDEO: TELEVISION"]	= FILETYPE_VIDEO_TV;
+	dataMap["VIDEO: MOVIE"]			= FILETYPE_VIDEO_MOVIE;
+	dataMap["VIDEO: OTHER"]			= FILETYPE_VIDEO_OTHER;
+	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
+	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
+	dataMap["NO SUBTYPE"]			= FILE_SUBTYPE_COUNT;
 	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
 }
 

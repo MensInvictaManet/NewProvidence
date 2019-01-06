@@ -14,7 +14,7 @@ const auto MainMenuBarHeight = 40;
 const auto HostedFileListWidth = 620;
 const auto HostedFileListHeight = 580;
 const auto SearchFilterBoxWidth = 480;
-const auto SearchFilterBoxHeight = 580;
+const auto SearchFilterBoxHeight = 230;
 
 int CurrentLatestUploadsStartingIndex = 0;
 
@@ -29,6 +29,7 @@ GUIEditBox* PasswordEditBox = nullptr;
 
 GUIObjectNode* MainMenuBarUINode = nullptr;
 GUIObjectNode* HostedFileListUINode = nullptr;
+GUIObjectNode* SearchFilterUINode = nullptr;
 GUIObjectNode* UploadMenuUINode = nullptr;
 
 GUIButton* UserSideTabButton = nullptr;
@@ -49,6 +50,11 @@ std::string SelectedUploadFileName = "";
 
 GUILabel* LatestUploadsTitleLabel = nullptr;
 GUIListBox* LatestUploadsListBox = nullptr;
+
+GUIEditBox* FilterByUserEditBox = nullptr;
+GUIDropDown* FilterByTypeDropDown = nullptr;
+GUIDropDown* FilterBySubtypeDropDown = nullptr;
+
 GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
@@ -212,6 +218,23 @@ void SetLatestUploads(std::vector<HostedFileEntry> latestUploadsList)
 }
 
 
+void ApplySearchFilter(GUIObjectNode* object)
+{
+	if (FilterByUserEditBox == nullptr) return;
+	if (FilterByTypeDropDown == nullptr) return;
+	if (FilterBySubtypeDropDown == nullptr) return;
+	if (FilterByTypeDropDown->GetSelectedItem() == nullptr) return;
+	if (FilterBySubtypeDropDown->GetSelectedItem() == nullptr) return;
+
+	auto userName = FilterByUserEditBox->GetText();
+	auto encryptedUser = (userName.length() == 0) ? EncryptedData() : Groundfish::Encrypt(userName.c_str(), int(FilterByUserEditBox->GetText().length()));
+	auto filterType = HostedFileType(GetFileTypeIDFromName(FilterByTypeDropDown->GetSelectedItem()->GetObjectName()));
+	auto filterSubtype = HostedFileSubtype(GetFileSubTypeIDFromName(FilterBySubtypeDropDown->GetSelectedItem()->GetObjectName()));
+
+	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), encryptedUser, filterType, filterSubtype);
+}
+
+
 void SetUserMenuOpen(GUIObjectNode* node)
 {
 	//SideBarOpen = !SideBarOpen;
@@ -292,6 +315,7 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 
 	//  Make the latest uploads UI visible
 	HostedFileListUINode->SetVisible(true);
+	SearchFilterUINode->SetVisible(true);
 
 	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
 	LoginMenuNode->SetVisible(false);
@@ -299,10 +323,6 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 
 	//  Make the upload UI invisible
 	UploadMenuUINode->SetVisible(false);
-
-	//  Request the latest uploads from "Charlie"
-	//auto username = Groundfish::Encrypt("Charlie", 7);
-	//SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), username.size(), username.data(), );
 
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
@@ -318,6 +338,7 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 {
 	//  Make the latest uploads UI visible
 	HostedFileListUINode->SetVisible(true);
+	SearchFilterUINode->SetVisible(true);
 
 	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
 	LoginMenuNode->SetVisible(false);
@@ -347,6 +368,7 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 
 	//  Make the latest uploads UI invisible
 	HostedFileListUINode->SetVisible(false);
+	SearchFilterUINode->SetVisible(false);
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
@@ -406,6 +428,7 @@ void LoginRequestResponseCallback(int response, int inboxCount, int notification
 	LoginMenuNode->SetVisible(!success);
 	MainMenuBarUINode->SetVisible(success);
 	HostedFileListUINode->SetVisible(success);
+	SearchFilterUINode->SetVisible(success);
 	UploadMenuUINode->SetVisible(false);
 
 	UpdateUploadFolderList();
@@ -782,7 +805,7 @@ void PrimaryDialogue::LoadHostedFileListUI()
 	HostedFileListUINode->SetVisible(false);
 	AddChild(HostedFileListUINode);
 
-	//  Load the background strip behind the status bar
+	//  Load the background strip behind the hosted file list
 	auto hostedFileListContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
 	hostedFileListContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
 	hostedFileListContainer->SetDimensions(HostedFileListWidth, HostedFileListHeight);
@@ -824,6 +847,67 @@ void PrimaryDialogue::LoadHostedFileListUI()
 
 void PrimaryDialogue::LoadSearchFilterUI()
 {
+	if (SearchFilterUINode != nullptr) return;
+	SearchFilterUINode = GUIObjectNode::CreateObjectNode("");
+	SearchFilterUINode->SetVisible(false);
+	AddChild(SearchFilterUINode);
+
+	//  Load the background strip behind the search filter
+	auto searchFilterContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
+	searchFilterContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
+	searchFilterContainer->SetDimensions(SearchFilterBoxWidth, SearchFilterBoxHeight);
+	searchFilterContainer->SetPosition(80 + HostedFileListWidth + 20, 70);
+	SearchFilterUINode->AddChild(searchFilterContainer);
+
+	auto searchFiltersLabel = GUILabel::CreateLabel("Arial", "Search Filters:", 10, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	searchFilterContainer->AddChild(searchFiltersLabel);
+
+	auto filterByUserLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By User:", 10, 60, 220, 20, GUILabel::JUSTIFY_LEFT);
+	searchFilterContainer->AddChild(filterByUserLabel);
+
+	FilterByUserEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 160, 57, 240, 20);
+	FilterByUserEditBox->SetEmptyText("Leave blank to not filter");
+	FilterByUserEditBox->SetFont("Arial");
+	FilterByUserEditBox->SetEmptyTextColor(COLOR_WHITE_FADED);
+	searchFilterContainer->AddChild(FilterByUserEditBox);
+
+	auto filterByTypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Type:", 10, 100, 200, 20, GUILabel::JUSTIFY_LEFT);
+	searchFilterContainer->AddChild(filterByTypeLabel);
+
+	FilterByTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 160, 96, 240, 24, 222, 5, 14, 14);
+	auto defaultTypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+	defaultTypeFilter->SetObjectName("NO TYPE");
+	FilterByTypeDropDown->AddItem(defaultTypeFilter);
+	auto fileTypeList = GetListOfFileTypes();
+	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
+	{
+		auto typeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+		typeFilter->SetObjectName((*iter));
+		FilterByTypeDropDown->AddItem(typeFilter);
+	}
+	searchFilterContainer->AddChild(FilterByTypeDropDown);
+
+	auto filterBySubtypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Subtype:", 10, 140, 200, 20, GUILabel::JUSTIFY_LEFT);
+	searchFilterContainer->AddChild(filterBySubtypeLabel);
+
+	FilterBySubtypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 160, 136, 240, 24, 222, 5, 14, 14);
+	auto defaultSubtypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+	defaultSubtypeFilter->SetObjectName("NO SUBTYPE");
+	FilterBySubtypeDropDown->AddItem(defaultSubtypeFilter);
+	auto fileSubtypeList = GetListOfFileSubTypes();
+	for (auto iter = fileSubtypeList.begin(); iter != fileSubtypeList.end(); ++iter)
+	{
+		auto subtypeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+		subtypeFilter->SetObjectName((*iter));
+		FilterBySubtypeDropDown->AddItem(subtypeFilter);
+	}
+	searchFilterContainer->AddChild(FilterBySubtypeDropDown);
+
+	auto applySearchFilterButton = GUIButton::CreateTemplatedButton("Standard", 10, 170, 200, 26);
+	applySearchFilterButton->SetFont("Arial");
+	applySearchFilterButton->SetText("Apply Search Filter");
+	applySearchFilterButton->SetLeftClickCallback(ApplySearchFilter);
+	searchFilterContainer->AddChild(applySearchFilterButton);
 }
 
 
