@@ -32,7 +32,7 @@ void SendMessage_UserLoginRequest(EncryptedData& encryptedUsername, EncryptedDat
 	winsockWrapper.SendMessagePacket(socket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, 0);
 }
 
-void SendMessage_RequestHostedFileList(int startingIndex, int socket, EncryptedData username)
+void SendMessage_RequestHostedFileList(int startingIndex, int socket, EncryptedData username = EncryptedData(), HostedFileType type = FILE_TYPE_COUNT, HostedFileSubtype subtype = FILE_SUBTYPE_COUNT)
 {
 	//  Send a "Hosted File List Request" message
 	winsockWrapper.ClearBuffer(0);
@@ -41,6 +41,10 @@ void SendMessage_RequestHostedFileList(int startingIndex, int socket, EncryptedD
 	//  Define the user to request uploads from
 	winsockWrapper.WriteUnsignedShort((uint16_t)(username.size()), 0);
 	winsockWrapper.WriteChars(username.data(), username.size(), 0);
+
+	//  Define the type and sub-type to filter for
+	winsockWrapper.WriteChar(type, 0);
+	winsockWrapper.WriteChar(subtype, 0);
 
 	//  Define the starting index to begin the list at
 	winsockWrapper.WriteUnsignedShort(uint16_t(startingIndex), 0);

@@ -204,7 +204,7 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 }
 
 
-void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0, int usernameSize = 0, unsigned char* encryptedUsername = (unsigned char*)(""))
+void SendMessage_HostedFileList(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0, EncryptedData encryptedUsername = EncryptedData(), HostedFileType type = FILE_TYPE_COUNT, HostedFileSubtype subtype = FILE_SUBTYPE_COUNT)
 {
 	//  Message composition:
 	//  - (1 byte) unsigned char reprenting the message ID
@@ -214,9 +214,6 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 	//
 	//  Max message size = 1045 bytes
 
-	EncryptedData encryptedUsernameVec = EncryptedData();
-	if (usernameSize != 0) encryptedUsernameVec = EncryptedData(encryptedUsername, encryptedUsername + usernameSize);
-
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_HOSTED_FILE_LIST, 0);
 
@@ -225,12 +222,17 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 	auto listSize = std::max(0, endIndex - startIndex + 1);
 
 	//  Determine if we have enough uploads by the given user to fill the list size. If not, decrement the list size
-	if (usernameSize != 0)
+	if ((encryptedUsername.size() != 0) || (type != FILE_TYPE_COUNT) || (subtype != FILE_SUBTYPE_COUNT))
 	{
 		auto uploadCount = 0;
 		for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
-			if (CompareEncryptedData(encryptedUsernameVec, (*iter).EncryptedUploader, false) == 0)
-				++uploadCount;
+		{
+			if ((encryptedUsername.size() != 0) && CompareEncryptedData(encryptedUsername, (*iter).EncryptedUploader, false) != 0) continue;
+			if ((type != FILE_TYPE_COUNT) && ((*iter).FileType != type)) continue;
+			if ((subtype != FILE_SUBTYPE_COUNT) && ((*iter).FileSubType != subtype)) continue;
+
+			++uploadCount;
+		}
 		listSize = std::max<int>(std::min<int>(listSize, (uploadCount - startIndex)), 0);
 	}
 
@@ -243,14 +245,21 @@ void SendMessage_LatestUploads(std::list<HostedFileData>& hostedFileDataList, Us
 		for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
 		{
 			if (iterIndex++ < startIndex) continue;
-			if ((usernameSize != 0) && (CompareEncryptedData(encryptedUsernameVec, (*iter).EncryptedUploader, false) != 0)) continue;
+
+			//  Filter any entries that don't match our filter specifications
+			if ((encryptedUsername.size() != 0) && CompareEncryptedData(encryptedUsername, (*iter).EncryptedUploader, false) != 0) continue;
+			if ((type != FILE_TYPE_COUNT) && ((*iter).FileType != type)) continue;
+			if ((subtype != FILE_SUBTYPE_COUNT) && ((*iter).FileSubType != subtype)) continue;
+
 			if (--listSize < 0) break;
 			auto title = (*iter).EncryptedFileTitle;
 			assert(title.size() <= ENCRYPTED_TITLE_MAX_SIZE);
 			winsockWrapper.WriteChar((unsigned char)((*iter).FileType), 0);
 			winsockWrapper.WriteChar((unsigned char)((*iter).FileSubType), 0);
+
 			winsockWrapper.WriteChar((unsigned char)(title.size()), 0);
 			winsockWrapper.WriteChars(title.data(), int(title.size()), 0);
+
 			winsockWrapper.WriteChar(uint8_t((*iter).EncryptedUploader.size()), 0);
 			winsockWrapper.WriteChars((*iter).EncryptedUploader.data(), (*iter).EncryptedUploader.size(), 0);
 		}
@@ -609,12 +618,17 @@ void Server::ReceiveMessages(void)
 			//  Read the username to filter the list by (if any)
 			auto usernameSize = winsockWrapper.ReadUnsignedShort(0);
 			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
+			auto encryptedUsernameVec = EncryptedData(encryptedUsername, encryptedUsername + usernameSize);
+
+			//  Read the type and subtype to filter for
+			auto type = HostedFileType(winsockWrapper.ReadChar(0));
+			auto subtype = HostedFileSubtype(winsockWrapper.ReadChar(0));
 
 			//  Read the starting index to begin the list at
 			auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
 
 			//  Send a hosted file data list with the given filters
-			SendMessage_LatestUploads(HostedFileDataList, user, startingIndex, usernameSize, encryptedUsername);
+			SendMessage_HostedFileList(HostedFileDataList, user, startingIndex, encryptedUsernameVec, type, subtype);
 		}
 		break;
 
@@ -851,7 +865,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	ReadUserInbox(user);
 	ReadUserNotifications(user);
 	SendMessage_InboxAndNotifications(user);
-	SendMessage_LatestUploads(HostedFileDataList, user);
+	SendMessage_HostedFileList(HostedFileDataList, user);
 
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
@@ -1115,7 +1129,7 @@ void Server::SendOutLatestUploadsList(void)
 		//  If the user isn't logged in yet, skip over them. They'll get an update when they log in
 		if (user->LoginStatus != UserConnection::LOGIN_STATUS_LOGGED_IN) continue;
 
-		SendMessage_LatestUploads(HostedFileDataList, user);
+		SendMessage_HostedFileList(HostedFileDataList, user);
 	}
 }
 

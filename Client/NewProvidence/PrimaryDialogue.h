@@ -300,12 +300,12 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 
 	//  Request the latest uploads from "Charlie"
 	//auto username = Groundfish::Encrypt("Charlie", 7);
-	//SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), username.size(), username.data());
+	//SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), username.size(), username.data(), );
 
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), EncryptedData());
+	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket());
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -327,7 +327,7 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
 	UpdateUploadsRangeString();
-	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket(), EncryptedData());
+	SendMessage_RequestHostedFileList(0, ClientControl.GetServerSocket());
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -359,7 +359,7 @@ void ShiftLatestUploadsLeft(GUIObjectNode* object)
 	if (CurrentLatestUploadsStartingIndex < 20) return;
 	CurrentLatestUploadsStartingIndex -= 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket(), EncryptedData());
+	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
 	UpdateUploadsRangeString();
 }
 
@@ -369,7 +369,7 @@ void ShiftLatestUploadsRight(GUIObjectNode* object)
 	if (CurrentLatestUploadsStartingIndex > 50000) return;
 	CurrentLatestUploadsStartingIndex += 20;
 	auto usernameSize = ClientControl.GetUsername().size();
-	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket(), EncryptedData());
+	SendMessage_RequestHostedFileList(CurrentLatestUploadsStartingIndex, ClientControl.GetServerSocket());
 	UpdateUploadsRangeString();
 }
 
