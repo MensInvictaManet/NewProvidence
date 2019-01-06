@@ -11,8 +11,10 @@
 #include <math.h>
 
 const auto MainMenuBarHeight = 40;
-const auto LatestUploadsWidth = 1120;
-const auto LatestUploadsHeight = 580;
+const auto HostedFileListWidth = 620;
+const auto HostedFileListHeight = 580;
+const auto SearchFilterBoxWidth = 480;
+const auto SearchFilterBoxHeight = 580;
 
 int CurrentLatestUploadsStartingIndex = 0;
 
@@ -26,7 +28,7 @@ GUIEditBox* UsernameEditBox = nullptr;
 GUIEditBox* PasswordEditBox = nullptr;
 
 GUIObjectNode* MainMenuBarUINode = nullptr;
-GUIObjectNode* LatestUploadsUINode = nullptr;
+GUIObjectNode* HostedFileListUINode = nullptr;
 GUIObjectNode* UploadMenuUINode = nullptr;
 
 GUIButton* UserSideTabButton = nullptr;
@@ -187,7 +189,7 @@ void AddLatestUploadEntry(HostedFileEntry fileEntryData)
 	auto uploaderLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileUploader.c_str(), 456, 9, 100, 20);
 	entry->AddChild(uploaderLabel);
 
-	auto button = GUIButton::CreateTemplatedButton("Standard", LatestUploadsWidth - 100, 6, 80, 20);
+	auto button = GUIButton::CreateTemplatedButton("Standard", HostedFileListWidth - 100, 6, 80, 20);
 	button->SetFont("Arial");
 	button->SetText("Download");
 	button->SetObjectName("Download Button");
@@ -289,7 +291,7 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 	//  TODO: Set up the "HOME" menu (inbox, notifications, hot files, etc)
 
 	//  Make the latest uploads UI visible
-	LatestUploadsUINode->SetVisible(true);
+	HostedFileListUINode->SetVisible(true);
 
 	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
 	LoginMenuNode->SetVisible(false);
@@ -315,7 +317,7 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 void SetBrowseMenuOpen(GUIObjectNode* button)
 {
 	//  Make the latest uploads UI visible
-	LatestUploadsUINode->SetVisible(true);
+	HostedFileListUINode->SetVisible(true);
 
 	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
 	LoginMenuNode->SetVisible(false);
@@ -344,7 +346,7 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 	MainMenuBarUINode->SetVisible(true);
 
 	//  Make the latest uploads UI invisible
-	LatestUploadsUINode->SetVisible(false);
+	HostedFileListUINode->SetVisible(false);
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
@@ -403,7 +405,7 @@ void LoginRequestResponseCallback(int response, int inboxCount, int notification
 	bool success = (response == LOGIN_RESPONSE_SUCCESS);
 	LoginMenuNode->SetVisible(!success);
 	MainMenuBarUINode->SetVisible(success);
-	LatestUploadsUINode->SetVisible(success);
+	HostedFileListUINode->SetVisible(success);
 	UploadMenuUINode->SetVisible(false);
 
 	UpdateUploadFolderList();
@@ -498,7 +500,8 @@ private:
 	void LoadLoginMenu();
 	void LoadMainMenuBarUI();
 	void LoadSideBarUI();
-	void LoadLatestUploadsUI();
+	void LoadHostedFileListUI();
+	void LoadSearchFilterUI();
 	void LoadUploadMenuUI();
 
 	void UpdateUI();
@@ -689,7 +692,8 @@ void PrimaryDialogue::LoadMainMenuBarUI()
 {
 	//  Create the individual UI pieces
 	LoadUploadMenuUI();
-	LoadLatestUploadsUI();
+	LoadHostedFileListUI();
+	LoadSearchFilterUI();
 	LoadSideBarUI();
 
 	//  Set the Client control callbacks
@@ -771,19 +775,19 @@ void PrimaryDialogue::LoadSideBarUI()
 }
 
 
-void PrimaryDialogue::LoadLatestUploadsUI()
+void PrimaryDialogue::LoadHostedFileListUI()
 {
-	if (LatestUploadsUINode != nullptr) return;
-	LatestUploadsUINode = GUIObjectNode::CreateObjectNode("");
-	LatestUploadsUINode->SetVisible(false);
-	AddChild(LatestUploadsUINode);
+	if (HostedFileListUINode != nullptr) return;
+	HostedFileListUINode = GUIObjectNode::CreateObjectNode("");
+	HostedFileListUINode->SetVisible(false);
+	AddChild(HostedFileListUINode);
 
 	//  Load the background strip behind the status bar
 	auto hostedFileListContainer = GUIObjectNode::CreateObjectNode("./Assets/Textures/Pixel_White.png");
 	hostedFileListContainer->SetColor(0.4f, 0.4f, 0.7f, 1.0f);
-	hostedFileListContainer->SetDimensions(LatestUploadsWidth, LatestUploadsHeight);
+	hostedFileListContainer->SetDimensions(HostedFileListWidth, HostedFileListHeight);
 	hostedFileListContainer->SetPosition(80, 70);
-	LatestUploadsUINode->AddChild(hostedFileListContainer);
+	HostedFileListUINode->AddChild(hostedFileListContainer);
 
 	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 62, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
 	hostedFileListContainer->AddChild(fileTitleLabel);
@@ -793,18 +797,18 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
 	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + ")";
-	LatestUploadsTitleLabel = GUILabel::CreateLabel("Arial", latestUploadedFilesLabelString.c_str(), hostedFileListContainer->GetWidth() / 2, hostedFileListContainer->GetHeight() - 20, LatestUploadsWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
+	LatestUploadsTitleLabel = GUILabel::CreateLabel("Arial", latestUploadedFilesLabelString.c_str(), hostedFileListContainer->GetWidth() / 2, hostedFileListContainer->GetHeight() - 20, HostedFileListWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
 	LatestUploadsTitleLabel->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	hostedFileListContainer->AddChild(LatestUploadsTitleLabel);
 
-	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, LatestUploadsWidth - 10, LatestUploadsHeight - 54, LatestUploadsWidth - 26, 2, 12, 12, 12, 12, 12, 24, 2);
+	LatestUploadsListBox = GUIListBox::CreateTemplatedListBox("Standard", 5, 30, HostedFileListWidth - 10, HostedFileListHeight - 54, HostedFileListWidth - 26, 2, 12, 12, 12, 12, 12, 24, 2);
 	LatestUploadsListBox->SetItemClickCallback(UpdateLatestUploadsListBoxDownloadButtons);
 	hostedFileListContainer->AddChild(LatestUploadsListBox);
 
 	auto listBoxLeftArrowButton = GUIButton::CreateButton("./Assets/Textures/MainProgramUI/LeftArrowIcon.png");
 	listBoxLeftArrowButton->SetColorBytes(64, 64, 64, 255);
 	listBoxLeftArrowButton->SetDimensions(28, 28);
-	listBoxLeftArrowButton->SetPosition(4, LatestUploadsHeight - 26);
+	listBoxLeftArrowButton->SetPosition(4, HostedFileListHeight - 26);
 	listBoxLeftArrowButton->SetLeftClickCallback(ShiftLatestUploadsLeft);
 	hostedFileListContainer->AddChild(listBoxLeftArrowButton);
 
@@ -812,10 +816,14 @@ void PrimaryDialogue::LoadLatestUploadsUI()
 	listBoxRightArrowButton->SetColorBytes(64, 64, 64, 255);
 	listBoxRightArrowButton->SetDimensions(28, 28);
 	auto rightArrowWidth = listBoxRightArrowButton->GetWidth();
-	listBoxRightArrowButton->SetPosition(LatestUploadsWidth - rightArrowWidth - 4, LatestUploadsHeight - 26);
+	listBoxRightArrowButton->SetPosition(HostedFileListWidth - rightArrowWidth - 4, HostedFileListHeight - 26);
 	listBoxRightArrowButton->SetLeftClickCallback(ShiftLatestUploadsRight);
 	hostedFileListContainer->AddChild(listBoxRightArrowButton);
+}
 
+
+void PrimaryDialogue::LoadSearchFilterUI()
+{
 }
 
 

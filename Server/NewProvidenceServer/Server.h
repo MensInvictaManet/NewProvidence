@@ -210,7 +210,7 @@ void SendMessage_HostedFileList(std::list<HostedFileData>& hostedFileDataList, U
 	//  - (1 byte) unsigned char reprenting the message ID
 	//  - (2 bytes) unsigned short representing the starting index
 	//  - (2 bytes) unsigned short representing the list size (max 20)
-	//  - (1040 bytes) (1 + 1 + 1 + 49) x [list max (20)]
+	//  - (1440 bytes) (1 + 1 + 1 + 49 + 1 + 19) x [list max (20)]
 	//
 	//  Max message size = 1045 bytes
 

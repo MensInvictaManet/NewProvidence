@@ -69,9 +69,9 @@ struct HostedFileEntry
 	std::string FileTitle;
 	std::string FileUploader;
 
-	HostedFileEntry(HostedFileType type, HostedFileSubtype subType, std::string title, std::string uploader) :
+	HostedFileEntry(HostedFileType type, HostedFileSubtype subtype, std::string title, std::string uploader) :
 		FileType(type),
-		FileSubType(subType),
+		FileSubType(subtype),
 		FileTitle(title),
 		FileUploader(uploader)
 	{}
@@ -112,7 +112,7 @@ public:
 
 	bool Connect(void);
 
-	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subType);
+	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subtype);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileTransfers(void);
@@ -134,12 +134,12 @@ bool Client::Connect(void)
 }
 
 
-void Client::AddLatestUpload(int index, std::string fileTitle, std::string uploader, HostedFileType type, HostedFileSubtype subType)
+void Client::AddLatestUpload(int index, std::string fileTitle, std::string uploader, HostedFileType type, HostedFileSubtype subtype)
 {
 	for (auto iter = HostedFilesList.begin(); iter != HostedFilesList.end(); ++iter)
 		if ((*iter).FileTitle.compare(fileTitle) == 0) return;
 
-	auto newEntry = HostedFileEntry(type, subType, fileTitle, uploader);
+	auto newEntry = HostedFileEntry(type, subtype, fileTitle, uploader);
 
 	if (int(HostedFilesList.size()) > index)
 	{
@@ -307,7 +307,7 @@ bool Client::ReadMessages(void)
 		{
 			//  The file type and subtype
 			auto type = HostedFileType(winsockWrapper.ReadChar(0));
-			auto subType = HostedFileSubtype(winsockWrapper.ReadChar(0));
+			auto subtype = HostedFileSubtype(winsockWrapper.ReadChar(0));
 
 			//  The encrypted file title
 			auto ftSize = int(winsockWrapper.ReadChar(0));
@@ -323,7 +323,7 @@ bool Client::ReadMessages(void)
 			auto fuDataVector = EncryptedData(fuData, fuData + fuSize);
 			auto decryptedUploaderString = Groundfish::DecryptToString(fuDataVector.data());
 
-			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, decryptedUploaderString, type, subType);
+			AddLatestUpload(uploadsStartIndex++, decryptedTitleString, decryptedUploaderString, type, subtype);
 		}
 
 		if (LatestUploadsCallback != nullptr) LatestUploadsCallback(HostedFilesList);
