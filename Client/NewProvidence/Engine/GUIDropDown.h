@@ -8,15 +8,13 @@
 class GUIDropDown : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUIDropDownSelectCallback;
-
 	static GUIDropDown* CreateDropDown(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUIDropDown* CreateTemplatedDropDown(const char* dropdownTemplate, int x = 0, int y = 0, int w = 0, int h = 0, int dropDownX = 0, int dropDownY = 0, int dropDownW = 0, int dropDownH = 0);
 
 	explicit GUIDropDown(bool templated);
 	~GUIDropDown();
 
-	void SetItemSelectCallback(const GUIDropDownSelectCallback& callback) { m_ItemSelectCallback = callback; }
+	void SetItemSelectCallback(const GUIFunctionCallback& callback) { m_ItemSelectCallback = callback; }
 
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -29,7 +27,7 @@ public:
 	inline int GetSelectedIndex() const { return SelectedIndex; }
 
 private:
-	GUIDropDownSelectCallback	m_ItemSelectCallback;
+	GUIFunctionCallback	m_ItemSelectCallback;
 
 	bool m_Clicked;
 	unsigned int SelectedIndex;

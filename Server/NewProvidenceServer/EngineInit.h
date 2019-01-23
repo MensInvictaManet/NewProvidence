@@ -18,7 +18,7 @@ GUIObjectNode* currentDialogue;
 
 void CreateInitializationData()
 {
-	//  Load some basic fonts
+	//  Load the default fonts
 	fontManager.SetFontFolder("Assets/Fonts/");
 	fontManager.LoadFont("Arial");
 	fontManager.LoadFont("Arial-12-White");
@@ -37,7 +37,7 @@ void CreateInitializationData()
 void AppMain()
 {
 	SetBackgroundColor(0.0f, 0.04f, 0.08f);
-	if (!InitializeEngine("New Providence Server", 1280.0f, 720.0f))
+	if (!InitializeEngine("New Providence", 1280.0f, 720.0f))
 	{
 		ShutdownEngine();
 		throw std::runtime_error("InitializeEngine failed");

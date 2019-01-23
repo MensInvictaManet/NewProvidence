@@ -95,6 +95,8 @@ public:
 	int m_ClickY;
 };
 
+typedef std::function<void(GUIObjectNode*)> GUIFunctionCallback;
+
 inline GUIObjectNode* GUIObjectNode::CreateObjectNode(const char* imageFile)
 {
 	MANAGE_MEMORY_NEW("MenuUI_ObjectNode", sizeof(GUIObjectNode));

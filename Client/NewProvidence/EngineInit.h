@@ -18,7 +18,7 @@ GUIObjectNode* currentDialogue;
 
 void CreateInitializationData()
 {
-	//  Load some basic fonts
+	//  Load the default fonts
 	fontManager.SetFontFolder("Assets/Fonts/");
 	fontManager.LoadFont("Arial");
 	fontManager.LoadFont("Arial-12-White");

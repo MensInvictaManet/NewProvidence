@@ -8,15 +8,13 @@
 class GUIDropDown : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUIDropDownSelectCallback;
-
 	static GUIDropDown* CreateDropDown(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUIDropDown* CreateTemplatedDropDown(const char* dropdownTemplate, int x = 0, int y = 0, int w = 0, int h = 0, int dropDownX = 0, int dropDownY = 0, int dropDownW = 0, int dropDownH = 0);
 
 	explicit GUIDropDown(bool templated);
 	~GUIDropDown();
 
-	void SetItemSelectCallback(const GUIDropDownSelectCallback& callback) { m_ItemSelectCallback = callback; }
+	void SetItemSelectCallback(const GUIFunctionCallback& callback) { m_ItemSelectCallback = callback; }
 
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -24,13 +22,12 @@ public:
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
 
 	inline void AddItem(GUIObjectNode* item) { item->m_Created = true;  m_ItemList.push_back(item); if (m_Clicked) UpdateExpandedHeight(); }
-	inline void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); }
-	inline void SelectItem(unsigned int index) { SelectedIndex = std::min<int>(index, static_cast<unsigned int>(m_ItemList.size() - 1)); }
+	inline void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); SelectedIndex = 0; }
 	inline const GUIObjectNode* GetSelectedItem() const { return (SelectedIndex == -1) ? nullptr : m_ItemList[SelectedIndex]; }
 	inline int GetSelectedIndex() const { return SelectedIndex; }
 
 private:
-	GUIDropDownSelectCallback	m_ItemSelectCallback;
+	GUIFunctionCallback	m_ItemSelectCallback;
 
 	bool m_Clicked;
 	unsigned int SelectedIndex;
@@ -163,7 +160,9 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 		//  If we are inside of the drop-down box, select an index based on height
 		if ((mx > x) && (mx < x + m_Width) && (my > y + m_Height) && (my < y + int(ExpandedHeight)))
 		{
+			auto oldSelection = SelectedIndex;
 			SelectedIndex = static_cast<unsigned int>((my - y - m_Height) / m_Height);
+			if ((oldSelection != SelectedIndex) && (m_ItemSelectCallback != nullptr)) m_ItemSelectCallback(this);
 		}
 
 		//  If we click anywhere, close the drop-down box

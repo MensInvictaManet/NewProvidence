@@ -12,7 +12,6 @@ class GUIListBox : public GUIObjectNode
 {
 public:
 	enum Justifications { JUSTIFY_LEFT = 0, JUSTIFY_RIGHT, JUSTIFY_CENTER, JUSTIFICATION_COUNT };
-	typedef std::function<void(GUIObjectNode*)> GUIListBoxCallback;
 
 	static GUIListBox* CreateListBox(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0, int entryHeight = 100, int spaceBetweenEntries = 0);
 	static GUIListBox* CreateTemplatedListBox(const char* listboxTemplate, int x = 0, int y = 0, int w = 0, int h = 0, int dirButtonsX = 0, int contentY = 0, int upButtonW = 0, int upButtonH = 0, int downButtonW = 0, int downButtonH = 0, int barColumnW = 0, int entryHeight = 0, int spaceBetweenEntries = 0);
@@ -23,7 +22,7 @@ public:
 
 	void SetHeight(int height) override { GUIObjectNode::SetHeight(height); ItemDisplayCount = height / (EntryHeight + SpaceBetweenEntries); }
 
-	void SetItemClickCallback(const GUIListBoxCallback& callback) { m_ItemClickCallback = callback; }
+	void SetItemClickCallback(const GUIFunctionCallback& callback) { m_ItemClickCallback = callback; }
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Update(void) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -31,8 +30,8 @@ public:
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
 
 	void AddItem(GUIObjectNode* item) { item->m_Created = true; m_ItemList.push_back(item); UpdateMover(m_FlowToBottom ? std::max<int>(int(m_ItemList.size()) - ItemDisplayCount, 0) : -1); }
+	void RemoveItem(GUIObjectNode* item) { for (auto i = m_ItemList.begin(); i != m_ItemList.end(); ++i) if ((*i) == item) { m_ItemList.erase(i); return; } }
 	void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); SelectedIndex = -1; }
-	void SelectItem(unsigned int index) { SelectedIndex = std::min<int>(index, static_cast<unsigned int>(m_ItemList.size() - 1)); }
 	GUIObjectNode* GetSelectedItem() { return (SelectedIndex == -1) ? nullptr : m_ItemList[SelectedIndex]; }
 	int GetSelectedIndex() const { return SelectedIndex; }
 	void SetSelectable(bool selectable) { m_Selectable = selectable; }
@@ -45,7 +44,7 @@ public:
 	inline int GetSpaceBetweenEntries() const { return SpaceBetweenEntries; }
 
 private:
-	GUIListBoxCallback	m_ItemClickCallback;
+	GUIFunctionCallback	m_ItemClickCallback;
 
 	std::vector<GUIObjectNode*> m_ItemList;
 	bool m_Selectable;
@@ -342,10 +341,10 @@ inline void GUIListBox::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 		}

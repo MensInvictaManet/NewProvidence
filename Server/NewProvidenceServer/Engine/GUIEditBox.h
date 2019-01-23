@@ -10,7 +10,6 @@ constexpr Uint32 ticksPerCursorSwitch = 500;
 class GUIEditBox : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUIFunctionCallback;
 	enum TextAlignment { ALIGN_LEFT, ALIGN_CENTER };
 
 	static GUIEditBox* CreateEditBox(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);

@@ -9,8 +9,6 @@
 class GUIButton : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUIFunctionCallback;
-
 	static GUIButton* CreateButton(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUIButton* CreateTemplatedButton(const char* buttonTemplate, int x = 0, int y = 0, int w = 0, int h = 0);
 

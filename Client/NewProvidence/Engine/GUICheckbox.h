@@ -8,8 +8,6 @@
 class GUICheckbox : public GUIObjectNode
 {
 public:
-	typedef std::function<void(GUIObjectNode*)> GUICheckboxCallback;
-
 	static GUICheckbox* CreateCheckbox(const char* imageFile, const char* checkFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUICheckbox* CreateTemplatedCheckbox(const char* checkboxTemplate, int x = 0, int y = 0, int w = 0, int h = 0);
 
@@ -20,7 +18,7 @@ public:
 
 	void SetChecked(bool checked);
 	void SetCheckTextureID(int textureID) { m_CheckTextureID = textureID; }
-	void SetCheckCallback(const GUICheckboxCallback& callback) { m_CheckCallback = callback; }
+	void SetCheckCallback(const GUIFunctionCallback& callback) { m_CheckCallback = callback; }
 
 	void Input(int xOffset = 0, int yOffset = 0) override;
 	void Render(int xOffset = 0, int yOffset = 0) override;
@@ -31,7 +29,7 @@ private:
 	void Uncheck();
 
 	GLuint m_CheckTextureID;
-	GUICheckboxCallback	m_CheckCallback;
+	GUIFunctionCallback	m_CheckCallback;
 	bool m_Checked;
 
 	//  Template data
