@@ -155,7 +155,7 @@ inline void MD5::II(uint4 &a, uint4 b, uint4 c, uint4 d, uint4 x, uint4 s, uint4
 //////////////////////////////////////////////
 
 // default ctor, just initailize
-inline MD5::MD5() : 
+inline MD5::MD5() :
 	finalized(false)
 {
 	//  Initialize member variable data arrays
@@ -170,7 +170,7 @@ inline MD5::MD5() :
 //////////////////////////////////////////////
 
 // nifty shortcut ctor, computer MD5 for data array and finalize it right away
-inline MD5::MD5(const std::vector<unsigned char>& data) : 
+inline MD5::MD5(const std::vector<unsigned char>& data) :
 	finalized(false)
 {
 	//  Initialize member variable data arrays
@@ -185,7 +185,7 @@ inline MD5::MD5(const std::vector<unsigned char>& data) :
 }
 
 // nifty shortcut ctor, computer MD5 for data array and finalize it right away
-inline MD5::MD5(const char* data, int dataCount, int dataLength) : 
+inline MD5::MD5(const char* data, int dataCount, int dataLength) :
 	finalized(false)
 {
 	//  Initialize member variable data arrays

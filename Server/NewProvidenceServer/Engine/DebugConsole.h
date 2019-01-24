@@ -82,8 +82,7 @@ inline void DebugConsole::SetWindowDimensions(int width, int height)
 	if ((debugConsoleHeight % debugConsoleEntrySpacing) != 0)
 		debugConsoleHeight = (debugConsoleHeight / debugConsoleEntrySpacing * debugConsoleEntrySpacing);
 
-	m_DebugConsoleListBox->SetWidth(width);
-	m_DebugConsoleListBox->SetHeight(debugConsoleHeight);
+	m_DebugConsoleListBox->SetDimensions(width, debugConsoleHeight);
 }
 
 inline void DebugConsole::EnterCommand(std::string& commandString)
@@ -143,7 +142,7 @@ inline void DebugConsole::Input(int xOffset, int yOffset)
 inline void DebugConsole::Render(int xOffset, int yOffset)
 {
 	if (m_SetToDestroy || !m_Visible) return;
-	
+
 	glDisable(GL_TEXTURE_2D);
 	glColor4f(0.1f, 0.1f, 0.1f, 0.9f);
 	glBegin(GL_QUADS);

@@ -14,7 +14,7 @@ static unsigned int averageFPS = 0;
 #define TICKS_TO_SECONDS(ticks) double(ticks) / 1000.0
 #define SECONDS_TO_TICKS(seconds) Uint32(seconds * 1000.0)
 
-inline void DetermineAverageFPS(double newFrameSeconds)
+inline void DetermineAverageFPS()
 {
 	static unsigned int frameIndex = 0;
 	static double lastGameSeconds = 0.0;
@@ -39,7 +39,7 @@ inline void DetermineTimeSlice()
 	frameSeconds = float(TICKS_TO_SECONDS(frameTicksUint));
 	lastGameTicksUint = gameTicksUint;
 
-	DetermineAverageFPS(frameSeconds);
+	DetermineAverageFPS();
 	frameSecondsF = float(frameSeconds);
 	gameSecondsF = float(gameSeconds);
 }
