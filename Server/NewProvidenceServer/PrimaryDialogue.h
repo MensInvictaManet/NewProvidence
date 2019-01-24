@@ -28,9 +28,10 @@ void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
 		newFileDataEntry->AddChild(fileIDLabel);
 
 		//  Create the file size label
-		auto megabytes = fileData.FileSize / 1000000;
-		auto kilobytes = fileData.FileSize / 1000;
-		auto sizeString = (megabytes > 0) ? (std::to_string(megabytes) + " MB") : ((kilobytes > 0) ? (std::to_string(kilobytes) + " KB") : (std::to_string(fileData.FileSize) + " Bytes"));
+		uint64_t gigabytes = fileData.FileSize / (1024 * 1024 * 1024);
+		uint64_t megabytes = fileData.FileSize / (1024 * 1024);
+		uint64_t kilobytes = fileData.FileSize / (1024);
+		auto sizeString = (gigabytes > 9) ? (std::to_string(gigabytes) + "GB") : ((megabytes > 0) ? (std::to_string(megabytes) + " MB") : ((kilobytes > 0) ? (std::to_string(kilobytes) + " KB") : (std::to_string(fileData.FileSize) + " Bytes")));
 		auto fileSizeLabel = GUILabel::CreateLabel("Arial", sizeString.c_str(), 330, 8, 200, 24);
 		newFileDataEntry->AddChild(fileSizeLabel);
 
@@ -66,22 +67,55 @@ void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
 	}
 }
 
-void UpdateCurrentUserList(const std::unordered_map<UserConnection*, bool>& userConnectionList)
+void UpdateCurrentUserList(std::unordered_map<UserConnection*, bool> userConnectionList)
 {
-	//  Clear the current user list and rebuild it using the most recent data
-	CurrentUserList->ClearItems();
+	//  Clear out any users no longer connected, and update existing users from the new data
+	auto currentUserList = CurrentUserList->GetItemList();
+	for (auto iter = currentUserList.begin(); iter != currentUserList.end();)
+	{
+		auto user = ServerControl.GetUserConnectionByIP((*iter)->GetObjectName());
+
+		//  If the user no longer exists in the current connected user list, delete the iterator and continue
+		if (user == nullptr)
+		{
+			CurrentUserList->RemoveItem((*iter));
+			iter = currentUserList.erase(iter);
+			continue;
+		}
+
+		//  Create the user identifier label
+		auto userIDLabel = static_cast<GUILabel*>((*iter)->GetChildByName("UserIDLabel"));
+		assert(userIDLabel != nullptr);
+		userIDLabel->SetText(user->UserIdentifier);
+
+		//  Create the user identifier label
+		auto userStatusLabel = static_cast<GUILabel*>((*iter)->GetChildByName("UserStatusLabel"));
+		assert(userStatusLabel != nullptr);
+		userStatusLabel->SetText(user->StatusString);
+
+		auto userIter = userConnectionList.find(user);
+		assert(userIter != userConnectionList.end());
+		userConnectionList.erase(userIter);
+
+		iter++;
+	}
+
+	//  If there are any new user connections, they should still be in the passed list. Add entries for each new user
 	for (auto iter = userConnectionList.begin(); iter != userConnectionList.end(); ++iter)
 	{
 		auto user = (*iter).first;
 		auto newUserEntry = GUIObjectNode::CreateObjectNode("");
+		newUserEntry->SetObjectName((*iter).first->IPAddress);
 		
 		//  Create the user identifier label
 		auto userIDLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "", 10, 8, 200, 24);
+		userIDLabel->SetObjectName("UserIDLabel");
 		userIDLabel->SetText(user->UserIdentifier);
 		newUserEntry->AddChild(userIDLabel);
 
 		//  Create the user identifier label
 		auto userStatusLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), "", 360, 8, 200, 24);
+		userStatusLabel->SetObjectName("UserStatusLabel");
 		userStatusLabel->SetText(user->StatusString);
 		newUserEntry->AddChild(userStatusLabel);
 

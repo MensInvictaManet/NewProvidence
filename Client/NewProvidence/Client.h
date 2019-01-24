@@ -8,7 +8,7 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-constexpr auto VERSION_NUMBER			= "2019.01.05";
+constexpr auto VERSION_NUMBER			= "2019.01.23";
 constexpr auto NEW_PROVIDENCE_IP		= "98.181.188.165";
 constexpr auto NEW_PROVIDENCE_PORT		= 2347;
 
@@ -109,6 +109,11 @@ public:
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
 	inline void SetUsername(const EncryptedData& username) { EncryptedUsername = username; }
+	inline void AddFileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false)
+	{
+		assert(FileSend == nullptr);
+		FileSend = new FileSendTask(fileName, fileTitle, filePath, fileTypeID, fileSubTypeID, socketID, ipAddress, port, deleteAfter);
+	}
 
 	bool Connect(void);
 
@@ -161,16 +166,24 @@ void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::stri
 }
 
 
+void EncryptAndMoveThenReadySend(std::string unencryptedFileName, std::string encryptedFileName, Client* client, std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID)
+{
+	Groundfish::EncryptAndMoveFile(unencryptedFileName, encryptedFileName);
+
+	//  Add a new FileSendTask to our list, so it can manage itself
+	client->AddFileSendTask(fileName, fileTitle, encryptedFileName, fileTypeID, fileSubTypeID, client->GetServerSocket(), NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
+}
+
+
 void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID)
 {
 	if (FileSend != nullptr) return;
 
 	auto titleMD5 = md5(fileTitle);
 	auto hostedFileName = titleMD5 + ".hostedfile";
-	Groundfish::EncryptAndMoveFile(filePath, hostedFileName);
 
-	//  Add a new FileSendTask to our list, so it can manage itself
-	FileSend = new FileSendTask(fileName, fileTitle, hostedFileName, fileTypeID, fileSubTypeID, ServerSocket, NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
+	std::thread encryptThread(EncryptAndMoveThenReadySend, filePath, hostedFileName, this, fileName, fileTitle, filePath, fileTypeID, fileSubTypeID);
+	encryptThread.detach();
 }
 
 
@@ -179,7 +192,7 @@ void Client::ContinueFileTransfers(void)
 	// If there is a file send task, send a file chunk for each one if the file transfer is ready
 	if (FileSend == nullptr) return;
 
-	//  If we aren't ready to send the file, continue out and wait for a ready signal
+	//  If we aren't sending the file yet, continue out and wait for a ready signal
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
 
 	FileSend->SetFileTransferEndTime(gameSeconds);

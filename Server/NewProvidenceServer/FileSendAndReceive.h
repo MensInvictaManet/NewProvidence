@@ -1,6 +1,7 @@
 #pragma once
 
 #include <thread>
+#include <filesystem>
 #include "MessageIdentifiers.h"
 #include "Engine/WinsockWrapper.h"
 
@@ -126,9 +127,10 @@ public:
 	enum FileChunkSendState
 	{
 		CHUNK_STATE_INITIALIZING = 0,
-		CHUNK_STATE_SENDING = 1,
-		CHUNK_STATE_PENDING_COMPLETE = 2,
-		CHUNK_STATE_COMPLETE = 3,
+		CHUNK_STATE_READY_TO_SEND = 1,
+		CHUNK_STATE_SENDING = 2,
+		CHUNK_STATE_PENDING_COMPLETE = 3,
+		CHUNK_STATE_COMPLETE = 4,
 	};
 
 private:
@@ -197,10 +199,8 @@ public:
 		FileStream.open(FilePath, std::ios_base::binary);
 		assert(FileStream.good() && !FileStream.bad());
 
-		//  Determine the size of the file we're sending
-		FileSize = (uint64_t)(FileStream.tellg());
-		FileStream.seekg(0, std::ios::end);
-		FileSize = (uint64_t)(FileStream.tellg()) - FileSize;
+		//  Get the file size in bytes for the file
+		FileSize = std::filesystem::file_size(FilePath);
 
 		//  Determine the file chunk count and file portion count
 		FileChunkCount = FileSize / FILE_CHUNK_SIZE;
@@ -264,7 +264,7 @@ public:
 		if (GetFileTransferComplete()) return;
 
 		//  If we're pending completion, wait and send completion confirmation only if we've reached the end
-		if (FileChunkTransferState == CHUNK_STATE_PENDING_COMPLETE)
+		if (GetFileTransferState() == CHUNK_STATE_PENDING_COMPLETE)
 		{
 			//  If enough time has gone by without response from the last one, send the FileTransferPortionComplete message again
 			auto secondsSinceLastMessage = double(clock() - LastMessageTime) / CLOCKS_PER_SEC;
@@ -282,7 +282,7 @@ public:
 #if FILE_TRANSFER_DEBUGGING
 			debugConsole->AddDebugConsoleLine("CHUNK_STATE_PENDING_COMPLETE");
 #endif
-			FileChunkTransferState = CHUNK_STATE_PENDING_COMPLETE;
+			SetFileTransferState(CHUNK_STATE_PENDING_COMPLETE);
 			SendMessage_FileTransferPortionComplete(FilePortionIndex, SocketID, IPAddress.c_str(), ConnectionPort);
 			LastMessageTime = clock();
 			return;
@@ -305,7 +305,7 @@ public:
 		//  Given a list from the file receiver, reset the FileChunksToSend list so we can re-send the necessary file chunks
 		FileChunksToSend.clear();
 		for (auto i = chunksRemaining.begin(); i != chunksRemaining.end(); ++i) FileChunksToSend[(*i).first] = true;
-		FileChunkTransferState = CHUNK_STATE_SENDING;
+		SetFileTransferState(CHUNK_STATE_SENDING);
 	}
 
 	void ConfirmFilePortionSendComplete(uint64_t portionIndex)

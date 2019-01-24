@@ -7,6 +7,7 @@
 #include <fstream>			/* ifstream, ofstream */
 #include <string>			/* string */
 #include <unordered_map>	/* unordered_map */
+#include <filesystem>		/* file_size */
 
 typedef std::vector<unsigned char> EncryptedData;
 
@@ -63,18 +64,15 @@ namespace Groundfish
 		std::ofstream newFile(newFileName, std::ios_base::binary);
 		assert(newFile.good() && !newFile.bad());
 
-		//  Grab the file size of the unencrypted file
-		auto fileSize = int(targetFile.tellg());
-		targetFile.seekg(0, std::ios::end);
-		fileSize = int(targetFile.tellg()) - fileSize;
-		targetFile.seekg(0, std::ios::beg);
+		//  Get the file size in bytes for the unencrypted file
+		uint64_t fileSize = std::filesystem::file_size(targetFileName);
 
 		newFile.write((char*)&wordListVersion, sizeof(wordListVersion));
 		newFile.write((char*)&fileSize, sizeof(fileSize));
 		newFile.write((char*)&wordIndex, sizeof(wordIndex));
 
-		int bytesRead = 0;
-		int bytesToRead = 0;
+		uint64_t bytesRead = 0;
+		uint64_t bytesToRead = 0;
 		unsigned char readArray[1024] = "";
 		while (targetFile.eof() == false)
 		{
@@ -142,13 +140,11 @@ namespace Groundfish
 		assert(newFile.good() && !newFile.bad());
 
 		int wordListVersion = 0;
-		int newFileSize = 0;
+		uint64_t newFileSize = 0;
 		unsigned char wordIndex = 0;
 
-		auto fileSize = int(targetFile.tellg());
-		targetFile.seekg(0, std::ios::end);
-		fileSize = int(targetFile.tellg()) - fileSize;
-		targetFile.seekg(0, std::ios::beg);
+		//  Get the file size in bytes for the file
+		uint64_t fileSize = std::filesystem::file_size(targetFileName);
 
 		targetFile.read((char*)&wordListVersion, sizeof(wordListVersion));
 		targetFile.read((char*)&newFileSize, sizeof(newFileSize));
@@ -156,8 +152,8 @@ namespace Groundfish
 
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
 
-		int bytesRead = 0;
-		int bytesToRead = 0;
+		uint64_t bytesRead = 0;
+		uint64_t bytesToRead = 0;
 		unsigned char readArray[1024] = "";
 		while (targetFile.eof() == false)
 		{

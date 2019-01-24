@@ -10,7 +10,7 @@
 #include <fstream>
 #include <ctime>
 
-constexpr auto VERSION_NUMBER				= "2019.01.05";
+constexpr auto VERSION_NUMBER				= "2019.01.23";
 
 constexpr auto NEW_PROVIDENCE_PORT			= 2347;
 
@@ -103,8 +103,8 @@ bool CompareUploadsByTimeAdded(const HostedFileData& first, const HostedFileData
 
 struct UserConnection
 {
-	enum LoginStatus { LOGIN_STATUS_CONNECTED, LOGIN_STATUS_LOGGED_IN, LOGIN_STATUS_COUNT };
-	const std::string UserStatusStrings[LOGIN_STATUS_COUNT] = { "Connected", "Logged In" };
+	enum UserStatusID { USER_STATUS_CONNECTED, USER_STATUS_LOGGED_IN, USER_STATUS_DOWNLOADING, USER_STATUS_UPLOADING, USER_STATUS_COUNT };
+	const std::string UserStatusStrings[USER_STATUS_COUNT] = { "Connected", "Logged In", "Downloading", "Uploading" };
 
 	UserConnection() :
 		SocketID(-1),
@@ -114,7 +114,7 @@ struct UserConnection
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
 		Username("UNKNOWN USER"),
-		LoginStatus(LOGIN_STATUS_CONNECTED),
+		UserStatus(USER_STATUS_CONNECTED),
 		StatusString("Connected"),
 		UserFileSendTask(nullptr),
 		UserFileReceiveTask(nullptr)
@@ -128,7 +128,7 @@ struct UserConnection
 		InboxCount(0),
 		UserIdentifier("UNKNOWN ID"),
 		Username("UNKNOWN USER"),
-		LoginStatus(LOGIN_STATUS_CONNECTED),
+		UserStatus(USER_STATUS_CONNECTED),
 		StatusString("Connected"),
 		UserFileSendTask(nullptr),
 		UserFileReceiveTask(nullptr)
@@ -136,9 +136,9 @@ struct UserConnection
 
 	inline void UpdatePingTime() { LastPingTime = gameSeconds; UpdatePingRequestTime(); }
 	inline void UpdatePingRequestTime() { LastPingRequest = gameSeconds; }
-	inline std::string GetLoginStatusString() const { return UserStatusStrings[LoginStatus]; }
-	inline void SetStatusIdle(int secondsSinceActive = 0) { StatusString = GetLoginStatusString() + ", Idle (last activity " + std::to_string(secondsSinceActive) + " seconds ago)"; }
-	inline void SetStatusDownloading(std::string checksum, float percent, int kbps) { StatusString = "Downloading file " + checksum + " [" + std::to_string(int(percent * 100.0f)) + "% @" + std::to_string(kbps) + " KB/s]"; }
+	inline std::string GetUserStatusString() const { return UserStatusStrings[UserStatus]; }
+	inline void SetStatusIdle(int secondsSinceActive = 0) { StatusString = GetUserStatusString() + ", Idle (last activity " + std::to_string(secondsSinceActive) + " seconds ago)"; }
+	inline void SetStatusTransferring(bool download, std::string checksum, float percent, int kbps) { StatusString = StatusString = GetUserStatusString() + " file " + checksum + " [" + std::to_string(int(percent * 100.0f)) + "% @" + std::to_string(kbps) + " KB/s]"; }
 
 	int				SocketID;
 	std::string		IPAddress;
@@ -149,7 +149,7 @@ struct UserConnection
 
 	std::string		UserIdentifier;
 	std::string		Username;
-	LoginStatus		LoginStatus;
+	UserStatusID	UserStatus;
 	std::string		StatusString;
 
 	std::vector<std::string> NotificationsList;
@@ -354,7 +354,7 @@ private:
 	int		ServerSocketHandle;
 
 	std::function<void(const std::list<HostedFileData >&)> HostedFileListChangedCallback = nullptr;
-	std::function<void(std::unordered_map<UserConnection*, bool>&)> UserConnectionListChangedCallback = nullptr;
+	std::function<void(std::unordered_map<UserConnection*, bool>)> UserConnectionListChangedCallback = nullptr;
 
 	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
@@ -374,7 +374,7 @@ public:
 	~Server() {}
 
 	inline void SetHostedFileListChangedCallback(const std::function<void(const std::list<HostedFileData>& hostedFileDataList)>& callback) { HostedFileListChangedCallback = callback; }
-	inline void SetUserConnectionListChangedCallback(const std::function<void(std::unordered_map<UserConnection*, bool>&)>& callback) { UserConnectionListChangedCallback = callback; }
+	inline void SetUserConnectionListChangedCallback(const std::function<void(std::unordered_map<UserConnection*, bool>)>& callback) { UserConnectionListChangedCallback = callback; }
 	inline const std::list<HostedFileData>& GetHostedFileDataList() const { return HostedFileDataList; }
 
 	bool Initialize(void);
@@ -382,6 +382,7 @@ public:
 	void Shutdown(void);
 
 	void DeleteHostedFile(std::string fileChecksum);
+	inline UserConnection* GetUserConnectionByIP(std::string ip) const { for (auto i = UserConnectionsList.begin(); i != UserConnectionsList.end(); ++i) if ((*i).first->IPAddress == ip) return (*i).first; return nullptr; }
 
 private:
 	void AddClient(int socketID, std::string ipAddress);
@@ -403,7 +404,7 @@ private:
 
 	void ContinueFileTransfers(void);
 	void BeginFileTransfer(HostedFileData& fileData, UserConnection* user);
-	void UpdateFileTransferPercentage(UserConnection* user);
+	void UpdateFileTransferPercentage(bool download, UserConnection* user);
 	void SendChatString(const char* chatString);
 
 	inline const std::unordered_map<UserConnection*, bool> GetUserList(void) const { return UserConnectionsList; }
@@ -516,7 +517,7 @@ void Server::RemoveClient(UserConnection* user)
 	auto userIter = UserConnectionsList.find(user);
 	assert(userIter != UserConnectionsList.end());
 
-	if (user->LoginStatus == UserConnection::LOGIN_STATUS_LOGGED_IN)
+	if (user->UserStatus != UserConnection::USER_STATUS_CONNECTED)
 		debugConsole->AddDebugConsoleLine(GetCurrentTimeString() + " - User logged out: " + user->Username);
 
 	delete user;
@@ -561,246 +562,257 @@ void Server::ReceiveMessages(void)
 		char messageID = winsockWrapper.ReadChar(0);
 		switch (messageID)
 		{
-		case MESSAGE_ID_PING_RESPONSE:
-		{
-			//  NO DATA
-
-			user->SetStatusIdle(0);
-			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
-			//  Do nothing, as we've already updated the last ping time of the user
-		}
-		break;
-
-		case MESSAGE_ID_ENCRYPTED_CHAT_STRING:
-		{
-			//  (int) Message Size [N]
-			//  (N-sized char array) Encrypted String
-
-			int messageSize = winsockWrapper.ReadInt(0);
-
-			//  Decrypt using Groundfish
-			unsigned char encryptedChatString[256];
-			memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
-			std::string decryptedString = Groundfish::DecryptToString(encryptedChatString);
-
-			SendChatString(decryptedString.c_str());
-		}
-		break;
-
-		case MESSAGE_ID_USER_LOGIN_REQUEST: // Player enters the server, sending their encrypted name and password
-		{
-			//  (int) Length of encrypted username (n1)
-			//  (n1-size chars array) Encrypted username
-			//  (int) Length of encrypted password (n2)
-			//  (n2-size chars array) Encrypted password
-
-			//  Grab the current client version number to ensure they have the up-to-date version
-			std::string versionString = winsockWrapper.ReadString(0);
-
-			//  Grab the username size and encrypted username, and decrypt it, then the password size and encrypted password, and decrypt it
-			auto usernameSize = winsockWrapper.ReadInt(0);
-			auto usernameArray = winsockWrapper.ReadChars(0, usernameSize);
-			std::string username = Groundfish::DecryptToString(usernameArray);
-
-			auto passwordSize = winsockWrapper.ReadInt(0);
-			auto passwordArray = winsockWrapper.ReadChars(0, passwordSize);
-			std::string password = Groundfish::DecryptToString(passwordArray);
-
-			if (versionString.compare(VERSION_NUMBER) != 0)
+			case MESSAGE_ID_PING_RESPONSE:
 			{
-				SendMessage_LoginResponse(LOGIN_RESPONSE_VERSION_NUMBER_INCORRECT, user);
-				break;
+				//  NO DATA
+
+				user->SetStatusIdle(0);
+				if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
+				//  Do nothing, as we've already updated the last ping time of the user
 			}
+			break;
 
-			AttemptUserLogin(user, username, password);
-		}
-		break;
-
-		case MESSAGE_ID_REQUEST_HOSTED_FILE_LIST:
-		{
-			//  Read the username to filter the list by (if any)
-			auto usernameSize = winsockWrapper.ReadUnsignedShort(0);
-			auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
-			auto encryptedUsernameVec = EncryptedData(encryptedUsername, encryptedUsername + usernameSize);
-
-			//  Read the type and subtype to filter for
-			auto type = HostedFileType(winsockWrapper.ReadChar(0));
-			auto subtype = HostedFileSubtype(winsockWrapper.ReadChar(0));
-
-			//  Read the starting index to begin the list at
-			auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
-
-			//  Send a hosted file data list with the given filters
-			SendMessage_HostedFileList(HostedFileDataList, user, startingIndex, encryptedUsernameVec, type, subtype);
-		}
-		break;
-
-		case MESSAGE_ID_FILE_REQUEST:
-		{
-			auto fileNameLength = winsockWrapper.ReadInt(0);
-			auto fileTitle = std::string((char*)winsockWrapper.ReadChars(0, fileNameLength), fileNameLength);
-
-			auto hostedFileIdentifier = md5(fileTitle);
-			auto hostedFileIter = GetHostedFileIterByTitleChecksum(hostedFileIdentifier);
-			if (hostedFileIter == HostedFileDataList.end())
+			case MESSAGE_ID_ENCRYPTED_CHAT_STRING:
 			{
-				//  The file could not be found.
-				SendMessage_FileRequestFailed(fileTitle, "The specified file was not found.", user);
-				break;
+				//  (int) Message Size [N]
+				//  (N-sized char array) Encrypted String
+
+				int messageSize = winsockWrapper.ReadInt(0);
+
+				//  Decrypt using Groundfish
+				unsigned char encryptedChatString[256];
+				memcpy(encryptedChatString, winsockWrapper.ReadChars(0, messageSize), messageSize);
+				std::string decryptedString = Groundfish::DecryptToString(encryptedChatString);
+
+				SendChatString(decryptedString.c_str());
 			}
-			else if (user->UserFileSendTask != nullptr)
+			break;
+
+			case MESSAGE_ID_USER_LOGIN_REQUEST: // Player enters the server, sending their encrypted name and password
 			{
-				//  The user is already downloading something.
-				SendMessage_FileRequestFailed(fileTitle, "User is currently already downloading a file.", user);
-				break;
-			}
-			else
-			{
-				auto hostedFileData = (*hostedFileIter);
-				BeginFileTransfer(hostedFileData, user);
-				break;
-			}
-		}
-		break;
+				//  (int) Length of encrypted username (n1)
+				//  (n1-size chars array) Encrypted username
+				//  (int) Length of encrypted password (n2)
+				//  (n2-size chars array) Encrypted password
 
-		case MESSAGE_ID_FILE_SEND_INIT:
-		{
-			auto fileNameSize = winsockWrapper.ReadInt(0);
-			auto fileTitleSize = winsockWrapper.ReadInt(0);
-			auto fileDescriptionSize = winsockWrapper.ReadInt(0);
+				//  Grab the current client version number to ensure they have the up-to-date version
+				std::string versionString = winsockWrapper.ReadString(0);
 
-			//  Decrypt the file name using Groundfish and save it off
-			auto decryptedFileNamePure = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileNameSize));
-			auto decryptedFileName = "./_DownloadedFiles/" + decryptedFileNamePure;
+				//  Grab the username size and encrypted username, and decrypt it, then the password size and encrypted password, and decrypt it
+				auto usernameSize = winsockWrapper.ReadInt(0);
+				auto usernameArray = winsockWrapper.ReadChars(0, usernameSize);
+				std::string username = Groundfish::DecryptToString(usernameArray);
 
-			//  Decrypt the file title using Groundfish and save it off
-			auto decryptedFileTitle = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileTitleSize));
-			assert(decryptedFileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
+				auto passwordSize = winsockWrapper.ReadInt(0);
+				auto passwordArray = winsockWrapper.ReadChars(0, passwordSize);
+				std::string password = Groundfish::DecryptToString(passwordArray);
 
-			//  Determine whether a file with that title already exists in the hosted file list
-			auto fileTitleMD5 = md5(decryptedFileTitle);
-			auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
-			if (fileDataIter != HostedFileDataList.end())
-			{
-				SendMessage_FileSendInitFailed("A file with that title already exists on the server. Try again.", user);
-				return;
-			}
-
-			//  Decrypt the file description using Groundfish and save it off
-			auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
-
-			//  grab the file type and sub type
-			auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
-			auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
-
-			//  Grab the file size, file chunk size, and buffer count
-			auto fileSize = winsockWrapper.ReadLongInt(0);
-			auto fileChunkSize = winsockWrapper.ReadLongInt(0);
-			auto fileChunkBufferCount = winsockWrapper.ReadLongInt(0);
-
-			if (user->UserFileReceiveTask != nullptr) return;
-
-			//  Create a new file receive task
-			(void) _wmkdir(L"_DownloadedFiles");
-			user->UserFileReceiveTask = new FileReceiveTask(decryptedFileName, decryptedFileTitle, decryptedFileDescription, fileTypeID, fileSubTypeID, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
-			user->UserFileReceiveTask->SetDecryptWhenReceived(false);
-		}
-		break;
-
-		case MESSAGE_ID_FILE_RECEIVE_READY:
-		{
-			auto task = user->UserFileSendTask;
-			assert(task != nullptr);
-
-			task->SetFileTransferState(FileSendTask::CHUNK_STATE_SENDING);
-		}
-		break;
-
-		case MESSAGE_ID_FILE_PORTION:
-		{
-			if (user->UserFileReceiveTask == nullptr) break;
-
-			if (user->UserFileReceiveTask->ReceiveFileChunk())
-			{
-				assert(false); // ALERT: We should never be receiving a chunk after the file download is complete
-
-				//  If ReceiveFile returns true, the transfer is complete
-				delete user->UserFileReceiveTask;
-				user->UserFileReceiveTask = nullptr;
-
-#if FILE_TRANSFER_DEBUGGING
-				debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
-#endif
-			}
-		}
-		break;
-
-		case MESSAGE_ID_FILE_PORTION_COMPLETE:
-		{
-			auto portionIndex = winsockWrapper.ReadInt(0);
-			auto fileTask = user->UserFileReceiveTask;
-
-			if (fileTask == nullptr)
-			{
-				SendMessage_FilePortionCompleteConfirmation(portionIndex, user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT);
-				break;
-			}
-
-			(void) _wmkdir(L"_DownloadedFiles");
-			if (fileTask->CheckFilePortionComplete(portionIndex))
-			{
-				//if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
-
-				if (fileTask->GetFileTransferComplete())
+				if (versionString.compare(VERSION_NUMBER) != 0)
 				{
-					AddHostedFileFromEncrypted(fileTask->GetFileName(), fileTask->GetFileTitle(), fileTask->GetFileDescription(), fileTask->GetFileTypeID(), fileTask->GetFileSubTypeID(), user);
-					debugConsole->AddDebugConsoleLine("Added hosted file: \"" + fileTask->GetFileTitle() + "\"");
+					SendMessage_LoginResponse(LOGIN_RESPONSE_VERSION_NUMBER_INCORRECT, user);
+					break;
+				}
 
-					delete user->UserFileReceiveTask;
-					user->UserFileReceiveTask = nullptr;
+				AttemptUserLogin(user, username, password);
+			}
+			break;
 
-#if FILE_TRANSFER_DEBUGGING
-					debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
-#endif
+			case MESSAGE_ID_REQUEST_HOSTED_FILE_LIST:
+			{
+				//  Read the username to filter the list by (if any)
+				auto usernameSize = winsockWrapper.ReadUnsignedShort(0);
+				auto encryptedUsername = winsockWrapper.ReadChars(0, usernameSize);
+				auto encryptedUsernameVec = EncryptedData(encryptedUsername, encryptedUsername + usernameSize);
 
+				//  Read the type and subtype to filter for
+				auto type = HostedFileType(winsockWrapper.ReadChar(0));
+				auto subtype = HostedFileSubtype(winsockWrapper.ReadChar(0));
+
+				//  Read the starting index to begin the list at
+				auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
+
+				//  Send a hosted file data list with the given filters
+				SendMessage_HostedFileList(HostedFileDataList, user, startingIndex, encryptedUsernameVec, type, subtype);
+			}
+			break;
+
+			case MESSAGE_ID_FILE_REQUEST:
+			{
+				auto fileNameLength = winsockWrapper.ReadInt(0);
+				auto fileTitle = std::string((char*)winsockWrapper.ReadChars(0, fileNameLength), fileNameLength);
+
+				auto hostedFileIdentifier = md5(fileTitle);
+				auto hostedFileIter = GetHostedFileIterByTitleChecksum(hostedFileIdentifier);
+				if (hostedFileIter == HostedFileDataList.end())
+				{
+					//  The file could not be found.
+					SendMessage_FileRequestFailed(fileTitle, "The specified file was not found.", user);
+					break;
+				}
+				else if (user->UserFileSendTask != nullptr)
+				{
+					//  The user is already downloading something.
+					SendMessage_FileRequestFailed(fileTitle, "User is currently already downloading a file.", user);
+					break;
+				}
+				else
+				{
+					auto hostedFileData = (*hostedFileIter);
+					BeginFileTransfer(hostedFileData, user);
 					break;
 				}
 			}
-		}
-		break;
+			break;
 
-		case MESSAGE_ID_FILE_CHUNKS_REMAINING:
-		{
-			auto task = user->UserFileSendTask;
-			assert(task != nullptr);
+			case MESSAGE_ID_FILE_SEND_INIT:
+			{
+				auto fileNameSize = winsockWrapper.ReadInt(0);
+				auto fileTitleSize = winsockWrapper.ReadInt(0);
+				auto fileDescriptionSize = winsockWrapper.ReadInt(0);
 
-			auto chunkCount = winsockWrapper.ReadInt(0);
-			std::unordered_map<int, bool> chunksRemaining;
-			for (auto i = 0; i < chunkCount; ++i) chunksRemaining[winsockWrapper.ReadShort(0)] = true;
-			task->SetChunksRemaining(chunksRemaining);
-		}
-		break;
+				//  Decrypt the file name using Groundfish and save it off
+				auto decryptedFileNamePure = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileNameSize));
+				auto decryptedFileName = "./_DownloadedFiles/" + decryptedFileNamePure;
 
-		case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
-		{
-			auto portionIndex = winsockWrapper.ReadLongInt(0);
+				//  Decrypt the file title using Groundfish and save it off
+				auto decryptedFileTitle = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileTitleSize));
+				assert(decryptedFileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
-			auto task = user->UserFileSendTask;
-			if (task == nullptr) break;
+				//  Determine whether a file with that title already exists in the hosted file list
+				auto fileTitleMD5 = md5(decryptedFileTitle);
+				auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
+				if (fileDataIter != HostedFileDataList.end())
+				{
+					SendMessage_FileSendInitFailed("A file with that title already exists on the server. Try again.", user);
+					return;
+				}
 
-			if (task->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;
+				//  Decrypt the file description using Groundfish and save it off
+				auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
 
-			task->ConfirmFilePortionSendComplete(portionIndex);
+				//  grab the file type and sub type
+				auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
+				auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
 
-			//  Update the user list to reflect if we've updated % of file transferred
-			UpdateFileTransferPercentage(user);
-			if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
-		}
-		break;
+				//  Grab the file size, file chunk size, and buffer count
+				auto fileSize = winsockWrapper.ReadLongInt(0);
+				auto fileChunkSize = winsockWrapper.ReadLongInt(0);
+				auto fileChunkBufferCount = winsockWrapper.ReadLongInt(0);
 
-		default:
-			debugConsole->AddDebugConsoleLine("Unknown message ID received: " + std::to_string(messageID));
-			//assert(false);
+				if (user->UserFileReceiveTask != nullptr) return;
+
+				//  Create a new file receive task
+				(void) _wmkdir(L"_DownloadedFiles");
+				user->UserFileReceiveTask = new FileReceiveTask(decryptedFileName, decryptedFileTitle, decryptedFileDescription, fileTypeID, fileSubTypeID, fileSize, fileChunkSize, fileChunkBufferCount, "./_DownloadedFiles/_download.tempfile", user->SocketID, user->IPAddress, NEW_PROVIDENCE_PORT);
+				user->UserFileReceiveTask->SetDecryptWhenReceived(false);
+			}
+			break;
+
+			case MESSAGE_ID_FILE_RECEIVE_READY:
+			{
+				auto task = user->UserFileSendTask;
+				assert(task != nullptr);
+
+				task->SetFileTransferState(FileSendTask::CHUNK_STATE_SENDING);
+			}
+			break;
+
+			case MESSAGE_ID_FILE_PORTION:
+			{
+				if (user->UserFileReceiveTask == nullptr) break;
+
+				if (user->UserFileReceiveTask->ReceiveFileChunk())
+				{
+					assert(false); // ALERT: We should never be receiving a chunk after the file download is complete
+
+					//  If ReceiveFile returns true, the transfer is complete
+					delete user->UserFileReceiveTask;
+					user->UserFileReceiveTask = nullptr;
+
+	#if FILE_TRANSFER_DEBUGGING
+					debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+	#endif
+				}
+
+				//  Update the user's status message to show uploading status
+				auto titleChecksum = md5(user->UserFileReceiveTask->GetFileTitle());
+				auto percentageComplete = user->UserFileReceiveTask->GetPercentageComplete();
+				auto transferSpeed = int(float(user->UserFileReceiveTask->GetEstimatedTransferSpeed()) / 1024.0f);
+				user->UserStatus = UserConnection::USER_STATUS_UPLOADING;
+				user->SetStatusTransferring(false, titleChecksum, float(percentageComplete), transferSpeed);
+				if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
+			}
+			break;
+
+			case MESSAGE_ID_FILE_PORTION_COMPLETE:
+			{
+				auto portionIndex = winsockWrapper.ReadInt(0);
+				auto receiveTask = user->UserFileReceiveTask;
+
+				if (receiveTask == nullptr)
+				{
+					SendMessage_FilePortionCompleteConfirmation(portionIndex, user->SocketID, user->IPAddress.c_str(), NEW_PROVIDENCE_PORT);
+					break;
+				}
+
+				(void) _wmkdir(L"_DownloadedFiles");
+				if (receiveTask->CheckFilePortionComplete(portionIndex))
+				{
+					//if (DownloadPercentCompleteCallback != nullptr) DownloadPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetDownloadTime(), FileReceive->GetFileSize());
+
+					if (receiveTask->GetFileTransferComplete())
+					{
+						AddHostedFileFromEncrypted(receiveTask->GetFileName(), receiveTask->GetFileTitle(), receiveTask->GetFileDescription(), receiveTask->GetFileTypeID(), receiveTask->GetFileSubTypeID(), user);
+						debugConsole->AddDebugConsoleLine("Added hosted file: \"" + receiveTask->GetFileTitle() + "\"");
+
+						delete user->UserFileReceiveTask;
+						user->UserFileReceiveTask = nullptr;
+
+	#if FILE_TRANSFER_DEBUGGING
+						debugConsole->AddDebugConsoleLine("FileReceiveTask deleted...");
+	#endif
+
+						break;
+					}
+				}
+			}
+			break;
+
+			case MESSAGE_ID_FILE_CHUNKS_REMAINING:
+			{
+				auto task = user->UserFileSendTask;
+				assert(task != nullptr);
+
+				auto chunkCount = winsockWrapper.ReadInt(0);
+				std::unordered_map<int, bool> chunksRemaining;
+				for (auto i = 0; i < chunkCount; ++i) chunksRemaining[winsockWrapper.ReadShort(0)] = true;
+				task->SetChunksRemaining(chunksRemaining);
+			}
+			break;
+
+			case MESSAGE_ID_FILE_PORTION_COMPLETE_CONFIRM:
+			{
+				auto portionIndex = winsockWrapper.ReadLongInt(0);
+
+				auto task = user->UserFileSendTask;
+				if (task == nullptr) break;
+
+				if (task->GetFileTransferState() != FileSendTask::CHUNK_STATE_PENDING_COMPLETE) break;
+
+				task->ConfirmFilePortionSendComplete(portionIndex);
+
+				//  Update the user list to reflect if we've updated % of file transferred
+				UpdateFileTransferPercentage(true, user);
+				if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
+			}
+			break;
+
+			default:
+			{
+				std::string debugLine = "Unknown message ID received: " + std::to_string(messageID) + " from user " + user->Username;
+				debugConsole->AddDebugConsoleLine(debugLine);
+				//assert(false);
+			}
 			break;
 		}
 	}
@@ -861,7 +873,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	//  Set the user identifier and name
 	user->UserIdentifier = loginDataChecksum;
 	user->Username = username;
-	user->LoginStatus = UserConnection::LOGIN_STATUS_LOGGED_IN;
+	user->UserStatus = UserConnection::USER_STATUS_LOGGED_IN;
 	user->SetStatusIdle();
 	debugConsole->AddDebugConsoleLine(GetCurrentTimeString() + " - User logged in: " + user->Username);
 
@@ -982,12 +994,10 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 		assert(gameSecondsF < seconds + 0.1f);
 		if (gameSecondsF > seconds + 0.1f) return;
 	}
-
-	auto fileSize = int(targetFile.tellg());
-	targetFile.seekg(0, std::ios::end);
-	fileSize = int(targetFile.tellg()) - fileSize;
-	targetFile.seekg(0, std::ios::beg);
 	targetFile.close();
+
+	//  Get the file size in bytes for the file
+	uint64_t fileSize = std::filesystem::file_size(fileToAdd);
 
 	//  Find the file's primary name (no directories)
 	std::string pureFileName = fileToAdd;
@@ -1032,13 +1042,21 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	assert(fileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
 	//  Test that the file exists and is readable, and exit out if it is not
+	//  If the file isn't valid, attempt to re-open it for a quarter of a second
+	bool fileValid = false;
 	std::ifstream targetFile(fileToAdd, std::ios_base::binary);
-	if (!targetFile.good() || targetFile.bad()) return;
-	auto fileSize = int(targetFile.tellg());
-	targetFile.seekg(0, std::ios::end);
-	fileSize = int(targetFile.tellg()) - fileSize;
-	targetFile.seekg(0, std::ios::beg);
+	float seconds = gameSecondsF;
+	while (targetFile.good() && targetFile.bad())
+	{
+		targetFile = std::ifstream(fileToAdd, std::ios_base::binary);
+		DetermineTimeSlice();
+		assert(gameSecondsF < seconds + 0.1f);
+		if (gameSecondsF > seconds + 0.1f) return;
+	}
 	targetFile.close();
+
+	//  Get the file size in bytes for the file
+	uint64_t fileSize = std::filesystem::file_size(fileToAdd);
 
 	//  Find the file's primary name (no directories)
 	std::string pureFileName = fileToAdd;
@@ -1131,7 +1149,7 @@ void Server::SendOutHostedFileList(void)
 		auto user = (*userIter).first;
 
 		//  If the user isn't logged in yet, skip over them. They'll get an update when they log in
-		if (user->LoginStatus != UserConnection::LOGIN_STATUS_LOGGED_IN) continue;
+		if (user->UserStatus == UserConnection::USER_STATUS_CONNECTED) continue;
 
 		SendMessage_HostedFileList(HostedFileDataList, user);
 	}
@@ -1184,17 +1202,24 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 	//  Add a new FileSendTask to our list, so it can manage itself
 	FileSendTask* newTask = new FileSendTask(fileName, fileTitle, filePath, fileTypeID, fileSubTypeID, user->SocketID, std::string(user->IPAddress), NEW_PROVIDENCE_PORT);
 	user->UserFileSendTask = newTask;
-	UpdateFileTransferPercentage(user);
+	UpdateFileTransferPercentage(true, user);
 }
 
 
-void Server::UpdateFileTransferPercentage(UserConnection* user)
+void Server::UpdateFileTransferPercentage(bool download, UserConnection* user)
 {
-	auto fileTitleMD5 = md5(user->UserFileSendTask->GetFileTitle());
+	auto title = (download ? user->UserFileSendTask->GetFileTitle() : user->UserFileReceiveTask->GetFileTitle());
+	auto percentComplete = (download ? user->UserFileSendTask->GetPercentageComplete() : user->UserFileReceiveTask->GetPercentageComplete());
+	auto transferSpeed = (download ? user->UserFileSendTask->GetEstimatedTransferSpeed() : user->UserFileReceiveTask->GetEstimatedTransferSpeed());
+
+	auto fileTitleMD5 = md5(title);
 	auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
 	if (fileDataIter == HostedFileDataList.end()) return;
 	auto fileData = (*fileDataIter);
-	user->SetStatusDownloading(fileData.FileTitleChecksum, float(user->UserFileSendTask->GetPercentageComplete()), int(float(user->UserFileSendTask->GetEstimatedTransferSpeed()) / 1024.0f));
+	
+	//  Update the user and the UI user list
+	user->UserStatus = download ? UserConnection::USER_STATUS_DOWNLOADING : UserConnection::USER_STATUS_UPLOADING;
+	user->SetStatusTransferring(download, fileData.FileTitleChecksum, float(percentComplete), int(float(transferSpeed) / 1024.0f));
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 
