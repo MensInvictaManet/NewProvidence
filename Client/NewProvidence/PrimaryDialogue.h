@@ -76,7 +76,7 @@ void UpdateUploadFolderList(void)
 	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
 	{
 		auto shortName = (*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
-		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, GUILabel::JUSTIFY_CENTER);
+		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
 		itemLabel->SetObjectName(shortName);
 		UploadFolderItemsListBox->AddItem(itemLabel);
 	}
@@ -90,7 +90,7 @@ void UpdateUploadSubTypeList(GUIObjectNode* object)
 	auto fileSubTypeY = UploadFileSubTypeDropDown->GetHeight() / 2 - 6;
 	auto fileSubTypeList = GetListOfSpecificFileSubTypes(fileTypeNameSelected);
 	for (auto iter = fileSubTypeList.begin(); iter != fileSubTypeList.end(); ++iter)
-		UploadFileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileSubTypeX, fileSubTypeY, 200, 20, GUILabel::JUSTIFY_CENTER));
+		UploadFileSubTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileSubTypeX, fileSubTypeY, 200, 20, UI_JUSTIFY_CENTER));
 }
 
 void SelectUploadItem(GUIObjectNode* object)
@@ -620,7 +620,7 @@ void PrimaryDialogue::LoadStatusBar()
 	//  Load the status bar text label
 	StatusBarTextLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial-12-White"), "Test", -100, 0, int(ScreenWidth), backgroundStripHeight);
 	StatusBarTextLabel->SetY(backgroundStripY + 5);
-	StatusBarTextLabel->SetJustification(GUILabel::JUSTIFY_CENTER);
+	StatusBarTextLabel->SetJustification(UI_JUSTIFY_CENTER);
 	StatusBarNode->AddChild(StatusBarTextLabel);
 }
 
@@ -761,11 +761,11 @@ void PrimaryDialogue::LoadSideBarUI()
 #endif
 
 	//  Load the main menu "Home" button text
-	auto homeButtonText = GUILabel::CreateLabel("Arial-12-White", "HOME", 60, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	auto homeButtonText = GUILabel::CreateLabel("Arial-12-White", "HOME", 60, 14, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(homeButtonText);
 
 	//  Load the main menu divider text between HOME and BROWSE
-	auto dividerLabel_1 = GUILabel::CreateLabel("Arial-12-White", "||", 110, 12, 100, 20, GUILabel::JUSTIFY_CENTER);
+	auto dividerLabel_1 = GUILabel::CreateLabel("Arial-12-White", "||", 110, 12, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(dividerLabel_1);
 
 	//  Load the main menu "Browse" button
@@ -780,11 +780,11 @@ void PrimaryDialogue::LoadSideBarUI()
 #endif
 
 	//  Load the main menu "Browse" button text
-	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 165, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 165, 14, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(browseButtonText);
 
 	//  Load the main menu divider text between BROWSE and UPLOAD
-	auto dividerLabel_2 = GUILabel::CreateLabel("Arial-12-White", "||", 217, 12, 100, 20, GUILabel::JUSTIFY_CENTER);
+	auto dividerLabel_2 = GUILabel::CreateLabel("Arial-12-White", "||", 217, 12, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(dividerLabel_2);
 
 	//  Load the main menu "Upload" button
@@ -799,7 +799,7 @@ void PrimaryDialogue::LoadSideBarUI()
 #endif
 
 	//  Load the main menu "Upload" button text
-	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, GUILabel::JUSTIFY_CENTER);
+	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(uploadButtonText);
 }
 
@@ -818,15 +818,15 @@ void PrimaryDialogue::LoadHostedFileListUI()
 	hostedFileListContainer->SetPosition(80, 70);
 	HostedFileListUINode->AddChild(hostedFileListContainer);
 
-	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 62, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto fileTitleLabel = GUILabel::CreateLabel("Arial", "Hosted File Title:", 62, 10, 200, 20, UI_JUSTIFY_LEFT);
 	hostedFileListContainer->AddChild(fileTitleLabel);
 
-	auto fileUploaderLabel = GUILabel::CreateLabel("Arial", "File Uploader:", 462, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto fileUploaderLabel = GUILabel::CreateLabel("Arial", "File Uploader:", 462, 10, 200, 20, UI_JUSTIFY_LEFT);
 	hostedFileListContainer->AddChild(fileUploaderLabel);
 
 	auto rangeString = std::to_string(CurrentLatestUploadsStartingIndex) + " to " + std::to_string(CurrentLatestUploadsStartingIndex + 20);
 	auto latestUploadedFilesLabelString = "Latest Uploaded Files (" + rangeString + ")";
-	LatestUploadsTitleLabel = GUILabel::CreateLabel("Arial", latestUploadedFilesLabelString.c_str(), hostedFileListContainer->GetWidth() / 2, hostedFileListContainer->GetHeight() - 20, HostedFileListWidth - 20, 30, GUILabel::JUSTIFY_CENTER);
+	LatestUploadsTitleLabel = GUILabel::CreateLabel("Arial", latestUploadedFilesLabelString.c_str(), hostedFileListContainer->GetWidth() / 2, hostedFileListContainer->GetHeight() - 20, HostedFileListWidth - 20, 30, UI_JUSTIFY_CENTER);
 	LatestUploadsTitleLabel->SetColor(0.2f, 0.2f, 0.2f, 1.0f);
 	hostedFileListContainer->AddChild(LatestUploadsTitleLabel);
 
@@ -865,10 +865,10 @@ void PrimaryDialogue::LoadSearchFilterUI()
 	searchFilterContainer->SetPosition(80 + HostedFileListWidth + 20, 70);
 	SearchFilterUINode->AddChild(searchFilterContainer);
 
-	auto searchFiltersLabel = GUILabel::CreateLabel("Arial", "Search Filters:", 10, 10, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto searchFiltersLabel = GUILabel::CreateLabel("Arial", "Search Filters:", 10, 10, 200, 20, UI_JUSTIFY_LEFT);
 	searchFilterContainer->AddChild(searchFiltersLabel);
 
-	auto filterByUserLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By User:", 10, 60, 220, 20, GUILabel::JUSTIFY_LEFT);
+	auto filterByUserLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By User:", 10, 60, 220, 20, UI_JUSTIFY_LEFT);
 	searchFilterContainer->AddChild(filterByUserLabel);
 
 	FilterByUserEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 160, 57, 240, 20);
@@ -877,33 +877,33 @@ void PrimaryDialogue::LoadSearchFilterUI()
 	FilterByUserEditBox->SetEmptyTextColor(COLOR_WHITE_FADED);
 	searchFilterContainer->AddChild(FilterByUserEditBox);
 
-	auto filterByTypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Type:", 10, 100, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto filterByTypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Type:", 10, 100, 200, 20, UI_JUSTIFY_LEFT);
 	searchFilterContainer->AddChild(filterByTypeLabel);
 
 	FilterByTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 160, 96, 240, 24, 222, 5, 14, 14);
-	auto defaultTypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+	auto defaultTypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, UI_JUSTIFY_CENTER);
 	defaultTypeFilter->SetObjectName("NO TYPE");
 	FilterByTypeDropDown->AddItem(defaultTypeFilter);
 	auto fileTypeList = GetListOfFileTypes();
 	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
 	{
-		auto typeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+		auto typeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, UI_JUSTIFY_CENTER);
 		typeFilter->SetObjectName((*iter));
 		FilterByTypeDropDown->AddItem(typeFilter);
 	}
 	searchFilterContainer->AddChild(FilterByTypeDropDown);
 
-	auto filterBySubtypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Subtype:", 10, 140, 200, 20, GUILabel::JUSTIFY_LEFT);
+	auto filterBySubtypeLabel = GUILabel::CreateLabel("Arial-12-White", "Filter By Subtype:", 10, 140, 200, 20, UI_JUSTIFY_LEFT);
 	searchFilterContainer->AddChild(filterBySubtypeLabel);
 
 	FilterBySubtypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 160, 136, 240, 24, 222, 5, 14, 14);
-	auto defaultSubtypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+	auto defaultSubtypeFilter = GUILabel::CreateLabel("Arial", "NO FILTER", 111, 5, 100, 24, UI_JUSTIFY_CENTER);
 	defaultSubtypeFilter->SetObjectName("NO SUBTYPE");
 	FilterBySubtypeDropDown->AddItem(defaultSubtypeFilter);
 	auto fileSubtypeList = GetListOfFileSubTypes();
 	for (auto iter = fileSubtypeList.begin(); iter != fileSubtypeList.end(); ++iter)
 	{
-		auto subtypeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, GUILabel::JUSTIFY_CENTER);
+		auto subtypeFilter = GUILabel::CreateLabel("Arial", (*iter).c_str(), 111, 5, 100, 24, UI_JUSTIFY_CENTER);
 		subtypeFilter->SetObjectName((*iter));
 		FilterBySubtypeDropDown->AddItem(subtypeFilter);
 	}
@@ -974,7 +974,7 @@ void PrimaryDialogue::LoadUploadMenuUI()
 	auto fileTypeY = UploadFileTypeDropDown->GetHeight() / 2 - 6;
 	auto fileTypeList = GetListOfFileTypes();
 	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
-		UploadFileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileTypeX, fileTypeY, 200, 24, GUILabel::JUSTIFY_CENTER));
+		UploadFileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileTypeX, fileTypeY, 200, 24, UI_JUSTIFY_CENTER));
 	UploadFileTypeDropDown->SetItemSelectCallback(UpdateUploadSubTypeList);
 	UploadMenuUINode->AddChild(UploadFileTypeDropDown);
 
@@ -1003,6 +1003,6 @@ void PrimaryDialogue::UpdateUI()
 		auto statusBarPassTime = 20.0;
 		auto statusBarPassRatio = fmod(gameSeconds, statusBarPassTime) / statusBarPassTime;
 		auto statusBarX = (ScreenWidth + statusBarTextRangeExtension) - (statusBarTextRange * statusBarPassRatio);
-		StatusBarTextLabel->SetX(int(ScreenWidth / 2.0f));// int(statusBarX));
+		StatusBarTextLabel->SetX(int(ScreenWidth / 2.0f));
 	}
 }

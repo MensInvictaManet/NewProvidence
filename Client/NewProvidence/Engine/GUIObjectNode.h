@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <stack>
 
+enum UI_Justifications { UI_JUSTIFY_LEFT = 0, UI_JUSTIFY_RIGHT, UI_JUSTIFY_CENTER, UI_JUSTIFICATION_COUNT };
+
 class GUIObjectNode
 {
 protected:
@@ -68,7 +70,7 @@ public:
 	inline float getColorB() const { return m_Color.colorValues[2]; }
 	inline float getColorA() const { return m_Color.colorValues[3]; }
 	inline bool GetRenderLast() const { return m_RenderLast; }
-	
+
 
 	void AddChild(GUIObjectNode* child);
 	void AddChildSorted(GUIObjectNode* child);
@@ -319,3 +321,64 @@ inline GUIObjectNode* GUIObjectNode::GetChildByName(std::string childName)
 
 	return nullptr;
 }
+
+
+
+class GUITemplatedBox
+{
+private:
+	enum TemplatePortions { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, LEFT_SIDE, RIGHT_SIDE, TOP_SIDE, BOTTOM_SIDE, MIDDLE, TEMPLATE_PORTIONS_COUNT };
+	std::unordered_map<int, TextureManager::ManagedTexture*> TextureMap;
+
+public:
+	inline TextureManager::ManagedTexture* TopLeft(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + TOP_LEFT]; }
+	inline TextureManager::ManagedTexture* TopRight(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + TOP_RIGHT]; }
+	inline TextureManager::ManagedTexture* BottomLeft(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + BOTTOM_LEFT]; }
+	inline TextureManager::ManagedTexture* BottomRight(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + BOTTOM_RIGHT]; }
+	inline TextureManager::ManagedTexture* TopSide(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + TOP_SIDE]; }
+	inline TextureManager::ManagedTexture* LeftSide(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + LEFT_SIDE]; }
+	inline TextureManager::ManagedTexture* RightSide(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + RIGHT_SIDE]; }
+	inline TextureManager::ManagedTexture* BottomSide(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + BOTTOM_SIDE]; }
+	inline TextureManager::ManagedTexture* Middle(int layerIndex) { return TextureMap[TEMPLATE_PORTIONS_COUNT * layerIndex + MIDDLE]; }
+
+	GUITemplatedBox()
+	{
+	}
+
+	GUITemplatedBox(const char* uiObjectType, const char* templateName, int boxCount)
+	{
+		TextureMap.clear();
+		auto templateFolder("Assets/UITemplates/" + std::string(uiObjectType) + "/" + std::string(templateName) + "/");
+
+		for (auto i = 0; i < boxCount; ++i)
+		{
+			auto layerIndex = TEMPLATE_PORTIONS_COUNT * i;
+			TextureMap[layerIndex + TOP_LEFT] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_TopLeftCorner.png").c_str());
+			TextureMap[layerIndex + TOP_RIGHT] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_TopRightCorner.png").c_str());
+			TextureMap[layerIndex + BOTTOM_LEFT] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_BottomLeftCorner.png").c_str());
+			TextureMap[layerIndex + BOTTOM_RIGHT] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_BottomRightCorner.png").c_str());
+			TextureMap[layerIndex + LEFT_SIDE] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_LeftSide.png").c_str());
+			TextureMap[layerIndex + RIGHT_SIDE] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_RightSide.png").c_str());
+			TextureMap[layerIndex + TOP_SIDE] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_TopSide.png").c_str());
+			TextureMap[layerIndex + BOTTOM_SIDE] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_BottomSide.png").c_str());
+			TextureMap[layerIndex + MIDDLE] = textureManager.LoadTexture(std::string(templateFolder + std::to_string(i) + "_Middle.png").c_str());
+		}
+	}
+
+	void Render(int textureIndex, int x, int y, int w, int h)
+	{
+		assert(TextureMap.empty() == false);
+		if (TextureMap.empty() == true) return;
+
+		auto layerIndex = TEMPLATE_PORTIONS_COUNT * textureIndex;
+		TextureMap[layerIndex + TOP_LEFT]->RenderTexture(x, y, TopLeft(textureIndex)->getWidth(), TopLeft(textureIndex)->getHeight());
+		TextureMap[layerIndex + TOP_RIGHT]->RenderTexture(x + w - TopRight(textureIndex)->getWidth(), y, TopRight(textureIndex)->getWidth(), TopRight(textureIndex)->getHeight());
+		TextureMap[layerIndex + BOTTOM_LEFT]->RenderTexture(x, y + h - BottomLeft(textureIndex)->getHeight(), BottomLeft(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
+		TextureMap[layerIndex + BOTTOM_RIGHT]->RenderTexture(x + w - BottomRight(textureIndex)->getWidth(), y + h - BottomRight(textureIndex)->getHeight(), BottomRight(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
+		TextureMap[layerIndex + LEFT_SIDE]->RenderTexture(x, y + TopLeft(textureIndex)->getHeight(), LeftSide(textureIndex)->getWidth(), h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());
+		TextureMap[layerIndex + RIGHT_SIDE]->RenderTexture(x + w - RightSide(textureIndex)->getWidth(), y + TopRight(textureIndex)->getHeight(), RightSide(textureIndex)->getWidth(), h - TopRight(textureIndex)->getHeight() - BottomRight(textureIndex)->getHeight());
+		TextureMap[layerIndex + TOP_SIDE]->RenderTexture(x + TopLeft(textureIndex)->getWidth(), y, w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), TopSide(textureIndex)->getHeight());
+		TextureMap[layerIndex + BOTTOM_SIDE]->RenderTexture(x + BottomLeft(textureIndex)->getWidth(), y + h - BottomSide(textureIndex)->getHeight(), w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), BottomSide(textureIndex)->getHeight());
+		TextureMap[layerIndex + MIDDLE]->RenderTexture(x + LeftSide(textureIndex)->getWidth(), y + TopSide(textureIndex)->getHeight(), w - LeftSide(textureIndex)->getWidth() - RightSide(textureIndex)->getWidth(), h - TopSide(textureIndex)->getHeight() - BottomSide(textureIndex)->getHeight());
+	}
+};

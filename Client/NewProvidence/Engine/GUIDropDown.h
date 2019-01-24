@@ -25,6 +25,7 @@ public:
 	inline void ClearItems() { for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) { guiManager.DestroyNode((*iter)); } m_ItemList.clear(); SelectedIndex = 0; }
 	inline const GUIObjectNode* GetSelectedItem() const { return (SelectedIndex == -1) ? nullptr : m_ItemList[SelectedIndex]; }
 	inline int GetSelectedIndex() const { return SelectedIndex; }
+	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("DropDown", templateName, 1); }
 
 private:
 	GUIFunctionCallback	m_ItemSelectCallback;
@@ -38,20 +39,12 @@ private:
 	unsigned int DropDownH;
 
 	bool m_Templated;
-	TextureManager::ManagedTexture* TextureTopLeftCorner;
-	TextureManager::ManagedTexture* TextureTopRightCorner;
-	TextureManager::ManagedTexture* TextureBottomLeftCorner;
-	TextureManager::ManagedTexture* TextureBottomRightCorner;
-	TextureManager::ManagedTexture* TextureLeftSide;
-	TextureManager::ManagedTexture* TextureRightSide;
-	TextureManager::ManagedTexture* TextureTopSide;
-	TextureManager::ManagedTexture* TextureBottomSide;
-	TextureManager::ManagedTexture* TextureMiddle;
+	GUITemplatedBox m_TemplateBox;
 	TextureManager::ManagedTexture* TextureDropDown;
 	TextureManager::ManagedTexture* TextureSelector;
 
 	unsigned int ExpandedHeight;
-	inline void UpdateExpandedHeight() { ExpandedHeight = static_cast<unsigned int>(m_ItemList.size()) * m_Height + TextureTopSide->getHeight() + TextureBottomSide->getHeight(); }
+	inline void UpdateExpandedHeight() { ExpandedHeight = static_cast<unsigned int>(m_ItemList.size()) * m_Height + (m_Templated ? (m_TemplateBox.TopSide(0)->getHeight() + m_TemplateBox.BottomSide(0)->getHeight()) : 0); }
 };
 
 inline GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, int y, int w, int h)
@@ -59,42 +52,29 @@ inline GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, in
 	MANAGE_MEMORY_NEW("MenuUI_Dropdown", sizeof(GUIDropDown));
 	auto newDropDown = new GUIDropDown(false);
 	newDropDown->SetTextureID(textureManager.LoadTextureGetID(imageFile));
-	newDropDown->SetX(x);
-	newDropDown->SetY(y);
-	newDropDown->SetWidth(w);
-	newDropDown->SetHeight(h);
+	newDropDown->SetPosition(x, y);
+	newDropDown->SetDimensions(w, h);
 	return newDropDown;
 }
 
-inline GUIDropDown* GUIDropDown::CreateTemplatedDropDown(const char* dropdownTemplate, int x, int y, int w, int h, int dropDownX, int dropDownY, int dropDownW, int dropDownH)
+inline GUIDropDown* GUIDropDown::CreateTemplatedDropDown(const char* templateName, int x, int y, int w, int h, int dropDownX, int dropDownY, int dropDownW, int dropDownH)
 {
 	MANAGE_MEMORY_NEW("MenuUI_Dropdown", sizeof(GUIDropDown));
 	auto newDropDown = new GUIDropDown(true);
-
-	auto templateFolder("Assets/UITemplates/DropDown/" + std::string(dropdownTemplate) + "/");
 
 	newDropDown->DropDownX = dropDownX;
 	newDropDown->DropDownY = dropDownY;
 	newDropDown->DropDownW = dropDownW;
 	newDropDown->DropDownH = dropDownH;
 
-	newDropDown->TextureTopLeftCorner = textureManager.LoadTexture(std::string(templateFolder + "TopLeftCorner.png").c_str());
-	newDropDown->TextureTopRightCorner = textureManager.LoadTexture(std::string(templateFolder + "TopRightCorner.png").c_str());
-	newDropDown->TextureBottomLeftCorner = textureManager.LoadTexture(std::string(templateFolder + "BottomLeftCorner.png").c_str());
-	newDropDown->TextureBottomRightCorner = textureManager.LoadTexture(std::string(templateFolder + "BottomRightCorner.png").c_str());
-	newDropDown->TextureLeftSide = textureManager.LoadTexture(std::string(templateFolder + "LeftSide.png").c_str());
-	newDropDown->TextureRightSide = textureManager.LoadTexture(std::string(templateFolder + "RightSide.png").c_str());
-	newDropDown->TextureTopSide = textureManager.LoadTexture(std::string(templateFolder + "TopSide.png").c_str());
-	newDropDown->TextureBottomSide = textureManager.LoadTexture(std::string(templateFolder + "BottomSide.png").c_str());
-	newDropDown->TextureMiddle = textureManager.LoadTexture(std::string(templateFolder + "Middle.png").c_str());
+	auto templateFolder("Assets/UITemplates/DropDown/" + std::string(templateName) + "/");
+	newDropDown->SetTemplate(templateName);
 	newDropDown->TextureDropDown = textureManager.LoadTexture(std::string(templateFolder + "DropDown.png").c_str());
 	newDropDown->TextureSelector = textureManager.LoadTexture(std::string(templateFolder + "Selector.png").c_str());
 	newDropDown->SetTextureID(0);
 
-	newDropDown->SetX(x);
-	newDropDown->SetY(y);
-	newDropDown->SetWidth(w);
-	newDropDown->SetHeight(h);
+	newDropDown->SetPosition(x, y);
+	newDropDown->SetDimensions(w, h);
 
 	newDropDown->SetClickX(dropDownX + dropDownW / 2);
 	newDropDown->SetClickY(dropDownY + dropDownH / 2);
@@ -111,15 +91,6 @@ inline GUIDropDown::GUIDropDown(bool templated) :
 	DropDownW(0),
 	DropDownH(0),
 	m_Templated(templated),
-	TextureTopLeftCorner(nullptr),
-	TextureTopRightCorner(nullptr),
-	TextureBottomLeftCorner(nullptr),
-	TextureBottomRightCorner(nullptr),
-	TextureLeftSide(nullptr),
-	TextureRightSide(nullptr),
-	TextureTopSide(nullptr),
-	TextureBottomSide(nullptr),
-	TextureMiddle(nullptr),
 	TextureDropDown(nullptr),
 	TextureSelector(nullptr),
 	ExpandedHeight(0)
@@ -192,15 +163,7 @@ inline void GUIDropDown::Render(int xOffset, int yOffset)
 
 		if (m_Templated)
 		{
-			TextureTopLeftCorner->RenderTexture(x, y, TextureTopLeftCorner->getWidth(), TextureTopLeftCorner->getHeight());
-			TextureTopRightCorner->RenderTexture(x + m_Width - TextureRightSide->getWidth(), y, TextureTopRightCorner->getWidth(), TextureTopRightCorner->getHeight());
-			TextureBottomLeftCorner->RenderTexture(x, y + m_Height - TextureBottomSide->getHeight() + ExpandedHeight, TextureBottomLeftCorner->getWidth(), TextureBottomLeftCorner->getHeight());
-			TextureBottomRightCorner->RenderTexture(x + m_Width - TextureRightSide->getWidth(), y + m_Height - TextureBottomSide->getHeight() + ExpandedHeight, TextureBottomRightCorner->getWidth(), TextureBottomRightCorner->getHeight());
-			TextureLeftSide->RenderTexture(x, y + TextureTopSide->getHeight(), TextureLeftSide->getWidth(), m_Height - TextureTopSide->getHeight() - TextureBottomSide->getHeight() + ExpandedHeight);
-			TextureRightSide->RenderTexture(x + m_Width - TextureRightSide->getWidth(), y + TextureTopSide->getHeight(), TextureRightSide->getWidth(), m_Height - TextureTopSide->getHeight() - TextureBottomSide->getHeight() + ExpandedHeight);
-			TextureTopSide->RenderTexture(x + TextureLeftSide->getWidth(), y, m_Width - TextureLeftSide->getWidth() - TextureRightSide->getWidth(), TextureTopSide->getHeight());
-			TextureBottomSide->RenderTexture(x + TextureLeftSide->getWidth(), y + m_Height - TextureBottomSide->getHeight() + ExpandedHeight, m_Width - TextureLeftSide->getWidth() - TextureRightSide->getWidth(), TextureBottomSide->getHeight());
-			TextureMiddle->RenderTexture(x + TextureLeftSide->getWidth(), y + TextureTopSide->getHeight(), m_Width - TextureLeftSide->getWidth() - TextureRightSide->getWidth(), m_Height - TextureTopSide->getHeight() - TextureBottomSide->getHeight() + ExpandedHeight);
+			m_TemplateBox.Render(0, x, y, m_Width, m_Height + ExpandedHeight);
 			TextureDropDown->RenderTexture(x + DropDownX, y + DropDownY, DropDownW, DropDownH);
 
 			if (!m_ItemList.empty())
@@ -215,7 +178,7 @@ inline void GUIDropDown::Render(int xOffset, int yOffset)
 						(*iter)->Render(x + 10, y + m_Height * i);
 					}
 
-					TextureSelector->RenderTexture(x + TextureLeftSide->getWidth(), y + TextureTopSide->getHeight() + m_Height * (SelectedIndex + 1), m_Width - TextureLeftSide->getWidth() - TextureRightSide->getWidth(), m_Height - TextureTopSide->getHeight() - TextureBottomSide->getHeight());
+					TextureSelector->RenderTexture(x + m_TemplateBox.LeftSide(0)->getWidth(), y + m_TemplateBox.TopSide(0)->getHeight() + m_Height * (SelectedIndex + 1), m_Width - m_TemplateBox.LeftSide(0)->getWidth() - m_TemplateBox.RightSide(0)->getWidth(), m_Height - m_TemplateBox.TopSide(0)->getHeight() - m_TemplateBox.BottomSide(0)->getHeight());
 				}
 			}
 		}

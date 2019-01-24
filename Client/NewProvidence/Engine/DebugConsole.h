@@ -82,8 +82,7 @@ inline void DebugConsole::SetWindowDimensions(int width, int height)
 	if ((debugConsoleHeight % debugConsoleEntrySpacing) != 0)
 		debugConsoleHeight = (debugConsoleHeight / debugConsoleEntrySpacing * debugConsoleEntrySpacing);
 
-	m_DebugConsoleListBox->SetWidth(width);
-	m_DebugConsoleListBox->SetHeight(debugConsoleHeight);
+	m_DebugConsoleListBox->SetDimensions(width, debugConsoleHeight);
 }
 
 inline void DebugConsole::EnterCommand(std::string& commandString)
