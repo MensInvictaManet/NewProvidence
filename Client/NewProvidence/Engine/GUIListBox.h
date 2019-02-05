@@ -39,9 +39,10 @@ public:
 	unsigned int GetItemDisplayCount() const { return ItemDisplayCount; }
 	inline int GetEntryHeight() const { return EntryHeight; }
 	inline int GetSpaceBetweenEntries() const { return SpaceBetweenEntries; }
-	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("ListBox", templateName, 1); }
+	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("ListBox", templateName, 1); SetListboxTemplateData(templateName); }
 
 	inline void SetTemplateData(int dirButtonsX, int contentY, int upButtonW, int upButtonH, int downButtonW, int downButtonH, int barColumnW);
+	inline void SetListboxTemplateData(std::string templateName);
 
 private:
 	GUIFunctionCallback	m_ItemClickCallback;
@@ -101,15 +102,7 @@ inline GUIListBox* GUIListBox::CreateTemplatedListBox(const char* templateName, 
 	MANAGE_MEMORY_NEW("MenuUI_Listbox", sizeof(GUIListBox));
 	auto newListbox = new GUIListBox(true);
 
-	auto templateFolder("Assets/UITemplates/ListBox/" + std::string(templateName) + "/");
 	newListbox->SetTemplate(templateName);
-	newListbox->TextureUpButton = textureManager.LoadTexture(std::string(templateFolder + "UpButton.png").c_str());
-	newListbox->TextureDownButton = textureManager.LoadTexture(std::string(templateFolder + "DownButton.png").c_str());
-	newListbox->TextureBarColumn = textureManager.LoadTexture(std::string(templateFolder + "BarColumn.png").c_str());
-	newListbox->TextureMoverTop = textureManager.LoadTexture(std::string(templateFolder + "MoverTop.png").c_str());
-	newListbox->TextureMoverMiddle = textureManager.LoadTexture(std::string(templateFolder + "MoverMiddle.png").c_str());
-	newListbox->TextureMoverBottom = textureManager.LoadTexture(std::string(templateFolder + "MoverBottom.png").c_str());
-	newListbox->TextureSelector = textureManager.LoadTexture(std::string(templateFolder + "Selector.png").c_str());
 	newListbox->SetTextureID(0);
 
 	newListbox->DirectionalButtonsX = dirButtonsX;
@@ -368,4 +361,16 @@ inline void GUIListBox::SetTemplateData(int dirButtonsX, int contentY, int upBut
 	DownButtonW = downButtonW;
 	DownButtonH = downButtonH;
 	BarColumnW = barColumnW;
+}
+
+inline void GUIListBox::SetListboxTemplateData(std::string templateName)
+{
+	auto templateFolder("Assets/UITemplates/ListBox/" + std::string(templateName) + "/");
+	TextureUpButton = textureManager.LoadTexture(std::string(templateFolder + "UpButton.png").c_str());
+	TextureDownButton = textureManager.LoadTexture(std::string(templateFolder + "DownButton.png").c_str());
+	TextureBarColumn = textureManager.LoadTexture(std::string(templateFolder + "BarColumn.png").c_str());
+	TextureMoverTop = textureManager.LoadTexture(std::string(templateFolder + "MoverTop.png").c_str());
+	TextureMoverMiddle = textureManager.LoadTexture(std::string(templateFolder + "MoverMiddle.png").c_str());
+	TextureMoverBottom = textureManager.LoadTexture(std::string(templateFolder + "MoverBottom.png").c_str());
+	TextureSelector = textureManager.LoadTexture(std::string(templateFolder + "Selector.png").c_str());
 }
