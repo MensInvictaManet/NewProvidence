@@ -8,7 +8,7 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-constexpr auto VERSION_NUMBER			= "2019.01.23";
+constexpr auto VERSION_NUMBER			= "2019.02.04";
 constexpr auto NEW_PROVIDENCE_IP		= "98.181.188.165";
 constexpr auto NEW_PROVIDENCE_PORT		= 2347;
 
@@ -81,8 +81,9 @@ class Client
 {
 private:
 	int						ServerSocket = -1;
-	FileReceiveTask*		FileReceive = NULL;
-	FileSendTask*			FileSend = NULL;
+	FileEncryptTask*		FileEncrypt = nullptr;
+	FileReceiveTask*		FileReceive = nullptr;
+	FileSendTask*			FileSend = nullptr;
 	EncryptedData			EncryptedUsername;
 
 	std::function<void(int, int, int)> LoginResponseCallback = nullptr;
@@ -92,6 +93,7 @@ private:
 	std::function<void(std::string)> FileSendFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
+	std::function<void(double)> EncryptPercentCompleteCallback = nullptr;
 
 	std::vector<HostedFileEntry> HostedFilesList;
 
@@ -108,7 +110,15 @@ public:
 	inline void SetFileSendFailureCallback(const std::function<void(std::string)>& callback) { FileSendFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
+	inline void SetEncryptPercentCompleteCallback(const std::function<void(double)>& callback) { EncryptPercentCompleteCallback = callback; }
 	inline void SetUsername(const EncryptedData& username) { EncryptedUsername = username; }
+
+	inline void AddFileEncryptTask(std::string unencryptedFileName, std::string encryptedFileName)
+	{
+		assert(FileEncrypt == nullptr);
+		FileEncrypt = new FileEncryptTask(unencryptedFileName, encryptedFileName);
+	}
+
 	inline void AddFileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false)
 	{
 		assert(FileSend == nullptr);
@@ -120,6 +130,7 @@ public:
 	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subtype);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
+	void ContinueFileEncryptions(void);
 	void ContinueFileTransfers(void);
 	void CancelFileSend(void);
 
@@ -166,31 +177,55 @@ void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::stri
 }
 
 
-void EncryptAndMoveThenReadySend(std::string unencryptedFileName, std::string encryptedFileName, Client* client, std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID)
-{
-	Groundfish::EncryptAndMoveFile(unencryptedFileName, encryptedFileName);
-
-	//  Add a new FileSendTask to our list, so it can manage itself
-	client->AddFileSendTask(fileName, fileTitle, encryptedFileName, fileTypeID, fileSubTypeID, client->GetServerSocket(), NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
-}
-
-
 void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID)
 {
+	if (FileEncrypt != nullptr) return;
 	if (FileSend != nullptr) return;
 
 	auto titleMD5 = md5(fileTitle);
 	auto hostedFileName = titleMD5 + ".hostedfile";
 
-	std::thread encryptThread(EncryptAndMoveThenReadySend, filePath, hostedFileName, this, fileName, fileTitle, filePath, fileTypeID, fileSubTypeID);
-	encryptThread.detach();
+	//  Add a new FileEncryptTask to our list, so it can manage itself
+	AddFileEncryptTask(filePath, hostedFileName);
+
+	//  Add a new FileSendTask to our list, so it can manage itself (note: this will not start until the FileEncryptTask finishes
+	AddFileSendTask(fileName, fileTitle, hostedFileName, fileTypeID, fileSubTypeID, GetServerSocket(), NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
+}
+
+
+void Client::ContinueFileEncryptions(void)
+{
+	if (FileEncrypt == nullptr) return;
+
+	auto encryptComplete = FileEncrypt->Update();
+	if (EncryptPercentCompleteCallback != nullptr) EncryptPercentCompleteCallback(FileEncrypt->EncryptionPercentage);
+
+	if (encryptComplete)
+	{
+		delete FileEncrypt;
+		FileEncrypt = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileEncryptTask deleted...");
+#endif
+	}
 }
 
 
 void Client::ContinueFileTransfers(void)
 {
+	//  If we're currently encrypting a file, do not continue a file transfer
+	if (FileEncrypt != nullptr) return;
+
 	// If there is a file send task, send a file chunk for each one if the file transfer is ready
 	if (FileSend == nullptr) return;
+
+	//  If we haven't "started" the file send, do so now and return out
+	if (FileSend->FileSendStarted == false)
+	{
+		FileSend->StartFileSend();
+		return;
+	}
 
 	//  If we aren't sending the file yet, continue out and wait for a ready signal
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
@@ -240,6 +275,9 @@ bool Client::MainProcess(void)
 
 	// Receive messages
 	ReadMessages();
+
+	//  Encrypt files
+	ContinueFileEncryptions();
 
 	//  Send files
 	ContinueFileTransfers();
