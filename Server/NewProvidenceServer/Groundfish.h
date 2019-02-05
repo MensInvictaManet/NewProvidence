@@ -9,6 +9,8 @@
 #include <unordered_map>	/* unordered_map */
 #include <filesystem>		/* file_size */
 
+#define FILE_ENCRYPTION_BYTES_PER_STEP		1024
+
 typedef std::vector<unsigned char> EncryptedData;
 
 namespace Groundfish
@@ -56,7 +58,6 @@ namespace Groundfish
 	bool EncryptAndMoveFile(std::string targetFileName, std::string newFileName, const int wordListVersion = 0, unsigned char wordIndex = 0)
 	{
 		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
-		unsigned int encryptionIndex = 0;
 
 		std::ifstream targetFile(targetFileName, std::ios_base::binary);
 		assert(targetFile.good() && !targetFile.bad());
@@ -269,3 +270,84 @@ namespace Groundfish
 		CreateWordList(CurrentWordList);
 	}
 }
+
+class FileEncryptTask
+{
+private:
+	const std::string TargetFileName;
+	const std::string NewFileName;
+	const int WordListVersion;
+	unsigned char WordIndex;
+
+	Groundfish::GroundfishWordlist& WordList;
+
+	std::ifstream FileStreamIn;
+	std::ofstream FileStreamOut;
+	uint64_t FileInSize;
+	uint64_t BytesRead;
+
+	bool EncryptionComplete;
+
+public:
+	double EncryptionPercentage;
+
+	FileEncryptTask(std::string targetFileName, std::string newFileName, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+		TargetFileName(targetFileName),
+		NewFileName(newFileName),
+		WordListVersion(wordListVersion),
+		WordIndex(wordStartingIndex),
+		WordList(Groundfish::CurrentWordList),
+		BytesRead(0),
+		EncryptionComplete(false),
+		EncryptionPercentage(0.0)
+	{
+		//  Open the target file, and ensure it is a valid file
+		FileStreamIn = std::ifstream(TargetFileName, std::ios_base::binary);
+		assert(FileStreamIn.good() && !FileStreamIn.bad());
+
+		//  Open the new file, and ensure it is a valid file
+		FileStreamOut = std::ofstream(NewFileName, std::ios_base::binary);
+		assert(FileStreamOut.good() && !FileStreamOut.bad());
+
+		//  Get the file size in bytes for the unencrypted file
+		FileInSize = std::filesystem::file_size(TargetFileName);
+
+		//  Write out the file information for the output file
+		FileStreamOut.write((char*)&WordListVersion, sizeof(WordListVersion));
+		FileStreamOut.write((char*)&FileInSize, sizeof(FileInSize));
+		FileStreamOut.write((char*)&WordIndex, sizeof(WordIndex));
+	}
+
+	bool Update()
+	{
+		if (EncryptionComplete) return true;
+
+		uint64_t bytesToRead = 0;
+		unsigned char readArray[FILE_ENCRYPTION_BYTES_PER_STEP] = "";
+
+		//  Determine how many bytes to read this step
+		bytesToRead = ((FileInSize - BytesRead) > FILE_ENCRYPTION_BYTES_PER_STEP) ? FILE_ENCRYPTION_BYTES_PER_STEP : FileInSize - BytesRead;
+
+		//  If there is no more information to read, we're done encrypting
+		if (FileStreamIn.eof() || bytesToRead <= 0)
+		{
+			FileStreamIn.close();
+			FileStreamOut.close();
+			EncryptionComplete = true;
+			return true;
+		}
+
+		//  If we've gotten this far, we should grab the specified amount of data, encrypt it, and write it to the new file
+		FileStreamIn.read((char*)readArray, bytesToRead);
+		BytesRead += bytesToRead;
+		for (int i = 0; i < bytesToRead; ++i)
+		{
+			readArray[i] = (char)WordList.WordList[WordIndex++][(unsigned char)readArray[i]];
+		}
+		FileStreamOut.write((char*)readArray, bytesToRead);
+
+		EncryptionPercentage = double(BytesRead) / double(FileInSize);
+
+		return false;
+	}
+};

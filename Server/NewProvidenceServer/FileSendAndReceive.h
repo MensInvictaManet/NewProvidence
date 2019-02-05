@@ -133,6 +133,8 @@ public:
 		CHUNK_STATE_COMPLETE = 4,
 	};
 
+	bool FileSendStarted;
+
 private:
 	const std::string FileName;
 	const std::string FileTitle;
@@ -177,6 +179,7 @@ public:
 	inline uint64_t GetEstimatedSecondsRemaining() const { auto estimate = GetEstimatedTransferSpeed(); return ((estimate == 0) ? 100 : uint64_t(double(GetFilePortionsRemaining() * FILE_SEND_BUFFER_SIZE) / GetEstimatedTransferSpeed())); }
 
 	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false) :
+		FileSendStarted(false),
 		FileName(fileName),
 		FileTitle(fileTitle),
 		FilePath(filePath),
@@ -195,6 +198,22 @@ public:
 		//  Initialize the file portion buffer
 		memset(FilePortionBuffer, 0, FILE_SEND_BUFFER_SIZE);
 
+#if FILE_TRANSFER_DEBUGGING
+		debugConsole->AddDebugConsoleLine("FileSendTask created!");
+#endif
+	}
+
+	~FileSendTask()
+	{
+		FileStream.close();
+
+		if (DeleteAfter) std::remove(FilePath.c_str());
+	}
+
+	void StartFileSend()
+	{
+		FileSendStarted = true;
+
 		//  Open the file we're sending and ensure the file handler is valid
 		FileStream.open(FilePath, std::ios_base::binary);
 		assert(FileStream.good() && !FileStream.bad());
@@ -212,19 +231,8 @@ public:
 		//  Buffer a portion of the file in preparation of sending it
 		BufferFilePortion(FilePortionIndex);
 
-#if FILE_TRANSFER_DEBUGGING
-		debugConsole->AddDebugConsoleLine("FileSendTask created!");
-#endif
-
 		//  Send a "File Send Initializer" message
 		SendMessage_FileSendInitializer(FileName, FileTitle, "FILE DESCRIPTION", FileTypeID, FileSubTypeID, FileSize, SocketID, IPAddress.c_str(), ConnectionPort);
-	}
-
-	~FileSendTask()
-	{
-		FileStream.close();
-
-		if (DeleteAfter) std::remove(FilePath.c_str());
 	}
 
 	void BufferFilePortion(uint64_t filePortionIndex)
