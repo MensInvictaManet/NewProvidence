@@ -116,12 +116,7 @@ namespace Groundfish
 		encryptionIndex += 1;
 
 		for (unsigned int i = 0; i < messageLength; ++i)
-		{
-			for (int j = 0; j < 256; ++j) characterMap[wordList.WordList[wordIndex][j]] = j;
-			wordIndex++;
-
-			decryptedData.push_back(characterMap[(unsigned char)encrypted[encryptionIndex + i]]);
-		}
+			decryptedData.push_back((char)wordList.ReverseWordList[wordIndex++][(unsigned char)encrypted[encryptionIndex + i]]);
 
 		return decryptedData;
 	}

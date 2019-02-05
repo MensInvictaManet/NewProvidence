@@ -1164,6 +1164,13 @@ void Server::ContinueFileTransfers(void)
 		auto user = (*userIter).first;
 		if (user->UserFileSendTask == nullptr) continue;
 
+		//  If we haven't "started" the file send, do so now and return out
+		if (user->UserFileSendTask->FileSendStarted == false)
+		{
+			user->UserFileSendTask->StartFileSend();
+			continue;
+		}
+
 		//  If we aren't ready to send the file, continue out and wait for a ready signal
 		if (user->UserFileSendTask->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) continue;
 
