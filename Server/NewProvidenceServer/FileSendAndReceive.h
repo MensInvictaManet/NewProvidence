@@ -374,6 +374,7 @@ public:
 	inline int32_t GetFileSubTypeID() const { return FileSubTypeID; }
 	inline uint64_t GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
+	inline bool GetDecryptWhenRecieved() const { return DecryptWhenReceived; }
 	inline uint64_t GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
 	inline std::string GetTemporaryFileName() const { return TempFileName; }
 	inline double GetPercentageComplete() const { return double(FilePortionIndex * GetFileSendBufferSize()) / double(FileSize); }
@@ -520,8 +521,7 @@ public:
 
 			if (DecryptWhenReceived)
 			{
-				std::thread decryptThread(Groundfish::DecryptAndMoveFile, TempFileName, FileName, true);
-				decryptThread.detach();
+				return true;
 			}
 			else std::rename(TempFileName.c_str(), FileName.c_str());
 		}

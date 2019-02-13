@@ -127,48 +127,6 @@ namespace Groundfish
 		return std::string((char*)decryptedVector.data(), decryptedVector.size());
 	}
 
-	void DecryptAndMoveFile(std::string targetFileName, std::string newFileName, bool deleteOld)
-	{
-		std::ifstream targetFile(targetFileName, std::ios_base::binary);
-		assert(targetFile.good() && !targetFile.bad());
-
-		std::ofstream newFile(newFileName, std::ios_base::binary);
-		assert(newFile.good() && !newFile.bad());
-
-		int wordListVersion = 0;
-		uint64_t newFileSize = 0;
-		unsigned char wordIndex = 0;
-
-		//  Get the file size in bytes for the file
-		uint64_t fileSize = std::filesystem::file_size(targetFileName);
-
-		targetFile.read((char*)&wordListVersion, sizeof(wordListVersion));
-		targetFile.read((char*)&newFileSize, sizeof(newFileSize));
-		targetFile.read((char*)&wordIndex, sizeof(wordIndex));
-
-		GroundfishWordlist& wordList = (wordListVersion == 0) ? CurrentWordList : CurrentWordList; // TODO: Update this to grab old versions
-
-		uint64_t bytesRead = 0;
-		uint64_t bytesToRead = 0;
-		unsigned char readArray[1024] = "";
-		while (targetFile.eof() == false)
-		{
-			bytesToRead = ((fileSize - bytesRead) > 1024) ? 1024 : fileSize - bytesRead;
-			if (bytesToRead <= 0) break;
-			targetFile.read((char*)readArray, bytesToRead);
-			bytesRead += bytesToRead;
-			for (int i = 0; i < bytesToRead; ++i)
-				readArray[i] = (char)wordList.ReverseWordList[wordIndex++][(unsigned char)readArray[i]];
-
-			newFile.write((char*)readArray, bytesToRead);
-		}
-
-		targetFile.close();
-		newFile.close();
-
-		if (deleteOld) std::remove(targetFileName.c_str());
-	}
-
 	void SaveWordList(GroundfishWordlist& savedList, std::string filename)
 	{
 		std::ofstream wordlistOutput(filename.c_str(), std::ofstream::out | std::ifstream::binary);
@@ -335,13 +293,86 @@ public:
 		//  If we've gotten this far, we should grab the specified amount of data, encrypt it, and write it to the new file
 		FileStreamIn.read((char*)readArray, bytesToRead);
 		BytesRead += bytesToRead;
-		for (int i = 0; i < bytesToRead; ++i)
-		{
-			readArray[i] = (char)WordList.WordList[WordIndex++][(unsigned char)readArray[i]];
-		}
+		for (int i = 0; i < bytesToRead; ++i) readArray[i] = (char)WordList.WordList[WordIndex++][(unsigned char)readArray[i]];
 		FileStreamOut.write((char*)readArray, bytesToRead);
 
 		EncryptionPercentage = double(BytesRead) / double(FileInSize);
+
+		return false;
+	}
+};
+
+class FileDecryptTask
+{
+private:
+	const std::string TargetFileName;
+	const std::string NewFileName;
+	const bool DeleteOldFile;
+	int WordListVersion;
+	unsigned char WordIndex;
+
+	Groundfish::GroundfishWordlist& WordList;
+
+	std::ifstream FileStreamIn;
+	std::ofstream FileStreamOut;
+	uint64_t FileInSize;
+	uint64_t BytesRead;
+
+	bool DecryptionComplete;
+
+public:
+	double DecryptionPercentage;
+
+	FileDecryptTask(std::string targetFileName, std::string newFileName, const bool deleteOldFile, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+		TargetFileName(targetFileName),
+		NewFileName(newFileName),
+		DeleteOldFile(deleteOldFile),
+		WordList(Groundfish::CurrentWordList),
+		BytesRead(0),
+		DecryptionComplete(false),
+		DecryptionPercentage(0.0)
+	{
+		//  Open the target file, and ensure it is a valid file
+		FileStreamIn = std::ifstream(TargetFileName, std::ios_base::binary);
+		assert(FileStreamIn.good() && !FileStreamIn.bad());
+
+		//  Open the new file, and ensure it is a valid file
+		FileStreamOut = std::ofstream(NewFileName, std::ios_base::binary);
+		assert(FileStreamOut.good() && !FileStreamOut.bad());
+
+		//  Write out the file information for the output file
+		FileStreamIn.read((char*)&WordListVersion, sizeof(WordListVersion));
+		FileStreamIn.read((char*)&FileInSize, sizeof(FileInSize));
+		FileStreamIn.read((char*)&WordIndex, sizeof(WordIndex));
+	}
+
+	bool Update()
+	{
+		if (DecryptionComplete) return true;
+
+		uint64_t bytesToRead = 0;
+		unsigned char readArray[FILE_ENCRYPTION_BYTES_PER_STEP] = "";
+
+		//  Determine how many bytes to read this step
+		bytesToRead = ((FileInSize - BytesRead) > FILE_ENCRYPTION_BYTES_PER_STEP) ? FILE_ENCRYPTION_BYTES_PER_STEP : FileInSize - BytesRead;
+
+		//  If there is no more information to read, we're done decrypting
+		if (FileStreamIn.eof() || bytesToRead <= 0)
+		{
+			FileStreamIn.close();
+			FileStreamOut.close();
+			if (DeleteOldFile) std::remove(TargetFileName.c_str());
+			DecryptionComplete = true;
+			return true;
+		}
+
+		//  If we've gotten this far, we should grab the specified amount of data, decrypt it, and write it to the new file
+		FileStreamIn.read((char*)readArray, bytesToRead);
+		BytesRead += bytesToRead;
+		for (int i = 0; i < bytesToRead; ++i) readArray[i] = (char)WordList.ReverseWordList[WordIndex++][(unsigned char)readArray[i]];
+		FileStreamOut.write((char*)readArray, bytesToRead);
+
+		DecryptionPercentage = double(BytesRead) / double(FileInSize);
 
 		return false;
 	}

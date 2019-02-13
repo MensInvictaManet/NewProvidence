@@ -404,18 +404,20 @@ void ShiftLatestUploadsRight(GUIObjectNode* object)
 }
 
 
-void SetEncryptionPercentage(double percent)
+void SetCryptPercentage(double percent, bool encryption)
 {
+	std::string type = (encryption ? "Encryption" : "Decryption");
+
 	if (percent >= 1.0)
 	{
 		StatusBarTransferFill->SetVisible(false);
-		SetStatusBarMessage("Encryption completed. Encrypted file is ready for upload.", false);
+		SetStatusBarMessage(type + " completed.", false);
 	}
 	else
 	{
 		StatusBarTransferFill->SetVisible(true);
 		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
-		SetStatusBarMessage("Encryption is " + std::to_string(int(percent * 100.0)) + "% complete", false);
+		SetStatusBarMessage(type + " is " + std::to_string(int(percent * 100.0)) + "% complete", false);
 	}
 }
 
@@ -749,7 +751,8 @@ void PrimaryDialogue::LoadMainMenuBarUI()
 	ClientControl.SetFileSendFailureCallback(FileSendFailureCallback);
 	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
 	ClientControl.SetTransferPercentCompleteCallback(SetTransferPercentage);
-	ClientControl.SetEncryptPercentCompleteCallback(SetEncryptionPercentage);
+	ClientControl.SetEncryptPercentCompleteCallback(SetCryptPercentage);
+	ClientControl.SetDecryptPercentCompleteCallback(SetCryptPercentage);
 }
 
 void PrimaryDialogue::LoadSideBarUI()

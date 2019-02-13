@@ -82,6 +82,7 @@ class Client
 private:
 	int						ServerSocket = -1;
 	FileEncryptTask*		FileEncrypt = nullptr;
+	FileDecryptTask*		FileDecrypt = nullptr;
 	FileReceiveTask*		FileReceive = nullptr;
 	FileSendTask*			FileSend = nullptr;
 	EncryptedData			EncryptedUsername;
@@ -93,7 +94,8 @@ private:
 	std::function<void(std::string)> FileSendFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
 	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
-	std::function<void(double)> EncryptPercentCompleteCallback = nullptr;
+	std::function<void(double, bool)> EncryptPercentCompleteCallback = nullptr;
+	std::function<void(double, bool)> DecryptPercentCompleteCallback = nullptr;
 
 	std::vector<HostedFileEntry> HostedFilesList;
 
@@ -110,13 +112,20 @@ public:
 	inline void SetFileSendFailureCallback(const std::function<void(std::string)>& callback) { FileSendFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
 	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
-	inline void SetEncryptPercentCompleteCallback(const std::function<void(double)>& callback) { EncryptPercentCompleteCallback = callback; }
+	inline void SetEncryptPercentCompleteCallback(const std::function<void(double, bool)>& callback) { EncryptPercentCompleteCallback = callback; }
+	inline void SetDecryptPercentCompleteCallback(const std::function<void(double, bool)>& callback) { DecryptPercentCompleteCallback = callback; }
 	inline void SetUsername(const EncryptedData& username) { EncryptedUsername = username; }
 
 	inline void AddFileEncryptTask(std::string unencryptedFileName, std::string encryptedFileName)
 	{
 		assert(FileEncrypt == nullptr);
 		FileEncrypt = new FileEncryptTask(unencryptedFileName, encryptedFileName);
+	}
+
+	inline void AddFileDecryptTask(std::string encryptedFileName, std::string unencryptedFileName)
+	{
+		assert(FileDecrypt == nullptr);
+		FileDecrypt = new FileDecryptTask(encryptedFileName, unencryptedFileName, true);
 	}
 
 	inline void AddFileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false)
@@ -195,19 +204,36 @@ void Client::SendFileToServer(std::string fileName, std::string filePath, std::s
 
 void Client::ContinueFileEncryptions(void)
 {
-	if (FileEncrypt == nullptr) return;
-
-	auto encryptComplete = FileEncrypt->Update();
-	if (EncryptPercentCompleteCallback != nullptr) EncryptPercentCompleteCallback(FileEncrypt->EncryptionPercentage);
-
-	if (encryptComplete)
+	if (FileEncrypt != nullptr)
 	{
-		delete FileEncrypt;
-		FileEncrypt = nullptr;
+		auto encryptComplete = FileEncrypt->Update();
+		if (EncryptPercentCompleteCallback != nullptr) EncryptPercentCompleteCallback(FileEncrypt->EncryptionPercentage, true);
+
+		if (encryptComplete)
+		{
+			delete FileEncrypt;
+			FileEncrypt = nullptr;
 
 #if FILE_TRANSFER_DEBUGGING
-		debugConsole->AddDebugConsoleLine("FileEncryptTask deleted...");
+			debugConsole->AddDebugConsoleLine("FileEncryptTask deleted...");
 #endif
+		}
+	}
+
+	if (FileDecrypt != nullptr)
+	{
+		auto decryptComplete = FileDecrypt->Update();
+		if (DecryptPercentCompleteCallback != nullptr) DecryptPercentCompleteCallback(FileDecrypt->DecryptionPercentage, false);
+
+		if (decryptComplete)
+		{
+			delete FileDecrypt;
+			FileDecrypt = nullptr;
+
+#if FILE_TRANSFER_DEBUGGING
+			debugConsole->AddDebugConsoleLine("FileDecryptTask deleted...");
+#endif
+		}
 	}
 }
 
@@ -479,6 +505,8 @@ bool Client::ReadMessages(void)
 
 			if (FileReceive->GetFileTransferComplete())
 			{
+				if (FileReceive->GetDecryptWhenRecieved()) AddFileDecryptTask(FileReceive->GetTemporaryFileName(), FileReceive->GetFileName());
+
 				delete FileReceive;
 				FileReceive = nullptr;
 
