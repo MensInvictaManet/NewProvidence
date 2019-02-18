@@ -361,7 +361,7 @@ public:
 		{
 			FileStreamIn.close();
 			FileStreamOut.close();
-			if (DeleteOldFile) std::remove(TargetFileName.c_str());
+			if (DeleteOldFile) std::filesystem::remove(TargetFileName.c_str());
 			DecryptionComplete = true;
 			return true;
 		}

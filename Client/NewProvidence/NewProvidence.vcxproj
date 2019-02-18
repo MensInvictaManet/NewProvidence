@@ -158,6 +158,7 @@
     <ClInclude Include="Engine\SoundWrapper.h" />
     <ClInclude Include="Engine\SplittableCube.h" />
     <ClInclude Include="Engine\SplittableIcosahedron.h" />
+    <ClInclude Include="Engine\StringTools.h" />
     <ClInclude Include="Engine\TextureAnimation.h" />
     <ClInclude Include="Engine\TextureManager.h" />
     <ClInclude Include="Engine\TimeSlice.h" />

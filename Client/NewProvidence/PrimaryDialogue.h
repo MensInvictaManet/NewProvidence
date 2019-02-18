@@ -7,6 +7,7 @@
 #include "Engine/GUIListBox.h"
 #include "Engine/FontManager.h"
 #include "Engine/TimeSlice.h"
+#include "Engine/StringTools.h"
 #include "HostedFileData.h"
 #include <math.h>
 
@@ -59,18 +60,6 @@ GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
-std::string ws2s(const std::wstring& s)
-{
-	int len;
-	int slength = (int)s.length() + 1;
-	len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0);
-	char* buf = new char[len];
-	WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, buf, len, 0, 0);
-	std::string r(buf);
-	delete[] buf;
-	return r;
-}
-
 void UpdateUploadFolderList(void)
 {
 	if (UploadFolderItemsListBox == nullptr) return;
@@ -87,10 +76,11 @@ void UpdateUploadFolderList(void)
 
 	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
 	{
-		auto shortName = (*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
-		auto shortNameS = ws2s(shortName);
-		auto itemLabel = GUILabel::CreateLabel("Arial", shortNameS.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
-		itemLabel->SetObjectName(shortNameS);
+		if (s2ws(ws2s(*iter)).compare((*iter)) != 0) continue;
+
+		auto shortName = ws2s(*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
+		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
+		itemLabel->SetObjectName(shortName);
 		UploadFolderItemsListBox->AddItem(itemLabel);
 	}
 }

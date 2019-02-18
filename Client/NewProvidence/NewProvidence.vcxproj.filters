@@ -171,6 +171,9 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\StringTools.h">
+      <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt">
