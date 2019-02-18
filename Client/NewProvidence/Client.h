@@ -137,7 +137,7 @@ public:
 	bool Connect(void);
 
 	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subtype);
-	void DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList);
+	void DetectFilesInUploadFolder(std::string folder, std::vector<std::wstring>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
 	void ContinueFileEncryptions(void);
 	void ContinueFileTransfers(void);
@@ -176,11 +176,11 @@ void Client::AddLatestUpload(int index, std::string fileTitle, std::string uploa
 }
 
 
-void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::string>& fileList)
+void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::wstring>& fileList)
 {
 	for (const auto& entry : std::filesystem::directory_iterator(folder))
 	{
-		auto path = entry.path().string();
+		auto path = entry.path().wstring();
 		fileList.push_back(path);
 	}
 }

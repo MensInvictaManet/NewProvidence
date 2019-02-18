@@ -59,13 +59,25 @@ GUIObjectNode* CurrentTransferContainer = nullptr;
 
 Client ClientControl;
 
+std::string ws2s(const std::wstring& s)
+{
+	int len;
+	int slength = (int)s.length() + 1;
+	len = WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, 0, 0, 0, 0);
+	char* buf = new char[len];
+	WideCharToMultiByte(CP_ACP, 0, s.c_str(), slength, buf, len, 0, 0);
+	std::string r(buf);
+	delete[] buf;
+	return r;
+}
+
 void UpdateUploadFolderList(void)
 {
 	if (UploadFolderItemsListBox == nullptr) return;
 	UploadFolderItemsListBox->ClearItems();
 
 	std::string uploadFolder("_FilesToUpload");
-	std::vector<std::string> fileList;
+	std::vector<std::wstring> fileList;
 	ClientControl.DetectFilesInUploadFolder(uploadFolder, fileList);
 
 	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
@@ -76,8 +88,9 @@ void UpdateUploadFolderList(void)
 	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
 	{
 		auto shortName = (*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
-		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
-		itemLabel->SetObjectName(shortName);
+		auto shortNameS = ws2s(shortName);
+		auto itemLabel = GUILabel::CreateLabel("Arial", shortNameS.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
+		itemLabel->SetObjectName(shortNameS);
 		UploadFolderItemsListBox->AddItem(itemLabel);
 	}
 }
