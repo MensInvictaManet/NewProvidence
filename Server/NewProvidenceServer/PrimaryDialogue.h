@@ -8,6 +8,31 @@ Server ServerControl;
 GUIListBox* HostedFileListBox = nullptr;
 GUIListBox* CurrentUserList = nullptr;
 
+void AddDebugCommand_AddUserData(void)
+{
+	//  AddUserData: ["AddUserData USER PASS"] adds a user to the server if they don't already exist 
+	debugConsole->AddDebugCommand("AddUserData", [=](std::string commandString) -> bool
+	{
+		auto firstSpace = commandString.find_first_of(' ');
+		auto lastSpace = commandString.find_last_of(' ');
+		auto fullCommand = (lastSpace != (commandString.length() - 1));
+
+		if ((firstSpace == -1) || (firstSpace != lastSpace) || !fullCommand)
+		{
+			debugConsole->AddDebugConsoleLine("Proper use of AddUserData command: \"AddUserData USER PASS\"");
+			return false;
+		}
+
+		auto username = commandString.substr(0, firstSpace);
+		auto password = commandString.substr(firstSpace + 1, commandString.length() - 1 - firstSpace);
+		debugConsole->AddDebugConsoleLine("Adding user data: (" + username + ")[" + password + "]");
+
+		ServerControl.AddUserLoginDetails(username, password);
+
+		return true;
+	});
+}
+
 void DeleteHostedFile(GUIObjectNode* fileDeleteButton)
 {
 	auto fileChecksum = ((GUIButton*)fileDeleteButton)->GetObjectName();
@@ -149,6 +174,8 @@ inline PrimaryDialogue::PrimaryDialogue()
 {
 	LoadMainProgramUI();
 	InitializeServer();
+
+	AddDebugCommand_AddUserData();
 }
 
 

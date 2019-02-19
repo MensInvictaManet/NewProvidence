@@ -384,6 +384,8 @@ public:
 	void DeleteHostedFile(std::string fileChecksum);
 	inline UserConnection* GetUserConnectionByIP(std::string ip) const { for (auto i = UserConnectionsList.begin(); i != UserConnectionsList.end(); ++i) if ((*i).first->IPAddress == ip) return (*i).first; return nullptr; }
 
+	void AddUserLoginDetails(std::string username, std::string password);
+
 private:
 	void AddClient(int socketID, std::string ipAddress);
 	void RemoveClient(UserConnection* user);
@@ -394,7 +396,6 @@ private:
 
 	void LoadUserLoginDetails(void);
 	void SaveUserLoginDetails(void);
-	void AddUserLoginDetails(std::string username, std::string password);
 
 	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
@@ -497,6 +498,37 @@ void Server::DeleteHostedFile(std::string fileChecksum)
 	SaveHostedFileList();
 	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback(GetHostedFileDataList());
 	SendOutHostedFileList();
+}
+
+
+void Server::AddUserLoginDetails(std::string username, std::string password)
+{
+	//  Lowercase the username and password
+	std::transform(username.begin(), username.end(), username.begin(), ::tolower);
+	std::transform(password.begin(), password.end(), password.begin(), ::tolower);
+
+	//  Check if the MD5 of the unencrypted login details already links to a user login data entry, and if so exit out
+	auto loginDataMD5 = md5(username + password);
+	if (UserLoginDetailsList.find(loginDataMD5) != UserLoginDetailsList.end()) return;
+
+	//  If it's a new entry, encrypt the username and password, place both encrypted arrays in a vector of unsigned chars
+	EncryptedData usernameVector = Groundfish::Encrypt(username.c_str(), int(username.length()), 0, rand() % 256);
+	EncryptedData passwordVector = Groundfish::Encrypt(password.c_str(), int(password.length()), 0, rand() % 256);
+
+	//  Open and close the Inbox and Notifications file for this user, to create them
+	std::ofstream userInboxFile("./_UserInbox/" + loginDataMD5 + ".inbox");
+	assert(userInboxFile.good() && !userInboxFile.bad());
+	userInboxFile.close();
+	std::ofstream userNotificationFile("./_UserNotifications/" + loginDataMD5 + ".notifications");
+	assert(userNotificationFile.good() && !userNotificationFile.bad());
+	userNotificationFile.close();
+
+	//  Add a new notification for a welcoming message
+	AddUserNotification(loginDataMD5, "Welcome to New Providence");
+
+	//  Add the user data to the login details list, then save off the new user login details list
+	UserLoginDetailsList[loginDataMD5] = UserLoginDetails(usernameVector, passwordVector);
+	SaveUserLoginDetails();
 }
 
 
@@ -945,36 +977,6 @@ void Server::SaveUserLoginDetails(void)
 	}
 
 	uldFile.close();
-}
-
-void Server::AddUserLoginDetails(std::string username, std::string password)
-{
-	//  Lowercase the username and password
-	std::transform(username.begin(), username.end(), username.begin(), ::tolower);
-	std::transform(password.begin(), password.end(), password.begin(), ::tolower);
-
-	//  Check if the MD5 of the unencrypted login details already links to a user login data entry, and if so exit out
-	auto loginDataMD5 = md5(username + password);
-	if (UserLoginDetailsList.find(loginDataMD5) != UserLoginDetailsList.end()) return;
-
-	//  If it's a new entry, encrypt the username and password, place both encrypted arrays in a vector of unsigned chars
-	EncryptedData usernameVector = Groundfish::Encrypt(username.c_str(), int(username.length()), 0, rand() % 256);
-	EncryptedData passwordVector = Groundfish::Encrypt(password.c_str(), int(password.length()), 0, rand() % 256);
-
-	//  Open and close the Inbox and Notifications file for this user, to create them
-	std::ofstream userInboxFile("./_UserInbox/" + loginDataMD5 + ".inbox");
-	assert(userInboxFile.good() && !userInboxFile.bad());
-	userInboxFile.close();
-	std::ofstream userNotificationFile("./_UserNotifications/" + loginDataMD5 + ".notifications");
-	assert(userNotificationFile.good() && !userNotificationFile.bad());
-	userNotificationFile.close();
-
-	//  Add a new notification for a welcoming message
-	AddUserNotification(loginDataMD5, "Welcome to New Providence");
-	
-	//  Add the user data to the login details list, then save off the new user login details list
-	UserLoginDetailsList[loginDataMD5] = UserLoginDetails(usernameVector, passwordVector);
-	SaveUserLoginDetails();
 }
 
 

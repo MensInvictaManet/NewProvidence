@@ -76,9 +76,14 @@ void UpdateUploadFolderList(void)
 
 	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
 	{
-		if (s2ws(ws2s(*iter)).compare((*iter)) != 0) continue;
-
 		auto shortName = ws2s(*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
+
+		if (s2ws(ws2s(*iter)).compare((*iter)) != 0)
+		{
+			debugConsole->AddDebugConsoleLine("File found with unrecognized characters in File Upload folder. File ignored: " + shortName);
+			continue;
+		}
+
 		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
 		itemLabel->SetObjectName(shortName);
 		UploadFolderItemsListBox->AddItem(itemLabel);
@@ -457,8 +462,6 @@ void LoginRequestResponseCallback(int response, int inboxCount, int notification
 	HostedFileListUINode->SetVisible(success);
 	SearchFilterUINode->SetVisible(success);
 	UploadMenuUINode->SetVisible(false);
-
-	UpdateUploadFolderList();
 
 	PasswordEditBox->SetText("");
 	SetStatusBarMessage(LoginResponses[response], !success);
