@@ -31,6 +31,9 @@
     <Filter Include="Header Files\ArcadiaEngine\Utilities">
       <UniqueIdentifier>{77720233-8597-455b-8fc4-c2308873e039}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Dialogues">
+      <UniqueIdentifier>{f0e993a7-f607-4983-8679-b4937a60bfef}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine\TextureManager.h">
@@ -150,9 +153,6 @@
     <ClInclude Include="Groundfish.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PrimaryDialogue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -173,6 +173,12 @@
     </ClInclude>
     <ClInclude Include="Engine\StringTools.h">
       <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
+    </ClInclude>
+    <ClInclude Include="PrimaryDialogue.h">
+      <Filter>Header Files\Dialogues</Filter>
+    </ClInclude>
+    <ClInclude Include="FileUploadDialogue.h">
+      <Filter>Header Files\Dialogues</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

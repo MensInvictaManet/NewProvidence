@@ -100,6 +100,8 @@ private:
 	std::vector<HostedFileEntry> HostedFilesList;
 
 public:
+	static Client& GetInstance() { static Client INSTANCE; return INSTANCE; }
+
 	Client()	{}
 	~Client()	{ Shutdown(); }
 
@@ -227,6 +229,7 @@ void Client::ContinueFileEncryptions(void)
 
 		if (decryptComplete)
 		{
+			DecryptPercentCompleteCallback(1.0, false);
 			delete FileDecrypt;
 			FileDecrypt = nullptr;
 
