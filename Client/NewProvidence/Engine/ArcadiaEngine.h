@@ -47,6 +47,7 @@
 #endif
 
 #include <iostream>
+#include <filesystem>
 
 #include "WindowManager.h"
 #include "TextureManager.h"
@@ -58,6 +59,7 @@
 #include "MemoryManager.h"
 #include "DebugConsole.h"
 #include "AutoPlayManager.h"
+#include "EventManager.h"
 
 #if AUDIO_ENABLED
 #include "SoundWrapper.h"
@@ -419,6 +421,19 @@ inline void PrimaryLoop()
 				case 3: inputManager.SetMouseButtonRight((e.type == SDL_MOUSEBUTTONDOWN)); break;
 				default: break;
 				}
+				break;
+
+			case SDL_DROPFILE:
+			{
+				auto dropFilePath = std::string(e.drop.file);
+				if (std::filesystem::exists(dropFilePath))
+				{
+					auto isFolder = std::filesystem::is_directory(dropFilePath);
+					auto fileDrop = FileDropEventData(dropFilePath, isFolder, "ArcadiaEngine");
+					eventManager.BroadcastEvent(&fileDrop);
+				}
+			}
+			break;
 
 			default:
 				windowManager.HandleEvent(e);

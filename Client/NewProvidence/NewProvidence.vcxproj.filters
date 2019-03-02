@@ -168,9 +168,6 @@
     <ClInclude Include="HostedFileData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Engine\StringTools.h">
       <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
     </ClInclude>
@@ -182,6 +179,12 @@
     </ClInclude>
     <ClInclude Include="Engine\GUIProgressBar.h">
       <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\EventManager.h">
+      <Filter>Header Files\ArcadiaEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Resource Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
