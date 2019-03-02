@@ -49,6 +49,7 @@ public:
 	inline void SetParent(GUIObjectNode* parent) { m_Parent = parent; }
 	inline void SetColor(float r, float g, float b, float a) { m_Color.colorValues[0] = r; m_Color.colorValues[1] = g; m_Color.colorValues[2] = b; m_Color.colorValues[3] = a; }
 	inline void SetColorBytes(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) { SetColor(float(r) / 255.0f, float(g) / 255.0f, float(b) / 255.0f, float(a) / 255.0f); }
+	inline void SetColor(Color color) { m_Color = color; }
 	inline void SetObjectName(std::string objectName) { m_ObjectName = objectName; }
 	inline void SetClickX(int clickX) { m_ClickX = clickX; }
 	inline void SetClickY(int clickY) { m_ClickY = clickY; }
@@ -365,20 +366,44 @@ public:
 		}
 	}
 
-	void Render(int textureIndex, int x, int y, int w, int h)
+	void Render(int textureIndex, int x, int y, int w, int h, bool cutoff = false, int fullWidth = -1)
 	{
 		assert(TextureMap.empty() == false);
 		if (TextureMap.empty() == true) return;
 
 		auto layerIndex = TEMPLATE_PORTIONS_COUNT * textureIndex;
-		TextureMap[layerIndex + TOP_LEFT]->RenderTexture(x, y, TopLeft(textureIndex)->getWidth(), TopLeft(textureIndex)->getHeight());
-		TextureMap[layerIndex + TOP_RIGHT]->RenderTexture(x + w - TopRight(textureIndex)->getWidth(), y, TopRight(textureIndex)->getWidth(), TopRight(textureIndex)->getHeight());
-		TextureMap[layerIndex + BOTTOM_LEFT]->RenderTexture(x, y + h - BottomLeft(textureIndex)->getHeight(), BottomLeft(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
-		TextureMap[layerIndex + BOTTOM_RIGHT]->RenderTexture(x + w - BottomRight(textureIndex)->getWidth(), y + h - BottomRight(textureIndex)->getHeight(), BottomRight(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
-		TextureMap[layerIndex + LEFT_SIDE]->RenderTexture(x, y + TopLeft(textureIndex)->getHeight(), LeftSide(textureIndex)->getWidth(), h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());
-		TextureMap[layerIndex + RIGHT_SIDE]->RenderTexture(x + w - RightSide(textureIndex)->getWidth(), y + TopRight(textureIndex)->getHeight(), RightSide(textureIndex)->getWidth(), h - TopRight(textureIndex)->getHeight() - BottomRight(textureIndex)->getHeight());
-		TextureMap[layerIndex + TOP_SIDE]->RenderTexture(x + TopLeft(textureIndex)->getWidth(), y, w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), TopSide(textureIndex)->getHeight());
-		TextureMap[layerIndex + BOTTOM_SIDE]->RenderTexture(x + BottomLeft(textureIndex)->getWidth(), y + h - BottomSide(textureIndex)->getHeight(), w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), BottomSide(textureIndex)->getHeight());
-		TextureMap[layerIndex + MIDDLE]->RenderTexture(x + LeftSide(textureIndex)->getWidth(), y + TopSide(textureIndex)->getHeight(), w - LeftSide(textureIndex)->getWidth() - RightSide(textureIndex)->getWidth(), h - TopSide(textureIndex)->getHeight() - BottomSide(textureIndex)->getHeight());
+		if (cutoff)
+		{
+			auto leftWidth = std::min<int>(w, TopLeft(textureIndex)->getWidth());
+			TextureMap[layerIndex + TOP_LEFT]->RenderTexturePart(x, y, 0, 0, leftWidth, TopLeft(textureIndex)->getHeight());
+			TextureMap[layerIndex + LEFT_SIDE]->RenderTexturePart(x, y + TopLeft(textureIndex)->getHeight(), 0, 0, leftWidth, h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_LEFT]->RenderTexturePart(x, y + h - BottomLeft(textureIndex)->getHeight(), 0, 0, leftWidth, BottomLeft(textureIndex)->getHeight());
+
+			auto middleWidth = std::min<int>(w - TopLeft(textureIndex)->getWidth(), fullWidth - TopLeft(textureIndex)->getWidth() - TopRight(textureIndex)->getWidth());
+			if (middleWidth <= 0) return;
+			TextureMap[layerIndex + TOP_SIDE]->RenderTexturePart(x + TopLeft(textureIndex)->getWidth(), y, 0, 0, middleWidth, TopSide(textureIndex)->getHeight());
+			TextureMap[layerIndex + MIDDLE]->RenderTexturePart(x + LeftSide(textureIndex)->getWidth(), y + TopSide(textureIndex)->getHeight(), 0, 0, middleWidth, h - TopSide(textureIndex)->getHeight() - BottomSide(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_SIDE]->RenderTexturePart(x + BottomLeft(textureIndex)->getWidth(), y + h - BottomSide(textureIndex)->getHeight(), 0, 0, middleWidth, BottomSide(textureIndex)->getHeight());
+
+			auto rightWidth = w - leftWidth - middleWidth;
+			if (rightWidth <= 0) return;
+			TextureMap[layerIndex + TOP_RIGHT]->RenderTexturePart(x + fullWidth - TopRight(textureIndex)->getWidth(), y, 0, 0, rightWidth, TopRight(textureIndex)->getHeight());
+			TextureMap[layerIndex + RIGHT_SIDE]->RenderTexturePart(x + fullWidth - RightSide(textureIndex)->getWidth(), y + TopRight(textureIndex)->getHeight(), 0, 0, rightWidth, h - TopRight(textureIndex)->getHeight() - BottomRight(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_RIGHT]->RenderTexturePart(x + fullWidth - BottomRight(textureIndex)->getWidth(), y + h - BottomRight(textureIndex)->getHeight(), 0, 0, rightWidth, BottomLeft(textureIndex)->getHeight());
+		}
+		else
+		{
+			TextureMap[layerIndex + TOP_LEFT]->RenderTexture(x, y, TopLeft(textureIndex)->getWidth(), TopLeft(textureIndex)->getHeight());
+			TextureMap[layerIndex + LEFT_SIDE]->RenderTexture(x, y + TopLeft(textureIndex)->getHeight(), LeftSide(textureIndex)->getWidth(), h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_LEFT]->RenderTexture(x, y + h - BottomLeft(textureIndex)->getHeight(), BottomLeft(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
+
+			TextureMap[layerIndex + TOP_SIDE]->RenderTexture(x + TopLeft(textureIndex)->getWidth(), y, w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), TopSide(textureIndex)->getHeight());
+			TextureMap[layerIndex + MIDDLE]->RenderTexture(x + LeftSide(textureIndex)->getWidth(), y + TopSide(textureIndex)->getHeight(), w - LeftSide(textureIndex)->getWidth() - RightSide(textureIndex)->getWidth(), h - TopSide(textureIndex)->getHeight() - BottomSide(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_SIDE]->RenderTexture(x + BottomLeft(textureIndex)->getWidth(), y + h - BottomSide(textureIndex)->getHeight(), w - BottomLeft(textureIndex)->getWidth() - BottomRight(textureIndex)->getWidth(), BottomSide(textureIndex)->getHeight());
+
+			TextureMap[layerIndex + TOP_RIGHT]->RenderTexture(x + w - TopRight(textureIndex)->getWidth(), y, TopRight(textureIndex)->getWidth(), TopRight(textureIndex)->getHeight());
+			TextureMap[layerIndex + RIGHT_SIDE]->RenderTexture(x + w - RightSide(textureIndex)->getWidth(), y + TopRight(textureIndex)->getHeight(), RightSide(textureIndex)->getWidth(), h - TopRight(textureIndex)->getHeight() - BottomRight(textureIndex)->getHeight());
+			TextureMap[layerIndex + BOTTOM_RIGHT]->RenderTexture(x + w - BottomRight(textureIndex)->getWidth(), y + h - BottomRight(textureIndex)->getHeight(), BottomRight(textureIndex)->getWidth(), BottomLeft(textureIndex)->getHeight());
+		}
 	}
 };

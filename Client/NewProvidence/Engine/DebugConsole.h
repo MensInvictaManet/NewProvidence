@@ -146,22 +146,22 @@ inline void DebugConsole::Render(int xOffset, int yOffset)
 	glDisable(GL_TEXTURE_2D);
 	glColor4f(0.1f, 0.1f, 0.1f, 0.9f);
 	glBegin(GL_QUADS);
-	glVertex2i(0, 0);
-	glVertex2i(m_WindowWidth, 0);
-	glVertex2i(m_WindowWidth, m_WindowHeight / 2);
-	glVertex2i(0, m_WindowHeight / 2);
+		glVertex2i(0, 0);
+		glVertex2i(m_WindowWidth, 0);
+		glVertex2i(m_WindowWidth, m_WindowHeight / 2);
+		glVertex2i(0, m_WindowHeight / 2);
 	glEnd();
 
 	glColor3i(0, 0, 0);
 	glLineWidth(3);
 	glBegin(GL_LINE_STRIP);
-	glVertex2i(1, 1);
-	glVertex2i(m_WindowWidth - 1, 1);
-	glVertex2i(m_WindowWidth - 1, m_WindowHeight / 2 - 1);
-	glVertex2i(1, m_WindowHeight / 2 - 1);
-	glVertex2i(1, 1);
-	glVertex2i(1, m_WindowHeight / 2 - 26 - 1);
-	glVertex2i(m_WindowWidth - 1, m_WindowHeight / 2 - 26 - 1);
+		glVertex2i(1, 1);
+		glVertex2i(m_WindowWidth - 1, 1);
+		glVertex2i(m_WindowWidth - 1, m_WindowHeight / 2 - 1);
+		glVertex2i(1, m_WindowHeight / 2 - 1);
+		glVertex2i(1, 1);
+		glVertex2i(1, m_WindowHeight / 2 - 26 - 1);
+		glVertex2i(m_WindowWidth - 1, m_WindowHeight / 2 - 26 - 1);
 	glEnd();
 
 	//  Render the text in the lower box
