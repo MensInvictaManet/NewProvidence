@@ -146,6 +146,7 @@
     <ClInclude Include="Engine\GUIManager.h" />
     <ClInclude Include="Engine\GUIMoveable.h" />
     <ClInclude Include="Engine\GUIObjectNode.h" />
+    <ClInclude Include="Engine\GUIProgressBar.h" />
     <ClInclude Include="Engine\InputManager.h" />
     <ClInclude Include="Engine\MemoryManager.h" />
     <ClInclude Include="Engine\Program.h" />

@@ -180,6 +180,9 @@
     <ClInclude Include="FileUploadDialogue.h">
       <Filter>Header Files\Dialogues</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\GUIProgressBar.h">
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt">
