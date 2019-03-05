@@ -134,6 +134,7 @@
     <ClInclude Include="Engine\BasicRenderable3D.h" />
     <ClInclude Include="Engine\Color.h" />
     <ClInclude Include="Engine\DebugConsole.h" />
+    <ClInclude Include="Engine\EventManager.h" />
     <ClInclude Include="Engine\FontManager.h" />
     <ClInclude Include="Engine\GLMCamera.h" />
     <ClInclude Include="Engine\GUIButton.h" />
@@ -145,6 +146,7 @@
     <ClInclude Include="Engine\GUIManager.h" />
     <ClInclude Include="Engine\GUIMoveable.h" />
     <ClInclude Include="Engine\GUIObjectNode.h" />
+    <ClInclude Include="Engine\GUIProgressBar.h" />
     <ClInclude Include="Engine\InputManager.h" />
     <ClInclude Include="Engine\MemoryManager.h" />
     <ClInclude Include="Engine\Program.h" />
@@ -157,6 +159,7 @@
     <ClInclude Include="Engine\SoundWrapper.h" />
     <ClInclude Include="Engine\SplittableCube.h" />
     <ClInclude Include="Engine\SplittableIcosahedron.h" />
+    <ClInclude Include="Engine\StringTools.h" />
     <ClInclude Include="Engine\TextureAnimation.h" />
     <ClInclude Include="Engine\TextureManager.h" />
     <ClInclude Include="Engine\TimeSlice.h" />

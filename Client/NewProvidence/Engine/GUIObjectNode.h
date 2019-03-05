@@ -31,6 +31,7 @@ public:
 	virtual void SetToDestroy(std::stack<GUIObjectNode*>& destroyList);
 	virtual void Destroy();
 	virtual bool SortChild(GUIObjectNode* child);
+	virtual bool IsMouseWithin(int mX, int mY);
 
 	bool GetClickPosition(const std::string& objectName, int& xPos, int& yPos);
 	int GetTrueX() const;
@@ -245,6 +246,16 @@ inline bool GUIObjectNode::SortChild(GUIObjectNode* child)
 	m_Children.erase(childIter);
 	AddChildSorted(child);
 	return true;
+}
+
+inline bool GUIObjectNode::IsMouseWithin(int mX, int mY)
+{
+	auto within = true;
+	within &= (mX > m_X);
+	within &= (mY > m_Y);
+	within &= (mX < m_X + m_Width);
+	within &= (mY < m_Y + m_Height);
+	return within;
 }
 
 inline bool GUIObjectNode::GetClickPosition(const std::string& objectName, int& xPos, int& yPos)

@@ -5,6 +5,7 @@
 #include "Engine/GUIEditBox.h"
 #include "Engine/GUILabel.h"
 #include "Engine/GUIListBox.h"
+#include "Engine/GUIProgressBar.h"
 #include "Engine/FontManager.h"
 #include "Engine/TimeSlice.h"
 #include "Engine/StringTools.h"
@@ -50,6 +51,7 @@ GUIDropDown* FilterByTypeDropDown = nullptr;
 GUIDropDown* FilterBySubtypeDropDown = nullptr;
 
 GUIObjectNode* CurrentTransferContainer = nullptr;
+//GUIProgressBar* ProgressBarTest = nullptr;
 
 Client& ClientControl = Client::GetInstance();
 
@@ -331,7 +333,7 @@ void SetCryptPercentage(double percent, bool encryption)
 	{
 		StatusBarTransferFill->SetVisible(true);
 		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
-		SetStatusBarMessage(type + " is " + std::to_string(int(percent * 100.0)) + "% complete", false);
+		SetStatusBarMessage(type + " is " + getDoubleStringRounded(percent * 100.0, 2) + "% complete", false);
 	}
 }
 
@@ -355,7 +357,7 @@ void SetTransferPercentage(double percent, double time, uint64_t fileSize, uint6
 
 		StatusBarTransferFill->SetVisible(true);
 		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
-		SetStatusBarMessage(transferType + " " + std::to_string(int(percent * 100.0)) + "% complete (est. " + timeString + " remaining)", false);
+		SetStatusBarMessage(transferType + " " + getDoubleStringRounded(percent * 100.0, 2) + "% complete (est. " + timeString + " remaining)", false);
 	}
 }
 
@@ -495,6 +497,11 @@ PrimaryDialogue::~PrimaryDialogue()
 
 inline void PrimaryDialogue::Update()
 {
+	//static float progress = 0.0f;
+	//progress += 0.0001f;
+	//if (progress > 1.0f) progress = 1.0f;
+	//ProgressBarTest->SetProgress(progress);
+
 	GUIObjectNode::Update();
 
 	if (ClientConnected == CONNECTION_STATUS_CONNECTED) ClientControl.MainProcess();
@@ -645,6 +652,11 @@ void PrimaryDialogue::LoadLoginMenu()
 	UsernameEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
 	PasswordEditBox->SetEnterKeyCallback(EnterFromUsernameOrPasswordBoxCallback);
 	UsernameEditBox->SetSelected(true);
+
+	//ProgressBarTest = GUIProgressBar::CreateTemplatedProgressBar("Standard", 100, 160, 300, 40);
+	//ProgressBarTest->SetBarColor(COLOR_RED);
+	//ProgressBarTest->SetFont("Arial");
+	//LoginMenuNode->AddChild(ProgressBarTest);
 }
 
 

@@ -8,7 +8,7 @@
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
-constexpr auto VERSION_NUMBER			= "2019.02.04";
+constexpr auto VERSION_NUMBER			= "2019.03.02";
 constexpr auto NEW_PROVIDENCE_IP		= "98.181.188.165";
 constexpr auto NEW_PROVIDENCE_PORT		= 2347;
 

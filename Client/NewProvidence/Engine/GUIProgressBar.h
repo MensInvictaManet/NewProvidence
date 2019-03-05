@@ -84,7 +84,7 @@ inline void GUIProgressBar::Render(int xOffset, int yOffset)
 
 			if (m_Font != nullptr)
 			{
-				auto percentString = std::to_string(int(m_Progress * 100.0f)) + "%";
+				auto percentString = getDoubleStringRounded(m_Progress / 100.0, 2) + "%";
 				m_Font->RenderText(percentString.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, 1.0f, 1.0f, m_TextColor);
 			}
 		}

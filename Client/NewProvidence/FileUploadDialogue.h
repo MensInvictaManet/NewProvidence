@@ -8,6 +8,7 @@
 #include "Engine/GUIButton.h"
 #include "Engine/StringTools.h"
 #include "Engine/DebugConsole.h"
+#include "Engine/EventManager.h"
 #include "HostedFileData.h"
 #include "FileSendAndReceive.h"
 #include "Client.h"
@@ -23,6 +24,23 @@ std::string SelectedUploadFileName = "";
 GUIObjectNode* UploadErrorBG = nullptr;
 GUILabel* UploadErrorLabel = nullptr;
 
+void AddUploadFolderItem(std::string filePath)
+{
+	if (UploadFolderItemsListBox == nullptr) return;
+
+	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
+	auto entryY = 12;
+	auto entryH = UploadFolderItemsListBox->GetEntryHeight();
+	auto entryW = UploadFolderItemsListBox->GetWidth();
+
+	auto displayName = getFilenameFromPath(filePath);
+
+	auto itemLabel = GUILabel::CreateLabel("Arial", displayName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
+	itemLabel->SetObjectName(filePath);
+	UploadFolderItemsListBox->AddItem(itemLabel);
+
+}
+
 void UpdateUploadFolderList(void)
 {
 	if (UploadFolderItemsListBox == nullptr) return;
@@ -33,11 +51,6 @@ void UpdateUploadFolderList(void)
 	Client& client = Client::GetInstance();
 	client.DetectFilesInUploadFolder(uploadFolder, fileList);
 
-	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
-	auto entryY = 12;
-	auto entryH = UploadFolderItemsListBox->GetEntryHeight();
-	auto entryW = UploadFolderItemsListBox->GetWidth();
-
 	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
 	{
 		auto shortName = ws2s(*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
@@ -47,10 +60,8 @@ void UpdateUploadFolderList(void)
 			debugConsole->AddDebugConsoleLine("File found with unrecognized characters in File Upload folder. File ignored: " + shortName);
 			continue;
 		}
-
-		auto itemLabel = GUILabel::CreateLabel("Arial", shortName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
-		itemLabel->SetObjectName(shortName);
-		UploadFolderItemsListBox->AddItem(itemLabel);
+		
+		AddUploadFolderItem(uploadFolder + "/" + shortName);
 	}
 }
 
@@ -73,7 +84,7 @@ void SelectUploadItem(GUIObjectNode* object)
 	auto listBox = (GUIListBox*)(object);
 	auto selectedItem = listBox->GetSelectedItem();
 	SelectedUploadFileName = selectedItem->GetObjectName();
-	UploadFileNameLabel->SetText("File Name:       " + SelectedUploadFileName);
+	UploadFileNameLabel->SetText("File Name:       " + getFilenameFromPath(SelectedUploadFileName));
 	UploadFileTitleEditBox->SetText("");
 }
 
@@ -95,8 +106,8 @@ void UploadFileToServer(GUIObjectNode* object)
 	if (SelectedUploadFileName.length() == 0) return;
 
 	//  If the currently selected file does not exist or is not readable, return out
-	auto fileToUpload = "_FilesToUpload/" + SelectedUploadFileName;
-	std::ifstream fileCheck(fileToUpload);
+	auto fileName = getFilenameFromPath(SelectedUploadFileName);
+	std::ifstream fileCheck(SelectedUploadFileName);
 	auto fileGood = fileCheck.good() && !fileCheck.bad();
 	fileCheck.close();
 	if (!fileGood)
@@ -124,11 +135,11 @@ void UploadFileToServer(GUIObjectNode* object)
 	//  Attempt to start an upload of the file to the server
 	SetUploadErrorMessage("", false);
 	Client& client = Client::GetInstance();
-	client.SendFileToServer(SelectedUploadFileName, fileToUpload, fileToUploadTitle, fileTypeID, fileSubTypeID);
+	client.SendFileToServer(fileName, SelectedUploadFileName, fileToUploadTitle, fileTypeID, fileSubTypeID);
 }
 
 
-class FileUploadDialogue : public GUIObjectNode
+class FileUploadDialogue : public GUIObjectNode, EventListener
 {
 public:
 	static FileUploadDialogue* GetInstance() { static FileUploadDialogue* INSTANCE = new FileUploadDialogue; return INSTANCE; }
@@ -144,6 +155,8 @@ public:
 
 	inline void SetUIVisible() { UploadMenuUINode->SetVisible(true); }
 	inline void SetUIHidden() { UploadMenuUINode->SetVisible(false); }
+
+	virtual void ReceiveEvent(EventData* eventData);
 
 private:
 	void LoadUploadErrorUI();
@@ -259,6 +272,26 @@ void FileUploadDialogue::LoadUploadMenuUI()
 	UploadFileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
 	UpdateUploadSubTypeList(UploadFileSubTypeDropDown);
 	UploadMenuUINode->AddChild(UploadFileSubTypeDropDown);
+
+	eventManager.AddEventListener("FileDrop", this);
+}
+
+
+
+void FileUploadDialogue::ReceiveEvent(EventData* eventData)
+{
+	if (!this->GetVisible()) return;
+	if (!UploadFolderItemsListBox->IsMouseWithin(inputManager.GetMouseX(), inputManager.GetMouseY())) return;
+
+	auto fileDrop = static_cast<FileDropEventData*>(eventData);
+	debugConsole->AddDebugConsoleLine("Dropped File: \"" + fileDrop->File + "\" (type: " + std::string(fileDrop->IsFolder ? "Folder" : "File") + ")");
+
+	if (fileDrop->IsFolder)SetUploadErrorMessage("Sorry, dropping a folder into the upload section is not supported at this time.", true);
+	else
+	{
+		SetUploadErrorMessage("", false);
+		AddUploadFolderItem(fileDrop->File);
+	}
 }
 
 

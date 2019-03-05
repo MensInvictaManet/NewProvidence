@@ -165,6 +165,15 @@
     <ClInclude Include="HostedFileData.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\EventManager.h">
+      <Filter>Header Files\ArcadiaEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\GUIProgressBar.h">
+      <Filter>Header Files\ArcadiaEngine\GUI Object Types</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\StringTools.h">
+      <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">

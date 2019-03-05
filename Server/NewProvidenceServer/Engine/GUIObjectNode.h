@@ -31,6 +31,7 @@ public:
 	virtual void SetToDestroy(std::stack<GUIObjectNode*>& destroyList);
 	virtual void Destroy();
 	virtual bool SortChild(GUIObjectNode* child);
+	virtual bool IsMouseWithin(int mX, int mY);
 
 	bool GetClickPosition(const std::string& objectName, int& xPos, int& yPos);
 	int GetTrueX() const;
@@ -187,10 +188,10 @@ inline void GUIObjectNode::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 			else if (m_TextureAnimation != nullptr)
@@ -245,6 +246,16 @@ inline bool GUIObjectNode::SortChild(GUIObjectNode* child)
 	m_Children.erase(childIter);
 	AddChildSorted(child);
 	return true;
+}
+
+inline bool GUIObjectNode::IsMouseWithin(int mX, int mY)
+{
+	auto within = true;
+	within &= (mX > m_X);
+	within &= (mY > m_Y);
+	within &= (mX < m_X + m_Width);
+	within &= (mY < m_Y + m_Height);
+	return within;
 }
 
 inline bool GUIObjectNode::GetClickPosition(const std::string& objectName, int& xPos, int& yPos)
