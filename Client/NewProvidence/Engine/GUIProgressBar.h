@@ -2,6 +2,7 @@
 
 #include "GUIObjectNode.h"
 #include "FontManager.h"
+#include "StringTools.h"
 
 class GUIProgressBar : public GUIObjectNode
 {
