@@ -5,6 +5,7 @@
 #include "Engine/WinsockWrapper.h"
 #include "Engine/SimpleMD5.h"
 #include "Engine/SimpleSHA256.h"
+#include "Engine/StringTools.h"
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
 
@@ -82,7 +83,7 @@ class Client
 private:
 	int						ServerSocket = -1;
 	FileEncryptTask*		FileEncrypt = nullptr;
-	FileDecryptTask*		FileDecrypt = nullptr;
+	std::vector<FileDecryptTask*> FileDecryptList;
 	FileReceiveTask*		FileReceive = nullptr;
 	FileSendTask*			FileSend = nullptr;
 	EncryptedData			EncryptedUsername;
@@ -93,9 +94,6 @@ private:
 	std::function<void(std::string, std::string)> FileRequestFailureCallback = nullptr;
 	std::function<void(std::string)> FileSendFailureCallback = nullptr;
 	std::function<void(std::string)> FileRequestSuccessCallback = nullptr;
-	std::function<void(double, double, uint64_t, uint64_t, bool)> TransferPercentCompleteCallback = nullptr;
-	std::function<void(double, bool)> EncryptPercentCompleteCallback = nullptr;
-	std::function<void(double, bool)> DecryptPercentCompleteCallback = nullptr;
 
 	std::vector<HostedFileEntry> HostedFilesList;
 
@@ -113,24 +111,21 @@ public:
 	inline void SetFileRequestFailureCallback(const std::function<void(std::string, std::string)>& callback) { FileRequestFailureCallback = callback; }
 	inline void SetFileSendFailureCallback(const std::function<void(std::string)>& callback) { FileSendFailureCallback = callback; }
 	inline void SetFileRequestSuccessCallback(const std::function<void(std::string)>& callback) { FileRequestSuccessCallback = callback; }
-	inline void SetTransferPercentCompleteCallback(const std::function<void(double, double, uint64_t, uint64_t, bool)>& callback) { TransferPercentCompleteCallback = callback; }
-	inline void SetEncryptPercentCompleteCallback(const std::function<void(double, bool)>& callback) { EncryptPercentCompleteCallback = callback; }
-	inline void SetDecryptPercentCompleteCallback(const std::function<void(double, bool)>& callback) { DecryptPercentCompleteCallback = callback; }
 	inline void SetUsername(const EncryptedData& username) { EncryptedUsername = username; }
 
-	inline void AddFileEncryptTask(std::string unencryptedFileName, std::string encryptedFileName)
+	inline void AddFileEncryptTask(std::string taskName, std::string unencryptedFileName, std::string encryptedFileName)
 	{
 		assert(FileEncrypt == nullptr);
-		FileEncrypt = new FileEncryptTask(unencryptedFileName, encryptedFileName);
+		FileEncrypt = new FileEncryptTask(taskName, unencryptedFileName, encryptedFileName);
 	}
 
-	inline void AddFileDecryptTask(std::string encryptedFileName, std::string unencryptedFileName)
+	inline void AddFileDecryptTask(std::string taskName, std::string encryptedFileName, std::string unencryptedFileName)
 	{
-		assert(FileDecrypt == nullptr);
-		FileDecrypt = new FileDecryptTask(encryptedFileName, unencryptedFileName, true);
+		auto decrypt = new FileDecryptTask(taskName, encryptedFileName, unencryptedFileName, true);
+		FileDecryptList.push_back(decrypt);
 	}
 
-	inline void AddFileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false)
+	inline void AddFileSendTask(std::string fileName, std::string fileTitle, std::string filePath, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false)
 	{
 		assert(FileSend == nullptr);
 		FileSend = new FileSendTask(fileName, fileTitle, filePath, fileTypeID, fileSubTypeID, socketID, ipAddress, port, deleteAfter);
@@ -140,7 +135,7 @@ public:
 
 	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subtype);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::wstring>& fileList);
-	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID);
+	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID);
 	void ContinueFileEncryptions(void);
 	void ContinueFileTransfers(void);
 	void CancelFileSend(void);
@@ -188,7 +183,7 @@ void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::wstr
 }
 
 
-void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, int fileTypeID, int fileSubTypeID)
+void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID)
 {
 	if (FileEncrypt != nullptr) return;
 	if (FileSend != nullptr) return;
@@ -197,7 +192,7 @@ void Client::SendFileToServer(std::string fileName, std::string filePath, std::s
 	auto hostedFileName = titleMD5 + ".hostedfile";
 
 	//  Add a new FileEncryptTask to our list, so it can manage itself
-	AddFileEncryptTask(filePath, hostedFileName);
+	AddFileEncryptTask(getFilenameFromPath(filePath) , filePath, hostedFileName);
 
 	//  Add a new FileSendTask to our list, so it can manage itself (note: this will not start until the FileEncryptTask finishes
 	AddFileSendTask(fileName, fileTitle, hostedFileName, fileTypeID, fileSubTypeID, GetServerSocket(), NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
@@ -209,7 +204,9 @@ void Client::ContinueFileEncryptions(void)
 	if (FileEncrypt != nullptr)
 	{
 		auto encryptComplete = FileEncrypt->Update();
-		if (EncryptPercentCompleteCallback != nullptr) EncryptPercentCompleteCallback(FileEncrypt->EncryptionPercentage, true);
+
+		auto cryptEvent = FileCryptProgressEventData(FileEncrypt->TaskName, FileEncrypt->EncryptionPercentage, "Encrypt", "Client");
+		eventManager.BroadcastEvent(&cryptEvent);
 
 		if (encryptComplete)
 		{
@@ -222,20 +219,27 @@ void Client::ContinueFileEncryptions(void)
 		}
 	}
 
-	if (FileDecrypt != nullptr)
+	if (!FileDecryptList.empty())
 	{
-		auto decryptComplete = FileDecrypt->Update();
-		if (DecryptPercentCompleteCallback != nullptr) DecryptPercentCompleteCallback(FileDecrypt->DecryptionPercentage, false);
-
-		if (decryptComplete)
+		for (auto task = FileDecryptList.begin(); task != FileDecryptList.end(); ++task)
 		{
-			DecryptPercentCompleteCallback(1.0, false);
-			delete FileDecrypt;
-			FileDecrypt = nullptr;
+			auto decryptComplete = (*task)->Update();
+
+			auto cryptEvent = FileCryptProgressEventData((*task)->TaskName, (*task)->DecryptionPercentage, "Decrypt", "Client");
+			eventManager.BroadcastEvent(&cryptEvent);
+
+			if (decryptComplete)
+			{
+				delete (*task);
+				FileDecryptList.erase(task);
 
 #if FILE_TRANSFER_DEBUGGING
-			debugConsole->AddDebugConsoleLine("FileDecryptTask deleted...");
+				debugConsole->AddDebugConsoleLine("FileDecryptTask deleted...");
 #endif
+
+				//  Just break out and come back to this funtion next loop... don't worry about iterating over the erase
+				break;
+			}
 		}
 	}
 }
@@ -260,7 +264,10 @@ void Client::ContinueFileTransfers(void)
 	if (FileSend->GetFileTransferState() == FileSendTask::CHUNK_STATE_INITIALIZING) return;
 
 	FileSend->SetFileTransferEndTime(gameSeconds);
-	if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), false);
+
+	//  Create the file progress event, but don't broadcast yet
+	auto fileProgressEvent = FileTransferProgressEventData(FileSend->GetFileName(), FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), "Upload", "Client");
+
 
 	if (FileSend->GetFileTransferComplete())
 	{
@@ -271,11 +278,13 @@ void Client::ContinueFileTransfers(void)
 #if FILE_TRANSFER_DEBUGGING
 		debugConsole->AddDebugConsoleLine("FileSendTask deleted...");
 #endif
-		return;
 	}
 
+	//  Broadcast the progress event after checking for a complete transfer, to avoid an overlap of FileSendTasks
+	eventManager.BroadcastEvent(&fileProgressEvent);
+
 	//  If we get this far, we have data to send. Send it and continue out
-	FileSend->SendFileChunk();
+	if (FileSend != nullptr) FileSend->SendFileChunk();
 }
 
 
@@ -438,8 +447,8 @@ bool Client::ReadMessages(void)
 		auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
 
 		//  Grab the file type and sub-type
-		auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
-		auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
+		auto fileTypeID = HostedFileType(winsockWrapper.ReadUnsignedShort(0));
+		auto fileSubTypeID = HostedFileSubtype(winsockWrapper.ReadUnsignedShort(0));
 
 		//  Grab the file size, file chunk size, and buffer count
 		auto fileSize = winsockWrapper.ReadLongInt(0);
@@ -504,11 +513,13 @@ bool Client::ReadMessages(void)
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
 			FileReceive->SetFileTransferEndTime(gameSecondsF);
-			if (TransferPercentCompleteCallback != nullptr) TransferPercentCompleteCallback(FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), FileReceive->GetEstimatedSecondsRemaining(), true);
+			auto fileProgressEvent = FileTransferProgressEventData(FileReceive->GetFileTitle(), FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), FileReceive->GetEstimatedSecondsRemaining(), "Download", "Client");
+			eventManager.BroadcastEvent(&fileProgressEvent);
 
 			if (FileReceive->GetFileTransferComplete())
 			{
-				if (FileReceive->GetDecryptWhenRecieved()) AddFileDecryptTask(FileReceive->GetTemporaryFileName(), FileReceive->GetFileName());
+				if (FileReceive->GetDecryptWhenRecieved())
+					AddFileDecryptTask(FileReceive->GetFileTitle(), FileReceive->GetTemporaryFileName(), FileReceive->GetFileName());
 
 				delete FileReceive;
 				FileReceive = nullptr;

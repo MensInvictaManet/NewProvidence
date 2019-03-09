@@ -186,6 +186,9 @@
     <ClInclude Include="resource.h">
       <Filter>Resource Files</Filter>
     </ClInclude>
+    <ClInclude Include="FileTransfersDialogue.h">
+      <Filter>Header Files\Dialogues</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Shaders\FragmentShader_Basic.txt">

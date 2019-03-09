@@ -13,17 +13,11 @@ class DebugConsole : public GUIObjectNode
 {
 private:
 	DebugConsole();
-	~DebugConsole();
 
 public:
 	typedef std::function<bool(std::string)> DebugConsoleCallback;
 
-	static DebugConsole* GetInstance()
-	{
-		static auto INSTANCE = new DebugConsole;
-		guiManager.AddChild(INSTANCE);
-		return INSTANCE;
-	}
+	static DebugConsole* GetInstance() { static DebugConsole* INSTANCE = new DebugConsole; return INSTANCE; }
 
 	void SetWindowDimensions(int width, int height);
 	void SetFont(const Font* font) { m_Font = font; }
@@ -49,7 +43,7 @@ private:
 	std::unordered_map<std::string, DebugConsoleCallback> m_DebugConsoleCommands;
 };
 
-inline DebugConsole::DebugConsole() :
+DebugConsole::DebugConsole() :
 	m_WindowWidth(1),
 	m_WindowHeight(1),
 	m_Font(nullptr),
@@ -64,11 +58,6 @@ inline DebugConsole::DebugConsole() :
 	m_DebugConsoleListBox->SetSelectable(false);
 	m_DebugConsoleListBox->SetFlowToBottom(true);
 	AddChild(m_DebugConsoleListBox);
-}
-
-
-inline DebugConsole::~DebugConsole()
-{
 }
 
 inline void DebugConsole::SetWindowDimensions(int width, int height)
@@ -176,4 +165,4 @@ inline void DebugConsole::Render(int xOffset, int yOffset)
 }
 
 //  Instance to be utilized by anyone including this header
-DebugConsole* debugConsole = DebugConsole::GetInstance();
+auto debugConsole = DebugConsole::GetInstance();

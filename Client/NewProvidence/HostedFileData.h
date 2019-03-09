@@ -18,7 +18,7 @@ constexpr unsigned int hash(const char* str, int h = 0)
 	return !str[h] ? 5381 : (hash(str, h + 1) * 33) ^ str[h];
 }
 
-inline std::string GetFileTypeNameFromID(int32_t id)
+inline std::string GetFileTypeNameFromID(HostedFileType id)
 {
 	switch (id)
 	{
@@ -31,18 +31,18 @@ inline std::string GetFileTypeNameFromID(int32_t id)
 	}
 }
 
-inline int32_t GetFileTypeIDFromName(std::string name)
+inline HostedFileType GetFileTypeIDFromName(std::string name)
 {
-	std::unordered_map<std::string, int32_t> dataMap;
+	std::unordered_map<std::string, HostedFileType> dataMap;
 	dataMap["MUSIC"]	= FILETYPE_MUSIC;
 	dataMap["VIDEO"]	= FILETYPE_VIDEO;
 	dataMap["GAMES"]	= FILETYPE_GAMES;
 	dataMap["OTHER"]	= FILETYPE_OTHER;
 	dataMap["NO TYPE"]	= FILE_TYPE_COUNT;
-	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
+	return (dataMap.find(name) == dataMap.end() ? HostedFileType(-1) : dataMap[name]);
 }
 
-inline std::string GetFileSubTypeNameFromID(int32_t id)
+inline std::string GetFileSubTypeNameFromID(HostedFileSubtype id)
 {
 	switch (id)
 	{
@@ -60,9 +60,9 @@ inline std::string GetFileSubTypeNameFromID(int32_t id)
 	}
 }
 
-inline int32_t GetFileSubTypeIDFromName(std::string name)
+inline HostedFileSubtype GetFileSubTypeIDFromName(std::string name)
 {
-	std::unordered_map<std::string, int32_t> dataMap;
+	std::unordered_map<std::string, HostedFileSubtype> dataMap;
 	dataMap["MUSIC: LFHHRBTRST"]	= FILETYPE_MUSIC_LFHHRBTRST;
 	dataMap["MUSIC: EDM/DANCE"]		= FILETYPE_MUSIC_EDM_DANCE;
 	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
@@ -73,10 +73,10 @@ inline int32_t GetFileSubTypeIDFromName(std::string name)
 	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
 	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
 	dataMap["NO SUBTYPE"]			= FILE_SUBTYPE_COUNT;
-	return (dataMap.find(name) == dataMap.end() ? -1 : dataMap[name]);
+	return (dataMap.find(name) == dataMap.end() ? HostedFileSubtype(-1) : dataMap[name]);
 }
 
-inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
+inline GUIObjectNode* GetFileTypeIconFromID(HostedFileType id)
 {
 	switch (id)
 	{
@@ -88,7 +88,7 @@ inline GUIObjectNode* GetFileTypeIconFromID(int32_t id)
 	}
 }
 
-inline GUIObjectNode* GetFileSubTypeIconFromID(int32_t id)
+inline GUIObjectNode* GetFileSubTypeIconFromID(HostedFileSubtype id)
 {
 	switch (id)
 	{
@@ -109,7 +109,7 @@ std::vector<std::string> GetListOfFileTypes(void)
 {
 	std::vector<std::string> typeList;
 	for (auto i = 0; i < FILE_TYPE_COUNT; ++i)
-		typeList.push_back(GetFileTypeNameFromID(i));
+		typeList.push_back(GetFileTypeNameFromID(HostedFileType(i)));
 	return typeList;
 }
 
@@ -117,7 +117,7 @@ std::vector<std::string> GetListOfFileSubTypes(void)
 {
 	std::vector<std::string> typeList;
 	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
-		typeList.push_back(GetFileSubTypeNameFromID(i));
+		typeList.push_back(GetFileSubTypeNameFromID(HostedFileSubtype(i)));
 	return typeList;
 }
 
@@ -125,8 +125,8 @@ std::vector<std::string> GetListOfSpecificFileSubTypes(std::string typeName)
 {
 	std::vector<std::string> typeList;
 	for (auto i = 0; i < FILE_SUBTYPE_COUNT; ++i)
-		if (GetFileSubTypeNameFromID(i).compare(0, typeName.length(), typeName.c_str()) == 0)
-			typeList.push_back(GetFileSubTypeNameFromID(i));
+		if (GetFileSubTypeNameFromID(HostedFileSubtype(i)).compare(0, typeName.length(), typeName.c_str()) == 0)
+			typeList.push_back(GetFileSubTypeNameFromID(HostedFileSubtype(i)));
 	return typeList;
 }
 

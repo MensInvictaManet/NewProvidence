@@ -224,9 +224,9 @@ namespace Groundfish
 	}
 }
 
-class FileEncryptTask
+struct FileEncryptTask
 {
-private:
+	const std::string TaskName;
 	const std::string TargetFileName;
 	const std::string NewFileName;
 	const int WordListVersion;
@@ -241,10 +241,10 @@ private:
 
 	bool EncryptionComplete;
 
-public:
 	double EncryptionPercentage;
 
-	FileEncryptTask(std::string targetFileName, std::string newFileName, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+	FileEncryptTask(std::string taskName, std::string targetFileName, std::string newFileName, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+		TaskName(taskName),
 		TargetFileName(targetFileName),
 		NewFileName(newFileName),
 		WordListVersion(wordListVersion),
@@ -302,9 +302,9 @@ public:
 	}
 };
 
-class FileDecryptTask
+struct FileDecryptTask
 {
-private:
+	const std::string TaskName;
 	const std::string TargetFileName;
 	const std::string NewFileName;
 	const bool DeleteOldFile;
@@ -320,10 +320,10 @@ private:
 
 	bool DecryptionComplete;
 
-public:
 	double DecryptionPercentage;
 
-	FileDecryptTask(std::string targetFileName, std::string newFileName, const bool deleteOldFile, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+	FileDecryptTask(std::string taskName, std::string targetFileName, std::string newFileName, const bool deleteOldFile, const int wordListVersion = 0, unsigned char wordStartingIndex = 0) :
+		TaskName(taskName),
 		TargetFileName(targetFileName),
 		NewFileName(newFileName),
 		DeleteOldFile(deleteOldFile),

@@ -2,7 +2,6 @@
 
 #include "Socket.h"
 #include "SocketBuffer.h"
-#include "SimpleMD5.h"
 
 #include <windows.h>
 #include <Wininet.h>
@@ -91,8 +90,6 @@ public:
 	bool CopyBuffer(int destinationID, int sourceID);
 	bool CopyBuffer(int destinationID, int start, int len, int sourceID);
 	const char* GetMacAddress() const;
-	static const char* GetStringMD5(char* str);
-	const char* GetBufferMD5(int bufferID) const;
 	bool EncryptBuffer(char* pass, int bufferID);
 	unsigned int GetBufferAdler32(int bufferID);
 	bool GetBufferExists(int bufferID);
@@ -612,17 +609,6 @@ inline const char* WinsockWrapper::GetMacAddress() const
 
 	sprintf_s(mac_address, 31, "%02X-%02X-%02X-%02X-%02X-%02X", AdapterInfo->Address[0], AdapterInfo->Address[1], AdapterInfo->Address[2], AdapterInfo->Address[3], AdapterInfo->Address[4], AdapterInfo->Address[5]);
 	return mac_address;
-}
-
-inline const char* WinsockWrapper::GetStringMD5(char* str)
-{
-	return MD5(str).hexdigest().c_str();
-}
-
-inline const char* WinsockWrapper::GetBufferMD5(int bufferID) const
-{
-	auto buffer = m_BufferList[bufferID];
-	return MD5(buffer->m_BufferData).hexdigest().c_str();
 }
 
 inline bool WinsockWrapper::EncryptBuffer(char* pass, int bufferID)

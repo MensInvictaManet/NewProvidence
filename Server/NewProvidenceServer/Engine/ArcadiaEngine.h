@@ -299,6 +299,7 @@ inline bool InitializeEngine(const char* programTitle, float screenWidth, float 
 	//  Add the Debug Console to the GUI Manager
 	debugConsole->SetWindowDimensions(int(ScreenWidth), int(ScreenHeight));
 	AddDebugConsoleCommands();
+	guiManager.AddChild(debugConsole);
 
 	//  Initialize OpenGL
 	if (!InitializeOpenGL())

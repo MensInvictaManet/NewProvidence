@@ -14,12 +14,15 @@ public:
 	explicit GUIProgressBar(bool templated);
 	~GUIProgressBar();
 
+	inline float GetProgress(void) const { return m_Progress; }
+
 	inline void SetFont(const Font* font) { m_Font = font; }
 	inline void SetFont(std::string fontName) { SetFont(fontManager.GetFont(fontName.c_str())); }
 	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("ProgressBar", templateName, 2); }
 	inline void SetBarColor(Color color) { m_BarColor = color; }
 	inline void SetTextColor(Color color) { m_TextColor = color; }
-	inline void SetProgress(float progress) { m_Progress = progress; }
+	inline void SetProgress(float progress) { m_Progress = std::max<float>(0.0f, std::min<float>(1.0f, progress)); }
+	inline void SetShowStringWhenComplete(bool show, std::string completeString = "") { m_ShowStringWhenComplete = show; m_CompleteString = completeString; }
 
 	void Render(int xOffset = 0, int yOffset = 0) override;
 
@@ -30,6 +33,9 @@ private:
 	Color m_BarColor;
 	Color m_TextColor;
 	float m_Progress;
+
+	bool m_ShowStringWhenComplete;
+	std::string m_CompleteString;
 };
 
 inline GUIProgressBar* GUIProgressBar::CreateTemplatedProgressBar(const char* templateName, int x, int y, int w, int h)
@@ -85,7 +91,8 @@ inline void GUIProgressBar::Render(int xOffset, int yOffset)
 
 			if (m_Font != nullptr)
 			{
-				auto percentString = getDoubleStringRounded(m_Progress / 100.0, 2) + "%";
+				auto percentString = getDoubleStringRounded(m_Progress * 100.0f, 2) + "%";
+				if (m_ShowStringWhenComplete && m_Progress >= 1.0f) percentString = m_CompleteString;
 				m_Font->RenderText(percentString.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, 1.0f, 1.0f, m_TextColor);
 			}
 		}

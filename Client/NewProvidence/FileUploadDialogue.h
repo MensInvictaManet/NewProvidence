@@ -11,6 +11,7 @@
 #include "Engine/EventManager.h"
 #include "HostedFileData.h"
 #include "FileSendAndReceive.h"
+#include "FileTransfersDialogue.h"
 #include "Client.h"
 #include <string>
 
@@ -129,13 +130,13 @@ void UploadFileToServer(GUIObjectNode* object)
 	//  Get the file type and sub-type, ensuring they match
 	auto fileTypeString = ((GUILabel*)(UploadFileTypeDropDown->GetSelectedItem()))->GetText();
 	auto fileSubTypeString = ((GUILabel*)(UploadFileSubTypeDropDown->GetSelectedItem()))->GetText();
-	int fileTypeID = GetFileTypeIDFromName(fileTypeString);
-	int fileSubTypeID = GetFileSubTypeIDFromName(fileSubTypeString);
+	auto fileTypeID = HostedFileType(GetFileTypeIDFromName(fileTypeString));
+	auto fileSubTypeID = HostedFileSubtype(GetFileSubTypeIDFromName(fileSubTypeString));
 
 	//  Attempt to start an upload of the file to the server
 	SetUploadErrorMessage("", false);
-	Client& client = Client::GetInstance();
-	client.SendFileToServer(fileName, SelectedUploadFileName, fileToUploadTitle, fileTypeID, fileSubTypeID);
+	auto uploadData = FileUploadData(fileName, SelectedUploadFileName, fileToUploadTitle, fileTypeID, fileSubTypeID);
+	FileTransfersDialogue::GetInstance()->AddUploadToQueue(uploadData);
 }
 
 
@@ -153,15 +154,15 @@ public:
 	void LoadUploadMenuUI();
 	void OpenUploadMenu();
 
-	inline void SetUIVisible() { UploadMenuUINode->SetVisible(true); }
-	inline void SetUIHidden() { UploadMenuUINode->SetVisible(false); }
+	inline void SetUIVisible() { MenuUINode->SetVisible(true); }
+	inline void SetUIHidden() { MenuUINode->SetVisible(false); }
 
 	virtual void ReceiveEvent(EventData* eventData);
 
 private:
 	void LoadUploadErrorUI();
 
-	GUIObjectNode* UploadMenuUINode = nullptr;
+	GUIObjectNode* MenuUINode = nullptr;
 	GUIObjectNode* UploadErrorNode = nullptr;
 };
 
@@ -192,7 +193,7 @@ inline void FileUploadDialogue::Shutdown()
 void FileUploadDialogue::OpenUploadMenu()
 {
 	//  Make the upload UI visible
-	UploadMenuUINode->SetVisible(true);
+	MenuUINode->SetVisible(true);
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
@@ -204,49 +205,49 @@ void FileUploadDialogue::OpenUploadMenu()
 
 void FileUploadDialogue::LoadUploadMenuUI()
 {
-	if (UploadMenuUINode != nullptr) return;
-	UploadMenuUINode = GUIObjectNode::CreateObjectNode("");
-	UploadMenuUINode->SetVisible(false);
-	AddChild(UploadMenuUINode);
+	if (MenuUINode != nullptr) return;
+	MenuUINode = GUIObjectNode::CreateObjectNode("");
+	MenuUINode->SetVisible(false);
+	AddChild(MenuUINode);
 
 	LoadUploadErrorUI();
 
 	auto filesInUploadFolderLabel = GUILabel::CreateLabel("Arial-12-White", "Files In The Upload Folder:", 34, 92, 200, 20);
 	filesInUploadFolderLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(filesInUploadFolderLabel);
+	MenuUINode->AddChild(filesInUploadFolderLabel);
 
 	UploadFolderItemsListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 108, 432, 568, 414, 0, 18, 18, 18, 18, 18, 32, 2);
 	UploadFolderItemsListBox->SetColorBytes(87, 28, 87, 255);
 	UploadFolderItemsListBox->SetItemClickCallback(SelectUploadItem);
-	UploadMenuUINode->AddChild(UploadFolderItemsListBox);
+	MenuUINode->AddChild(UploadFolderItemsListBox);
 
 	UploadFileNameLabel = GUILabel::CreateLabel("Arial-12-White", "File Name:       NO FILE SELECTED", 530, 126, 200, 20);
 	UploadFileNameLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(UploadFileNameLabel);
+	MenuUINode->AddChild(UploadFileNameLabel);
 
 	auto fileTitleLabel = GUILabel::CreateLabel("Arial-12-White", "File Title:", 530, 160, 200, 20);
 	fileTitleLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(fileTitleLabel);
+	MenuUINode->AddChild(fileTitleLabel);
 
 	UploadFileTitleEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 640, 150, 600, 32);
 	UploadFileTitleEditBox->SetFont("Arial");
 	UploadFileTitleEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
 	UploadFileTitleEditBox->SetColorBytes(230, 230, 230, 255);
-	UploadMenuUINode->AddChild(UploadFileTitleEditBox);
+	MenuUINode->AddChild(UploadFileTitleEditBox);
 
 	auto fileDescriptionLabel = GUILabel::CreateLabel("Arial-12-White", "File Description:", 530, 196, 200, 20);
 	fileDescriptionLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(fileDescriptionLabel);
+	MenuUINode->AddChild(fileDescriptionLabel);
 
 	auto fileDescriptionEditBox = GUIEditBox::CreateTemplatedEditBox("Standard", 528, 218, 712, 110);
 	fileDescriptionEditBox->SetFont("Arial");
 	fileDescriptionEditBox->SetTextAlignment(GUIEditBox::ALIGN_LEFT);
 	fileDescriptionEditBox->SetColorBytes(230, 230, 230, 255);
-	UploadMenuUINode->AddChild(fileDescriptionEditBox);
+	MenuUINode->AddChild(fileDescriptionEditBox);
 
 	auto fileTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 344, 200, 20);
 	fileTypeLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(fileTypeLabel);
+	MenuUINode->AddChild(fileTypeLabel);
 
 	//  Note: Create the upload button before the drop-downs, as they overlap it and the click will otherwise go through
 	auto fileUploadButton = GUIButton::CreateTemplatedButton("Standard", 824, 470, 420, 50);
@@ -254,7 +255,7 @@ void FileUploadDialogue::LoadUploadMenuUI()
 	fileUploadButton->SetFont("Arial");
 	fileUploadButton->SetText("UPLOAD FILE");
 	fileUploadButton->SetLeftClickCallback(UploadFileToServer);
-	UploadMenuUINode->AddChild(fileUploadButton);
+	MenuUINode->AddChild(fileUploadButton);
 
 	UploadFileTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 338, 420, 40, 386, 10, 16, 16);
 	auto fileTypeX = UploadFileTypeDropDown->GetWidth() / 2;
@@ -263,15 +264,15 @@ void FileUploadDialogue::LoadUploadMenuUI()
 	for (auto iter = fileTypeList.begin(); iter != fileTypeList.end(); ++iter)
 		UploadFileTypeDropDown->AddItem(GUILabel::CreateLabel("Arial", (*iter).c_str(), fileTypeX, fileTypeY, 200, 24, UI_JUSTIFY_CENTER));
 	UploadFileTypeDropDown->SetItemSelectCallback(UpdateUploadSubTypeList);
-	UploadMenuUINode->AddChild(UploadFileTypeDropDown);
+	MenuUINode->AddChild(UploadFileTypeDropDown);
 
 	auto fileSubTypeLabel = GUILabel::CreateLabel("Arial-12-White", "File Type:", 530, 386, 200, 20);
 	fileSubTypeLabel->SetColorBytes(160, 160, 160, 255);
-	UploadMenuUINode->AddChild(fileSubTypeLabel);
+	MenuUINode->AddChild(fileSubTypeLabel);
 
 	UploadFileSubTypeDropDown = GUIDropDown::CreateTemplatedDropDown("Standard", 824, 378, 420, 40, 386, 10, 16, 16);
 	UpdateUploadSubTypeList(UploadFileSubTypeDropDown);
-	UploadMenuUINode->AddChild(UploadFileSubTypeDropDown);
+	MenuUINode->AddChild(UploadFileSubTypeDropDown);
 
 	eventManager.AddEventListener("FileDrop", this);
 }
@@ -299,7 +300,7 @@ void FileUploadDialogue::LoadUploadErrorUI()
 {
 	if (UploadErrorNode != nullptr) return;
 	UploadErrorNode = GUIObjectNode::CreateObjectNode("");
-	UploadMenuUINode->AddChild(UploadErrorNode);
+	MenuUINode->AddChild(UploadErrorNode);
 
 	//  Load the background strip behind the status bar
 	auto uploadErrorBarMiddle = 880;

@@ -385,6 +385,7 @@ public:
 		auto layerIndex = TEMPLATE_PORTIONS_COUNT * textureIndex;
 		if (cutoff)
 		{
+			if (w == 0) return;
 			auto leftWidth = std::min<int>(w, TopLeft(textureIndex)->getWidth());
 			TextureMap[layerIndex + TOP_LEFT]->RenderTexturePart(x, y, 0, 0, leftWidth, TopLeft(textureIndex)->getHeight());
 			TextureMap[layerIndex + LEFT_SIDE]->RenderTexturePart(x, y + TopLeft(textureIndex)->getHeight(), 0, 0, leftWidth, h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());

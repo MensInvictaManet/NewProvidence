@@ -188,10 +188,10 @@ inline void GUIObjectNode::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 			else if (m_TextureAnimation != nullptr)
@@ -385,6 +385,7 @@ public:
 		auto layerIndex = TEMPLATE_PORTIONS_COUNT * textureIndex;
 		if (cutoff)
 		{
+			if (w == 0) return;
 			auto leftWidth = std::min<int>(w, TopLeft(textureIndex)->getWidth());
 			TextureMap[layerIndex + TOP_LEFT]->RenderTexturePart(x, y, 0, 0, leftWidth, TopLeft(textureIndex)->getHeight());
 			TextureMap[layerIndex + LEFT_SIDE]->RenderTexturePart(x, y + TopLeft(textureIndex)->getHeight(), 0, 0, leftWidth, h - TopLeft(textureIndex)->getHeight() - BottomLeft(textureIndex)->getHeight());

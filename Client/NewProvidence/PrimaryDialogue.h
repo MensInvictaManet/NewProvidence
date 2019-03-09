@@ -11,6 +11,7 @@
 #include "Engine/StringTools.h"
 #include "HostedFileData.h"
 #include "FileUploadDialogue.h"
+#include "FileTransfersDialogue.h"
 #include <math.h>
 
 const auto MainMenuBarHeight = 40;
@@ -68,8 +69,12 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 
 void RequestLatestUploadFile(GUIObjectNode* node)
 {
+
 	auto entry = LatestUploadsListBox->GetSelectedItem();
-	SendMessage_FileRequest(entry->GetObjectName(), ClientControl.GetServerSocket(), NEW_PROVIDENCE_IP);
+	auto fileTypeIndex = HostedFileType(entry->GetChildByName("FileTypeImage")->GetZOrder());
+	auto fileSubTypeIndex = HostedFileSubtype(entry->GetChildByName("FileSubTypeImage")->GetZOrder());
+
+	FileTransfersDialogue::GetInstance()->AddDownloadToQueue(entry->GetObjectName(), fileTypeIndex, fileSubTypeIndex);
 }
 
 
@@ -96,13 +101,17 @@ void AddLatestUploadEntry(HostedFileEntry fileEntryData)
 	entry->SetObjectName(fileEntryData.FileTitle);
 
 	auto fileTypeImage = GetFileTypeIconFromID(fileEntryData.FileType);
+	fileTypeImage->SetObjectName("FileTypeImage");
 	fileTypeImage->SetDimensions(20, 20);
 	fileTypeImage->SetPosition(6, 8);
+	fileTypeImage->SetZOrder(fileEntryData.FileType);
 	entry->AddChild(fileTypeImage);
 
 	auto fileSubTypeImage = GetFileSubTypeIconFromID(fileEntryData.FileSubType);
+	fileSubTypeImage->SetObjectName("FileSubTypeImage");
 	fileSubTypeImage->SetDimensions(20, 20);
 	fileSubTypeImage->SetPosition(26, 8);
+	fileSubTypeImage->SetZOrder(fileEntryData.FileSubType);
 	entry->AddChild(fileSubTypeImage);
 
 	auto titleLabel = GUILabel::CreateLabel(fontManager.GetFont("Arial"), fileEntryData.FileTitle.c_str(), 56, 9, 100, 20);
@@ -245,8 +254,9 @@ void SetHomeMenuOpen(GUIObjectNode* button)
 	LoginMenuNode->SetVisible(false);
 	MainMenuBarUINode->SetVisible(true);
 
-	//  Make the upload UI invisible
+	//  Make the upload and transfers UI invisible
 	FileUploadDialogue::GetInstance()->SetUIHidden();
+	FileTransfersDialogue::GetInstance()->SetUIHidden();
 
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
@@ -268,8 +278,9 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 	LoginMenuNode->SetVisible(false);
 	MainMenuBarUINode->SetVisible(true);
 
-	//  Make the upload UI invisible
+	//  Make the upload and transfers UI invisible
 	FileUploadDialogue::GetInstance()->SetUIHidden();
+	FileTransfersDialogue::GetInstance()->SetUIHidden();
 
 	//  Request a new hosted file list
 	CurrentLatestUploadsStartingIndex = 0;
@@ -283,8 +294,9 @@ void SetBrowseMenuOpen(GUIObjectNode* button)
 
 void SetUploadMenuOpen(GUIObjectNode* button)
 {
-	//  Make the upload UI visible
+	//  Make the upload UI visible and the transfers UI invisible
 	FileUploadDialogue::GetInstance()->OpenUploadMenu();
+	FileTransfersDialogue::GetInstance()->SetUIHidden();
 
 	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
 	LoginMenuNode->SetVisible(false);
@@ -296,6 +308,25 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 
 	//  Run a new detection of items in the uploads folder
 	UpdateUploadFolderList();
+
+	//  Set the status bar back to default
+	SetStatusBarMessage("", false);
+}
+
+
+void SetTransfersMenuOpen(GUIObjectNode* button)
+{
+	//  Make the upload UI invisible and the transfers UI visible
+	FileUploadDialogue::GetInstance()->SetUIHidden();
+	FileTransfersDialogue::GetInstance()->OpenTransfersMenu();
+
+	//  Make the sure base UI is set for logged in users (login screen off, main menu on)
+	LoginMenuNode->SetVisible(false);
+	MainMenuBarUINode->SetVisible(true);
+
+	//  Make the latest uploads UI invisible
+	HostedFileListUINode->SetVisible(false);
+	SearchFilterUINode->SetVisible(false);
 
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
@@ -317,48 +348,6 @@ void ShiftLatestUploadsRight(GUIObjectNode* object)
 	auto usernameSize = ClientControl.GetUsername().size();
 	RequestHostedFileList(CurrentLatestUploadsStartingIndex + 20);
 	UpdateUploadsRangeString();
-}
-
-
-void SetCryptPercentage(double percent, bool encryption)
-{
-	std::string type = (encryption ? "Encryption" : "Decryption");
-
-	if (percent >= 1.0)
-	{
-		StatusBarTransferFill->SetVisible(false);
-		SetStatusBarMessage(type + " completed.", false);
-	}
-	else
-	{
-		StatusBarTransferFill->SetVisible(true);
-		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
-		SetStatusBarMessage(type + " is " + getDoubleStringRounded(percent * 100.0, 2) + "% complete", false);
-	}
-}
-
-
-void SetTransferPercentage(double percent, double time, uint64_t fileSize, uint64_t timeRemaining, bool download)
-{
-	int averageKBs = int((double(fileSize) / 1024.0) / time);
-
-	std::string transferType = (download ? "Download" : "Upload");
-
-	if (percent >= 1.0f)
-	{
-		StatusBarTransferFill->SetVisible(false);
-		SetStatusBarMessage(transferType + " completed in " + std::to_string(int(time)) + " seconds (avg " + std::to_string(averageKBs) + " KB/s)", false);
-	}
-	else
-	{
-		auto minutesRemaining = timeRemaining / 60;
-		auto secondsRemaining = timeRemaining % 60;
-		auto timeString = (minutesRemaining != 0) ? (std::to_string(minutesRemaining) + " minutes") : std::to_string(secondsRemaining) + " seconds";
-
-		StatusBarTransferFill->SetVisible(true);
-		StatusBarTransferFill->SetWidth(int(float(percent) * ScreenWidth));
-		SetStatusBarMessage(transferType + " " + getDoubleStringRounded(percent * 100.0, 2) + "% complete (est. " + timeString + " remaining)", false);
-	}
 }
 
 
@@ -472,8 +461,6 @@ private:
 	//  Login Menu objects
 	GUIButton* LoginButton			= nullptr;
 	GUIObjectNode* ConnectedIcon	= nullptr;
-
-	FileUploadDialogue* FileUploadUI = FileUploadDialogue::GetInstance();
 
 	enum ConnectionStatus { CONNECTION_STATUS_NO_CONNECTION, CONNECTION_STATUS_CANNOT_CONNECT, CONNECTION_STATUS_CONNECTED };
 	ConnectionStatus ClientConnected = CONNECTION_STATUS_NO_CONNECTION;
@@ -662,8 +649,9 @@ void PrimaryDialogue::LoadLoginMenu()
 
 void PrimaryDialogue::LoadMainMenuBarUI()
 {
-	//  Load the File Upload Dialogue
-	AddChild(FileUploadUI);
+	//  Load the File Upload Dialogue and the File Transfers
+	AddChild(FileUploadDialogue::GetInstance());
+	AddChild(FileTransfersDialogue::GetInstance());
 
 	//  Create the individual UI pieces
 	LoadHostedFileListUI();
@@ -677,9 +665,6 @@ void PrimaryDialogue::LoadMainMenuBarUI()
 	ClientControl.SetFileRequestFailureCallback(FileRequestFailureCallback);
 	ClientControl.SetFileSendFailureCallback(FileSendFailureCallback);
 	ClientControl.SetFileRequestSuccessCallback(FileRequestSucceeded);
-	ClientControl.SetTransferPercentCompleteCallback(SetTransferPercentage);
-	ClientControl.SetEncryptPercentCompleteCallback(SetCryptPercentage);
-	ClientControl.SetDecryptPercentCompleteCallback(SetCryptPercentage);
 }
 
 void PrimaryDialogue::LoadSideBarUI()
@@ -712,13 +697,13 @@ void PrimaryDialogue::LoadSideBarUI()
 	MainMenuBarUINode->AddChild(homeButtonText);
 
 	//  Load the main menu divider text between HOME and BROWSE
-	auto dividerLabel_1 = GUILabel::CreateLabel("Arial-12-White", "||", 110, 12, 100, 20, UI_JUSTIFY_CENTER);
+	auto dividerLabel_1 = GUILabel::CreateLabel("Arial-12-White", "||", 104, 12, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(dividerLabel_1);
 
 	//  Load the main menu "Browse" button
 	auto browseButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
 	browseButton->SetColorBytes(0, 0, 0, 1);
-	browseButton->SetPosition(125, 5);
+	browseButton->SetPosition(119, 5);
 	browseButton->SetDimensions(80, 28);
 	browseButton->SetLeftClickCallback(SetBrowseMenuOpen);
 	MainMenuBarUINode->AddChild(browseButton);
@@ -727,17 +712,17 @@ void PrimaryDialogue::LoadSideBarUI()
 #endif
 
 	//  Load the main menu "Browse" button text
-	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 165, 14, 100, 20, UI_JUSTIFY_CENTER);
+	auto browseButtonText = GUILabel::CreateLabel("Arial-12-White", "BROWSE", 159, 14, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(browseButtonText);
 
 	//  Load the main menu divider text between BROWSE and UPLOAD
-	auto dividerLabel_2 = GUILabel::CreateLabel("Arial-12-White", "||", 217, 12, 100, 20, UI_JUSTIFY_CENTER);
+	auto dividerLabel_2 = GUILabel::CreateLabel("Arial-12-White", "||", 213, 12, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(dividerLabel_2);
 
 	//  Load the main menu "Upload" button
 	auto uploadButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
 	uploadButton->SetColorBytes(0, 0, 0, 1);
-	uploadButton->SetPosition(232, 5);
+	uploadButton->SetPosition(225, 5);
 	uploadButton->SetDimensions(80, 28);
 	uploadButton->SetLeftClickCallback(SetUploadMenuOpen);
 	MainMenuBarUINode->AddChild(uploadButton);
@@ -746,8 +731,27 @@ void PrimaryDialogue::LoadSideBarUI()
 #endif
 
 	//  Load the main menu "Upload" button text
-	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 272, 14, 100, 20, UI_JUSTIFY_CENTER);
+	auto uploadButtonText = GUILabel::CreateLabel("Arial-12-White", "UPLOAD", 265, 14, 100, 20, UI_JUSTIFY_CENTER);
 	MainMenuBarUINode->AddChild(uploadButtonText);
+
+	//  Load the main menu divider text between BROWSE and UPLOAD
+	auto dividerLabel_3 = GUILabel::CreateLabel("Arial-12-White", "||", 318, 12, 100, 20, UI_JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(dividerLabel_3);
+
+	//  Load the main menu "Upload" button
+	auto transfersButton = GUIButton::CreateButton("./Assets/Textures/Pixel_White.png");
+	transfersButton->SetColorBytes(0, 0, 0, 1);
+	transfersButton->SetPosition(332, 5);
+	transfersButton->SetDimensions(110, 28);
+	transfersButton->SetLeftClickCallback(SetTransfersMenuOpen);
+	MainMenuBarUINode->AddChild(transfersButton);
+#ifdef _DEBUG //  Show the button area in debug mode
+	transfersButton->SetColorBytes(0, 0, 0, 50);
+#endif
+
+	//  Load the main menu "Transfers" button text
+	auto transfersButtonText = GUILabel::CreateLabel("Arial-12-White", "TRANSFERS", 387, 14, 100, 20, UI_JUSTIFY_CENTER);
+	MainMenuBarUINode->AddChild(transfersButtonText);
 }
 
 

@@ -47,7 +47,7 @@ private:
 	inline void UpdateExpandedHeight() { ExpandedHeight = static_cast<unsigned int>(m_ItemList.size()) * m_Height + (m_Templated ? (m_TemplateBox.TopSide(0)->getHeight() + m_TemplateBox.BottomSide(0)->getHeight()) : 0); }
 };
 
-inline GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, int y, int w, int h)
+GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, int y, int w, int h)
 {
 	MANAGE_MEMORY_NEW("MenuUI_Dropdown", sizeof(GUIDropDown));
 	auto newDropDown = new GUIDropDown(false);
@@ -57,7 +57,7 @@ inline GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, in
 	return newDropDown;
 }
 
-inline GUIDropDown* GUIDropDown::CreateTemplatedDropDown(const char* templateName, int x, int y, int w, int h, int dropDownX, int dropDownY, int dropDownW, int dropDownH)
+GUIDropDown* GUIDropDown::CreateTemplatedDropDown(const char* templateName, int x, int y, int w, int h, int dropDownX, int dropDownY, int dropDownW, int dropDownH)
 {
 	MANAGE_MEMORY_NEW("MenuUI_Dropdown", sizeof(GUIDropDown));
 	auto newDropDown = new GUIDropDown(true);
@@ -98,13 +98,13 @@ inline GUIDropDown::GUIDropDown(bool templated) :
 }
 
 
-inline GUIDropDown::~GUIDropDown()
+GUIDropDown::~GUIDropDown()
 {
 	MANAGE_MEMORY_DELETE("MenuUI_Dropdown", sizeof(GUIDropDown));
 }
 
 
-inline void GUIDropDown::Input(int xOffset, int yOffset)
+void GUIDropDown::Input(int xOffset, int yOffset)
 {
 	if (m_SetToDestroy || !m_Visible) return;
 
@@ -151,7 +151,7 @@ inline void GUIDropDown::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void GUIDropDown::Render(int xOffset, int yOffset)
+void GUIDropDown::Render(int xOffset, int yOffset)
 {
 	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
 
@@ -199,7 +199,7 @@ inline void GUIDropDown::Render(int xOffset, int yOffset)
 	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }
 
-inline void GUIDropDown::SetToDestroy(std::stack<GUIObjectNode*>& destroyList)
+void GUIDropDown::SetToDestroy(std::stack<GUIObjectNode*>& destroyList)
 {
 	//  Pass the 'set to destroy' call to all items in item list
 	for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) (*iter)->SetToDestroy(destroyList);

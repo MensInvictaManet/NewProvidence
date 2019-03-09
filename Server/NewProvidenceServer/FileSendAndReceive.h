@@ -2,17 +2,19 @@
 
 #include <thread>
 #include <filesystem>
-#include "MessageIdentifiers.h"
 #include "Engine/WinsockWrapper.h"
+#include "MessageIdentifiers.h"
+#include "Groundfish.h"
+#include "HostedFileData.h"
 
 
-constexpr auto FILE_CHUNK_SIZE				= 1024;
-constexpr auto FILE_CHUNK_BUFFER_COUNT		= 500;
-constexpr auto FILE_SEND_BUFFER_SIZE		= (FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT);
-constexpr auto PORTION_COMPLETE_REMIND_TIME	= 0.1;
+constexpr auto FILE_CHUNK_SIZE = 1024;
+constexpr auto FILE_CHUNK_BUFFER_COUNT = 500;
+constexpr auto FILE_SEND_BUFFER_SIZE = (FILE_CHUNK_SIZE * FILE_CHUNK_BUFFER_COUNT);
+constexpr auto PORTION_COMPLETE_REMIND_TIME = 0.1;
 
-constexpr auto UPLOAD_TITLE_MAX_LENGTH		= 40;
-constexpr auto ENCRYPTED_TITLE_MAX_SIZE		= (UPLOAD_TITLE_MAX_LENGTH + 9);
+constexpr auto UPLOAD_TITLE_MAX_LENGTH = 40;
+constexpr auto ENCRYPTED_TITLE_MAX_SIZE = (UPLOAD_TITLE_MAX_LENGTH + 9);
 
 #define FILE_TRANSFER_DEBUGGING				0
 #if FILE_TRANSFER_DEBUGGING
@@ -20,7 +22,7 @@ constexpr auto ENCRYPTED_TITLE_MAX_SIZE		= (UPLOAD_TITLE_MAX_LENGTH + 9);
 #endif
 
 
-void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, uint64_t fileSize, int socket, const char* ip, const int port)
+void SendMessage_FileSendInitializer(std::string fileName, std::string fileTitle, std::string fileDescription, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID, uint64_t fileSize, int socket, const char* ip, const int port)
 {
 	//  Encrypt the file name, title, and description string using Groundfish
 	EncryptedData encryptedFilename = Groundfish::Encrypt(fileName.c_str(), int(fileName.length()), 0, rand() % 256);
@@ -139,8 +141,8 @@ private:
 	const std::string FileName;
 	const std::string FileTitle;
 	const std::string FilePath;
-	const int FileTypeID;
-	const int FileSubTypeID;
+	const HostedFileType FileTypeID;
+	const HostedFileSubtype FileSubTypeID;
 	const int SocketID;
 	const std::string IPAddress;
 	const int ConnectionPort;
@@ -178,7 +180,7 @@ public:
 	inline uint64_t GetFilePortionsRemaining() const { return (FilePortionCount - FilePortionIndex); }
 	inline uint64_t GetEstimatedSecondsRemaining() const { auto estimate = GetEstimatedTransferSpeed(); return ((estimate == 0) ? 100 : uint64_t(double(GetFilePortionsRemaining() * FILE_SEND_BUFFER_SIZE) / GetEstimatedTransferSpeed())); }
 
-	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, int fileTypeID, int fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false) :
+	FileSendTask(std::string fileName, std::string fileTitle, std::string filePath, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID, int socketID, std::string ipAddress, const int port, bool deleteAfter = false) :
 		FileSendStarted(false),
 		FileName(fileName),
 		FileTitle(fileTitle),
@@ -333,14 +335,15 @@ public:
 	}
 };
 
+
 class FileReceiveTask
 {
 private:
 	const std::string FileName;
 	const std::string FileTitle;
 	const std::string FileDescription;
-	const int32_t FileTypeID;
-	const int32_t FileSubTypeID;
+	const HostedFileType FileTypeID;
+	const HostedFileSubtype FileSubTypeID;
 
 	const uint64_t FileSize;
 	const uint64_t FileChunkSize;
@@ -370,8 +373,8 @@ public:
 	inline std::string GetFileName() const { return FileName; }
 	inline std::string GetFileTitle() const { return FileTitle; }
 	inline std::string GetFileDescription() const { return FileDescription; }
-	inline int32_t GetFileTypeID() const { return FileTypeID; }
-	inline int32_t GetFileSubTypeID() const { return FileSubTypeID; }
+	inline HostedFileType GetFileTypeID() const { return FileTypeID; }
+	inline HostedFileSubtype GetFileSubTypeID() const { return FileSubTypeID; }
 	inline uint64_t GetFileSize() const { return FileSize; }
 	inline bool GetFileTransferComplete() const { return FileTransferComplete; }
 	inline bool GetDecryptWhenRecieved() const { return DecryptWhenReceived; }
@@ -396,7 +399,7 @@ public:
 		outputFile.close();
 	}
 
-	FileReceiveTask(std::string fileName, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, uint64_t fileSize, uint64_t fileChunkSize, uint64_t fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
+	FileReceiveTask(std::string fileName, std::string fileTitle, std::string fileDescription, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID, uint64_t fileSize, uint64_t fileChunkSize, uint64_t fileChunkBufferCount, std::string tempFilePath, int socketID, std::string ipAddress, const int port) :
 		FileName(fileName),
 		FileTitle(fileTitle),
 		FileDescription(fileDescription),
@@ -441,7 +444,7 @@ public:
 
 	~FileReceiveTask()
 	{
-		FileStream.close();
+		if (FileStream.is_open()) FileStream.close();
 	}
 
 

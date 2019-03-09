@@ -41,6 +41,7 @@ public:
 	inline int GetSpaceBetweenEntries() const { return SpaceBetweenEntries; }
 	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("ListBox", templateName, 1); SetListboxTemplateData(templateName); }
 
+	inline GUIObjectNode* GetItemByName(std::string objectName);
 	inline void SetTemplateData(int dirButtonsX, int contentY, int upButtonW, int upButtonH, int downButtonW, int downButtonH, int barColumnW);
 	inline void SetListboxTemplateData(std::string templateName);
 
@@ -288,10 +289,10 @@ inline void GUIListBox::Render(int xOffset, int yOffset)
 				glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 				glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
+					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
+					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
+					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
 				glEnd();
 			}
 		}
@@ -350,6 +351,16 @@ inline void GUIListBox::SetToDestroy(std::stack<GUIObjectNode*>& destroyList)
 	for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter) (*iter)->SetToDestroy(destroyList);
 
 	GUIObjectNode::SetToDestroy(destroyList);
+}
+
+
+inline GUIObjectNode* GUIListBox::GetItemByName(std::string objectName)
+{
+	for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter)
+		if ((*iter)->GetObjectName() == objectName)
+			return (*iter);
+
+	return nullptr;
 }
 
 inline void GUIListBox::SetTemplateData(int dirButtonsX, int contentY, int upButtonW, int upButtonH, int downButtonW, int downButtonH, int barColumnW)

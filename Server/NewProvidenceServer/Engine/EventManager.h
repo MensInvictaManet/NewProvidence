@@ -9,6 +9,7 @@ struct EventData
 	std::string EventType;
 	std::string EventSender;
 	EventData(std::string type, std::string sender) : EventType(type), EventSender(sender) {}
+	virtual ~EventData() {}
 };
 
 class EventListener
@@ -65,12 +66,47 @@ EventManager& eventManager = EventManager::GetInstance();
 ///// Basic Events All Projects Can Use
 struct FileDropEventData : public EventData
 {
-	std::string File;
-	bool IsFolder;
+	std::string		File;
+	bool			IsFolder;
 
 	FileDropEventData(std::string file, bool isFolder, std::string sender) :
 		EventData::EventData("FileDrop", sender),
 		File(file),
 		IsFolder(isFolder)
+	{}
+};
+
+struct FileTransferProgressEventData : public EventData
+{
+	std::string		FileTitle;
+	double			Progress;
+	double			TotalTime;
+	uint64_t		FileSize;
+	uint64_t		TimeRemaining;
+	std::string		TransferType;
+
+	FileTransferProgressEventData(std::string fileTitle, double progress, double totalTime, uint64_t fileSize, uint64_t timeRemaining, std::string transferType, std::string sender) :
+		EventData::EventData("FileTransferProgress", sender),
+		FileTitle(fileTitle),
+		Progress(progress),
+		TotalTime(totalTime),
+		FileSize(fileSize),
+		TimeRemaining(timeRemaining),
+		TransferType(transferType)
+	{}
+};
+
+struct FileCryptProgressEventData : public EventData
+{
+	std::string		FileTitle;
+	double			Progress;
+	double			TotalTime;
+	std::string		CryptType;
+
+	FileCryptProgressEventData(std::string fileTitle, double progress, std::string cryptType, std::string sender) :
+		EventData::EventData("FileCryptProgress", sender),
+		FileTitle(fileTitle),
+		Progress(progress),
+		CryptType(cryptType)
 	{}
 };

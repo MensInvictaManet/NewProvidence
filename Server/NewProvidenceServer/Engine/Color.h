@@ -24,6 +24,9 @@ struct Color
 	};
 };
 
+inline bool operator==(const Color& lhs, const Color& rhs) { return ((lhs.R == rhs.R) && (lhs.G == rhs.G) && (lhs.B == rhs.B) && (lhs.A == rhs.A)); }
+inline bool operator!=(const Color& lhs, const Color& rhs) { return ((lhs.R != rhs.R) || (lhs.G != rhs.G) || (lhs.B != rhs.B) || (lhs.A != rhs.A)); }
+
 static Color COLOR_WHITE(1.0f, 1.0f, 1.0f, 1.0f);
 static Color COLOR_WHITE_FADED(1.0f, 1.0f, 1.0f, 0.25f);
 static Color COLOR_RED(1.0f, 0.0f, 0.0f, 1.0f);
