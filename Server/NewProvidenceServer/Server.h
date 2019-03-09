@@ -723,8 +723,8 @@ void Server::ReceiveMessages(void)
 				auto decryptedFileDescription = Groundfish::DecryptToString(winsockWrapper.ReadChars(0, fileDescriptionSize));
 
 				//  grab the file type and sub type
-				auto fileTypeID = winsockWrapper.ReadUnsignedShort(0);
-				auto fileSubTypeID = winsockWrapper.ReadUnsignedShort(0);
+				auto fileTypeID = HostedFileType(winsockWrapper.ReadUnsignedShort(0));
+				auto fileSubTypeID = HostedFileSubtype(winsockWrapper.ReadUnsignedShort(0));
 
 				//  Grab the file size, file chunk size, and buffer count
 				auto fileSize = winsockWrapper.ReadLongInt(0);
