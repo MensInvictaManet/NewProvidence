@@ -268,7 +268,6 @@ void Client::ContinueFileTransfers(void)
 	//  Create the file progress event, but don't broadcast yet
 	auto fileProgressEvent = FileTransferProgressEventData(FileSend->GetFileTitle(), FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), "Upload", "Client");
 
-
 	if (FileSend->GetFileTransferComplete())
 	{
 		//  If the file send is complete, delete the file send task and move on
@@ -513,8 +512,6 @@ bool Client::ReadMessages(void)
 		if (FileReceive->CheckFilePortionComplete(portionIndex))
 		{
 			FileReceive->SetFileTransferEndTime(gameSecondsF);
-			auto fileProgressEvent = FileTransferProgressEventData(FileReceive->GetFileTitle(), FileReceive->GetPercentageComplete(), FileReceive->GetTransferTime(), FileReceive->GetFileSize(), FileReceive->GetEstimatedSecondsRemaining(), "Download", "Client");
-			eventManager.BroadcastEvent(&fileProgressEvent);
 
 			if (FileReceive->GetFileTransferComplete())
 			{

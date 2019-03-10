@@ -361,6 +361,7 @@ private:
 	uint64_t FilePortionCount;
 	std::unordered_map<uint64_t, bool> FileChunksToReceive;
 	std::ofstream FileStream;
+	uint64_t CurrentPortionChunkCount;
 
 	double TransferStartTime;
 	double TransferEndTime;
@@ -380,7 +381,8 @@ public:
 	inline bool GetDecryptWhenRecieved() const { return DecryptWhenReceived; }
 	inline uint64_t GetFileSendBufferSize() const { return FileChunkSize * FileChunkBufferCount; }
 	inline std::string GetTemporaryFileName() const { return TempFileName; }
-	inline double GetPercentageComplete() const { return double(FilePortionIndex * GetFileSendBufferSize()) / double(FileSize); }
+	inline double GetPortionPartComplete() const { return double(CurrentPortionChunkCount - FileChunksToReceive.size()) / double(CurrentPortionChunkCount); }
+	inline double GetPercentageComplete() const { return (double(FilePortionIndex) + GetPortionPartComplete()) * double(GetFileSendBufferSize()) / double(FileSize); }
 	inline void SetFileTransferEndTime(double endTime) { TransferEndTime = endTime; }
 	inline double GetTransferTime() { return TransferEndTime - TransferStartTime; }
 	inline uint64_t GetFileTransferBytesCompleted() const { return (FilePortionIndex * GetFileSendBufferSize()); }
@@ -389,7 +391,9 @@ public:
 	inline uint64_t GetEstimatedSecondsRemaining() const { return uint64_t(double(GetFilePortionsRemaining() * GetFileSendBufferSize()) / GetEstimatedTransferSpeed()); }
 
 	inline void SetDecryptWhenReceived(bool decrypt) { DecryptWhenReceived = decrypt; }
-	inline void ResetChunksToReceiveMap(uint64_t chunkCount) { FileChunksToReceive.clear(); for (auto i = 0; i < int(chunkCount); ++i)  FileChunksToReceive[i] = true; }
+	inline void ResetChunksToReceiveMap(uint64_t chunkCount) {
+		FileChunksToReceive.clear(); for (auto i = 0; i < int(chunkCount); ++i)  FileChunksToReceive[i] = true; CurrentPortionChunkCount = chunkCount;
+	}
 
 	inline void CreateTemporaryFile(const std::string tempFileName, const uint64_t tempFileSize) const {
 		std::ofstream outputFile(tempFileName, std::ios::binary | std::ios::trunc | std::ios_base::beg);
@@ -408,6 +412,7 @@ public:
 		FileSize(fileSize),
 		FileChunkSize(fileChunkSize),
 		FileChunkBufferCount(fileChunkBufferCount),
+		CurrentPortionChunkCount(fileChunkBufferCount),
 		TempFileName(tempFilePath),
 		SocketID(socketID),
 		IPAddress(ipAddress),
@@ -489,6 +494,10 @@ public:
 
 		//  Remove the chunk index from the list of chunks to receive, and return out
 		FileChunksToReceive.erase(iter);
+
+		auto fileProgressEvent = FileTransferProgressEventData(GetFileTitle(), GetPercentageComplete(), GetTransferTime(), GetFileSize(), GetEstimatedSecondsRemaining(), "Download", "FileSendAndReceive");
+		eventManager.BroadcastEvent(&fileProgressEvent);
+
 		return false;
 	}
 
