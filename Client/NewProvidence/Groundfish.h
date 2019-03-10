@@ -338,7 +338,10 @@ struct FileDecryptTask
 
 		//  Open the new file, and ensure it is a valid file
 		FileStreamOut = std::ofstream(NewFileName, std::ios_base::binary);
-		assert(FileStreamOut.good() && !FileStreamOut.bad());
+		if (!FileStreamOut.good() || FileStreamOut.bad())
+		{
+			debugConsole->AddDebugConsoleLine("Attempted to open " + NewFileName + " for writing, but failed. Did you have the file open?");
+		}
 
 		//  Write out the file information for the output file
 		FileStreamIn.read((char*)&WordListVersion, sizeof(WordListVersion));
@@ -348,6 +351,7 @@ struct FileDecryptTask
 
 	bool Update()
 	{
+		if (!FileStreamOut.good() || FileStreamOut.bad()) return true;
 		if (DecryptionComplete) return true;
 
 		uint64_t bytesToRead = 0;
@@ -373,6 +377,16 @@ struct FileDecryptTask
 		FileStreamOut.write((char*)readArray, bytesToRead);
 
 		DecryptionPercentage = double(BytesRead) / double(FileInSize);
+
+		//  Check once again... If there is no more information to read, we're done decrypting
+		if (FileStreamIn.eof() || BytesRead == FileInSize)
+		{
+			FileStreamIn.close();
+			FileStreamOut.close();
+			if (DeleteOldFile) std::filesystem::remove(TargetFileName.c_str());
+			DecryptionComplete = true;
+			return true;
+		}
 
 		return false;
 	}

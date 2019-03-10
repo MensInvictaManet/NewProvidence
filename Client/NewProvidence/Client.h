@@ -192,7 +192,7 @@ void Client::SendFileToServer(std::string fileName, std::string filePath, std::s
 	auto hostedFileName = titleMD5 + ".hostedfile";
 
 	//  Add a new FileEncryptTask to our list, so it can manage itself
-	AddFileEncryptTask(getFilenameFromPath(filePath) , filePath, hostedFileName);
+	AddFileEncryptTask(fileTitle, filePath, hostedFileName);
 
 	//  Add a new FileSendTask to our list, so it can manage itself (note: this will not start until the FileEncryptTask finishes
 	AddFileSendTask(fileName, fileTitle, hostedFileName, fileTypeID, fileSubTypeID, GetServerSocket(), NEW_PROVIDENCE_IP, NEW_PROVIDENCE_PORT, true);
@@ -266,7 +266,7 @@ void Client::ContinueFileTransfers(void)
 	FileSend->SetFileTransferEndTime(gameSeconds);
 
 	//  Create the file progress event, but don't broadcast yet
-	auto fileProgressEvent = FileTransferProgressEventData(FileSend->GetFileName(), FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), "Upload", "Client");
+	auto fileProgressEvent = FileTransferProgressEventData(FileSend->GetFileTitle(), FileSend->GetPercentageComplete(), FileSend->GetTransferTime(), FileSend->GetFileSize(), FileSend->GetEstimatedSecondsRemaining(), "Upload", "Client");
 
 
 	if (FileSend->GetFileTransferComplete())

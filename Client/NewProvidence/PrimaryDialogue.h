@@ -69,7 +69,6 @@ void SetStatusBarMessage(std::string statusBarMessage, bool error = false)
 
 void RequestLatestUploadFile(GUIObjectNode* node)
 {
-
 	auto entry = LatestUploadsListBox->GetSelectedItem();
 	auto fileTypeIndex = HostedFileType(entry->GetChildByName("FileTypeImage")->GetZOrder());
 	auto fileSubTypeIndex = HostedFileSubtype(entry->GetChildByName("FileSubTypeImage")->GetZOrder());

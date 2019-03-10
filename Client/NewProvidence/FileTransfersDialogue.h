@@ -86,7 +86,7 @@ public:
 	void RemoveUploadFromQueue(std::string fileTitle);
 
 	std::string GetDownloadByIndex(uint32_t entryIndex);
-	void UpdateDownload(std::string downloadName, double progress, Color& barColor);
+	bool UpdateDownload(std::string downloadName, double progress, Color& barColor);
 	std::string GetUploadByIndex(uint32_t entryIndex);
 	void UpdateUpload(std::string downloadName, double progress, Color& barColor);
 
@@ -201,10 +201,10 @@ void FileTransfersDialogue::AddUploadToQueue(FileUploadData& uploadData)
 		Client::GetInstance().SendFileToServer(uploadData.FileName, uploadData.FilePath, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
 
 	//  Add an entry in the QueuedUploads map and list
-	QueuedUploadsMap[uploadData.FileName] = uploadData;
-	QueuedUploadsList.push_back(uploadData.FileName);
+	QueuedUploadsMap[uploadData.FileTitle] = uploadData;
+	QueuedUploadsList.push_back(uploadData.FileTitle);
 
-	AddUploadToQueueUI(uploadData.FileName, uploadData.FileTypeID, uploadData.FileSubTypeID);
+	AddUploadToQueueUI(uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
 }
 
 void FileTransfersDialogue::RemoveDownloadFromQueue(std::string fileTitle)
@@ -223,7 +223,7 @@ void FileTransfersDialogue::RemoveDownloadFromQueue(std::string fileTitle)
 		}
 	}
 
-	//RemoveDownloadFromQueueUI(fileTitle);
+	RemoveDownloadFromQueueUI(fileTitle);
 }
 
 void FileTransfersDialogue::RemoveUploadFromQueue(std::string fileTitle)
@@ -253,20 +253,20 @@ std::string FileTransfersDialogue::GetDownloadByIndex(uint32_t entryIndex)
 }
 
 
-void FileTransfersDialogue::UpdateDownload(std::string entryName, double progress, Color& barColor)
+bool FileTransfersDialogue::UpdateDownload(std::string entryName, double progress, Color& barColor)
 {
 	auto entry = DownloadQueueListBox->GetItemByName(entryName);
 	if (entry == nullptr)
 	{
-		debugConsole->AddDebugConsoleLine("Attempted to update download (" + entryName + ") but could not find it");
-		return;
+		debugConsole->AddDebugConsoleLine("Attempted to update download (" + entryName + ") but could not find it [" + getDoubleStringRounded(progress * 100, 2) + "%]");
+		return false;
 	}
 
 	auto progressBar = static_cast<GUIProgressBar*>(entry->GetChildByName("ProgressBar"));
 	if (progressBar == nullptr)
 	{
 		debugConsole->AddDebugConsoleLine("Attempted to update download (" + entryName + ") but could not locate it's ProgressBar");
-		return;
+		return false;
 	}
 
 	if (progressBar->GetProgress() != float(progress))
@@ -284,6 +284,8 @@ void FileTransfersDialogue::UpdateDownload(std::string entryName, double progres
 				debugConsole->AddDebugConsoleLine("Attempting to begin the next queued download");
 			}
 		}
+
+		return true;
 	}
 }
 
@@ -315,14 +317,24 @@ void FileTransfersDialogue::UpdateUpload(std::string entryName, double progress,
 	progressBar->SetVisible(true);
 	progressBar->SetProgress(float(progress));
 
+	//  TODO: Fix this using the events system...
 	if (progress >= 1.0 && barColor == COLOR_GREEN)
 	{
 		this->RemoveUploadFromQueue(entryName);
-		if (!QueuedUploadsList.empty())
+		for (auto iter = QueuedUploadsList.begin(); iter != QueuedUploadsList.end();)
 		{
-			auto uploadData = QueuedUploadsMap[QueuedUploadsList[0]];
+			if (QueuedUploadsMap.find((*iter)) == QueuedUploadsMap.end())
+			{
+				debugConsole->AddDebugConsoleLine("Item \"" + (*iter) + " not found in QueuedUploadsMap");
+				this->RemoveUploadFromQueueUI((*iter));
+				iter = QueuedUploadsList.erase(iter);
+				continue;
+			}
+
+			auto uploadData = QueuedUploadsMap[(*iter)];
 			Client::GetInstance().SendFileToServer(uploadData.FileName, uploadData.FilePath, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
 			debugConsole->AddDebugConsoleLine("Attempting to begin the next queued upload");
+			break;
 		}
 	}
 }
@@ -381,10 +393,11 @@ void FileTransfersDialogue::AddDownloadToQueueUI(std::string fileTitle, HostedFi
 
 void FileTransfersDialogue::RemoveDownloadFromQueueUI(std::string fileTitle)
 {
-	auto listing = DownloadQueueListBox->GetChildByName(fileTitle);
+	auto listing = DownloadQueueListBox->GetItemByName(fileTitle);
 	if (listing == nullptr) return;
 
-	DownloadQueueListBox->RemoveItem(listing);
+	listing->SetObjectName("");
+	//DownloadQueueListBox->RemoveItem(listing);
 }
 
 
@@ -426,10 +439,11 @@ void FileTransfersDialogue::AddUploadToQueueUI(std::string fileTitle, HostedFile
 
 void FileTransfersDialogue::RemoveUploadFromQueueUI(std::string fileTitle)
 {
-	auto listing = UploadQueueListBox->GetChildByName(fileTitle);
+	auto listing = UploadQueueListBox->GetItemByName(fileTitle);
 	if (listing == nullptr) return;
 
-	UploadQueueListBox->RemoveItem(listing);
+	listing->SetObjectName("");
+	//UploadQueueListBox->RemoveItem(listing);
 }
 
 
