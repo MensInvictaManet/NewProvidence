@@ -39,8 +39,8 @@ public:
 	inline bool GetSelected() const { return m_Selected; }
 	inline void SetSelected(bool selected) { m_Selected = selected; }
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 private:
 	GUIFunctionCallback m_EnterKeyCallback;
@@ -160,35 +160,18 @@ inline void GUIEditBox::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void GUIEditBox::Render(int xOffset, int yOffset)
+inline void GUIEditBox::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && m_Width > 0 && m_Height > 0)
+	if (m_Width > 0 && m_Height > 0)
 	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-
 		if (m_Templated)
 		{
 			auto pressedIndex = (m_Selected ? 1 : 0);
-
 			m_TemplateBox.Render(pressedIndex, x, y, m_Width, m_Height);
 		}
 		else if (m_TextureID != 0)
 		{
-			glBindTexture(GL_TEXTURE_2D, m_TextureID);
-
-			auto pressedWidthDelta = m_Selected ? int(m_Width * 0.05f) : 0;
-			auto pressedHeightDelta = m_Selected ? int(m_Height * 0.05f) : 0;
-
-			glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex2i(x + pressedWidthDelta, y + pressedHeightDelta);
-			glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + pressedHeightDelta);
-			glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + m_Height - pressedHeightDelta);
-			glTexCoord2f(0.0f, 1.0f); glVertex2i(x + pressedWidthDelta, y + m_Height - pressedHeightDelta);
-			glEnd();
+			Draw2DTexturedSquare(m_TextureID, x, y, m_Width, m_Height);
 		}
 
 		//  Render the font the same way regardless of templating
@@ -209,7 +192,4 @@ inline void GUIEditBox::Render(int xOffset, int yOffset)
 				m_Font->RenderText(textDisplay.c_str(), textX, y + m_Height / 2, (m_TextAlignment == ALIGN_CENTER), true);
 		}
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }

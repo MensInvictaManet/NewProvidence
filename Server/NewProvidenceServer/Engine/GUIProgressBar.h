@@ -24,7 +24,7 @@ public:
 	inline void SetProgress(float progress) { m_Progress = std::max<float>(0.0f, std::min<float>(1.0f, progress)); }
 	inline void SetShowStringWhenComplete(bool show, std::string completeString = "") { m_ShowStringWhenComplete = show; m_CompleteString = completeString; }
 
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 private:
 	const Font* m_Font;
@@ -70,16 +70,11 @@ inline GUIProgressBar::~GUIProgressBar()
 }
 
 
-inline void GUIProgressBar::Render(int xOffset, int yOffset)
+inline void GUIProgressBar::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
 	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && m_Width > 0 && m_Height > 0)
+	if (m_Width > 0 && m_Height > 0)
 	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-
 		if (m_Templated)
 		{
 			//  Render the main border and background
@@ -97,7 +92,4 @@ inline void GUIProgressBar::Render(int xOffset, int yOffset)
 			}
 		}
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }

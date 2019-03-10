@@ -2,9 +2,10 @@
 
 #include <algorithm>
 #include <time.h>
+#include <SDL.h>
 
-static Uint32 gameTicksUint = 0;
-static Uint32 frameTicksUint = 0;
+static uint32_t gameTicksUint = 0;
+static uint32_t frameTicksUint = 0;
 static double gameSeconds = 0.0;
 static float gameSecondsF = 0.0f;
 static double frameSeconds = 0.0;
@@ -12,7 +13,7 @@ static float frameSecondsF = 0.0f;
 static unsigned int averageFPS = 0;
 
 #define TICKS_TO_SECONDS(ticks) double(ticks) / 1000.0
-#define SECONDS_TO_TICKS(seconds) Uint32(seconds * 1000.0)
+#define SECONDS_TO_TICKS(seconds) uint32_t(seconds * 1000.0)
 
 inline void DetermineAverageFPS()
 {
@@ -31,11 +32,11 @@ inline void DetermineAverageFPS()
 inline void DetermineTimeSlice()
 {
 	// Get the time slice
-	static Uint32 lastGameTicksUint = 0;
+	static uint32_t lastGameTicksUint = 0;
 
 	gameTicksUint = SDL_GetTicks();
 	gameSeconds = TICKS_TO_SECONDS(gameTicksUint);
-	frameTicksUint = std::min<Uint32>(gameTicksUint - lastGameTicksUint, 1000);
+	frameTicksUint = std::min<uint32_t>(gameTicksUint - lastGameTicksUint, 1000);
 	frameSeconds = float(TICKS_TO_SECONDS(frameTicksUint));
 	lastGameTicksUint = gameTicksUint;
 

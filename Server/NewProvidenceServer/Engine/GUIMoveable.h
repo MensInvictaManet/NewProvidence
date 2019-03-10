@@ -12,8 +12,8 @@ public:
 	GUIMoveable(bool templated, int grab_x, int grab_y, int grab_w, int grab_h);
 	~GUIMoveable();
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 	inline void SetMoveable(bool moveable) { m_Moveable = moveable; if (!moveable) m_Grabbed = false; }
 	inline void SetTemplate(const char* templateName) { m_Templated = true;  m_TemplateBox = GUITemplatedBox("Moveable", templateName, 1); }
@@ -110,19 +110,8 @@ inline void GUIMoveable::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void GUIMoveable::Render(int xOffset, int yOffset)
+inline void GUIMoveable::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
 	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && ((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
-	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-
-		if (m_Templated) m_TemplateBox.Render(0, x, y, m_Width, m_Height);
-	}
-
-	//  Do the base node render
-	GUIObjectNode::Render(xOffset, yOffset);
+	if (m_Templated && m_Width > 0 && m_Height > 0)  m_TemplateBox.Render(0, x, y, m_Width, m_Height);
 }

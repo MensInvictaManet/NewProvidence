@@ -1,7 +1,6 @@
 #pragma once
 
 #include <unordered_map>
-#include <functional>
 
 enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_GAMES, FILETYPE_OTHER, FILE_TYPE_COUNT };
 enum HostedFileSubtype

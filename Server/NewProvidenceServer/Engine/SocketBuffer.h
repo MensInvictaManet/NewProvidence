@@ -51,14 +51,14 @@ public:
 	char operator[](int index) const;
 };
 
-#define SIZEOF_CHAR sizeof(char)
-#define SIZEOF_SHRT sizeof(short)
-#define SIZEOF_USRT sizeof(unsigned short)
-#define SIZEOF_INTE sizeof(int)
-#define SIZEOF_UINT sizeof(unsigned int)
-#define SIZEOF_LINT sizeof(uint64_t)
-#define SIZEOF_FLOT sizeof(float)
-#define SIZEOF_DOUB sizeof(double)
+constexpr auto SIZEOF_CHAR = sizeof(char);
+constexpr auto SIZEOF_SHRT = sizeof(short);
+constexpr auto SIZEOF_USRT = sizeof(unsigned short);
+constexpr auto SIZEOF_INTE = sizeof(int);
+constexpr auto SIZEOF_UINT = sizeof(unsigned int);
+constexpr auto SIZEOF_LINT = sizeof(uint64_t);
+constexpr auto SIZEOF_FLOT = sizeof(float);
+constexpr auto SIZEOF_DOUB = sizeof(double);
 
 char SocketBuffer::m_ReturnValueBuffer[RETURNVAL_BUFFER_SIZE + 1];
 

@@ -122,8 +122,8 @@ void SetTransferPercentage(std::string fileTitle, double progress, double totalT
 	auto secondsRemaining = timeRemaining % 60;
 	auto timeString = (minutesRemaining != 0) ? (std::to_string(minutesRemaining) + " minutes") : std::to_string(secondsRemaining) + " seconds";
 
-	if (download)	transfers->UpdateDownload(fileTitle, progress, COLOR_RED);
-	else			transfers->UpdateUpload(fileTitle, progress, (progress >= 1.0) ? COLOR_GREEN : COLOR_RED);
+	if (download)	transfers->UpdateDownload(fileTitle, progress, COLOR_LIGHTRED);
+	else			transfers->UpdateUpload(fileTitle, progress, (progress >= 1.0) ? COLOR_LIGHTGREEN : COLOR_LIGHTRED);
 }
 
 
@@ -134,11 +134,11 @@ void SetCryptPercentage(std::string fileTitle, double percent, std::string crypt
 
 	if (encryption)
 	{
-		if (!fileTitle.empty()) transfers->UpdateUpload(fileTitle, std::min<double>(1.0, percent), COLOR_BLUE);
+		if (!fileTitle.empty()) transfers->UpdateUpload(fileTitle, std::min<double>(1.0, percent), COLOR_LIGHTBLUE);
 	}
 	else
 	{
-		if (!fileTitle.empty()) transfers->UpdateDownload(fileTitle, std::min<double>(1.0, percent), (percent >= 1.0) ? COLOR_GREEN : COLOR_BLUE);
+		if (!fileTitle.empty()) transfers->UpdateDownload(fileTitle, std::min<double>(1.0, percent), (percent >= 1.0) ? COLOR_LIGHTGREEN : COLOR_LIGHTBLUE);
 	}
 }
 
@@ -275,7 +275,7 @@ bool FileTransfersDialogue::UpdateDownload(std::string entryName, double progres
 		progressBar->SetVisible(true);
 		progressBar->SetProgress(float(progress));
 
-		if (progress >= 1.0 && barColor == COLOR_GREEN)
+		if (progress >= 1.0 && barColor == COLOR_LIGHTGREEN)
 		{
 			this->RemoveDownloadFromQueue(entryName);
 			if (!QueuedDownloadsList.empty())
@@ -284,9 +284,9 @@ bool FileTransfersDialogue::UpdateDownload(std::string entryName, double progres
 				debugConsole->AddDebugConsoleLine("Attempting to begin the next queued download");
 			}
 		}
-
-		return true;
 	}
+
+	return true;
 }
 
 
@@ -318,7 +318,7 @@ void FileTransfersDialogue::UpdateUpload(std::string entryName, double progress,
 	progressBar->SetProgress(float(progress));
 
 	//  TODO: Fix this using the events system...
-	if (progress >= 1.0 && barColor == COLOR_GREEN)
+	if (progress >= 1.0 && barColor == COLOR_LIGHTGREEN)
 	{
 		this->RemoveUploadFromQueue(entryName);
 		for (auto iter = QueuedUploadsList.begin(); iter != QueuedUploadsList.end();)

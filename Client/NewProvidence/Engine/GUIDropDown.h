@@ -3,12 +3,9 @@
 #include "GUIObjectNode.h"
 #include "InputManager.h"
 
-#include <functional>
-
 class GUIDropDown : public GUIObjectNode
 {
 public:
-	static GUIDropDown* CreateDropDown(const char* imageFile, int x = 0, int y = 0, int w = 0, int h = 0);
 	static GUIDropDown* CreateTemplatedDropDown(const char* dropdownTemplate, int x = 0, int y = 0, int w = 0, int h = 0, int dropDownX = 0, int dropDownY = 0, int dropDownW = 0, int dropDownH = 0);
 
 	explicit GUIDropDown(bool templated);
@@ -16,8 +13,8 @@ public:
 
 	void SetItemSelectCallback(const GUIFunctionCallback& callback) { m_ItemSelectCallback = callback; }
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
 
@@ -46,16 +43,6 @@ private:
 	unsigned int ExpandedHeight;
 	inline void UpdateExpandedHeight() { ExpandedHeight = static_cast<unsigned int>(m_ItemList.size()) * m_Height + (m_Templated ? (m_TemplateBox.TopSide(0)->getHeight() + m_TemplateBox.BottomSide(0)->getHeight()) : 0); }
 };
-
-GUIDropDown* GUIDropDown::CreateDropDown(const char* imageFile, int x, int y, int w, int h)
-{
-	MANAGE_MEMORY_NEW("MenuUI_Dropdown", sizeof(GUIDropDown));
-	auto newDropDown = new GUIDropDown(false);
-	newDropDown->SetTextureID(textureManager.LoadTextureGetID(imageFile));
-	newDropDown->SetPosition(x, y);
-	newDropDown->SetDimensions(w, h);
-	return newDropDown;
-}
 
 GUIDropDown* GUIDropDown::CreateTemplatedDropDown(const char* templateName, int x, int y, int w, int h, int dropDownX, int dropDownY, int dropDownW, int dropDownH)
 {
@@ -151,16 +138,10 @@ void GUIDropDown::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-void GUIDropDown::Render(int xOffset, int yOffset)
+void GUIDropDown::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && ((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
+	if (((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
 	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-
 		if (m_Templated)
 		{
 			m_TemplateBox.Render(0, x, y, m_Width, m_Height + ExpandedHeight);
@@ -182,21 +163,7 @@ void GUIDropDown::Render(int xOffset, int yOffset)
 				}
 			}
 		}
-		else
-		{
-			glBindTexture(GL_TEXTURE_2D, m_TextureID);
-
-			glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex2i(x + m_Width, y + m_Height);
-				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - m_Width, y + m_Height);
-				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - m_Width, y + m_Height - m_Height);
-				glTexCoord2f(0.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height - m_Height);
-			glEnd();
-		}
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }
 
 void GUIDropDown::SetToDestroy(std::stack<GUIObjectNode*>& destroyList)

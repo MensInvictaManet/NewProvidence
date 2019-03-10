@@ -26,8 +26,8 @@ public:
 	void EnterCommand(std::string& commandString);
 	void AddDebugConsoleLine(std::string newLine) const;
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 	inline GUIListBox* GetListbox() { return m_DebugConsoleListBox; }
 
@@ -128,10 +128,9 @@ inline void DebugConsole::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void DebugConsole::Render(int xOffset, int yOffset)
+void DebugConsole::TrueRender(int x, int y)
 {
-	if (m_SetToDestroy || !m_Visible) return;
-
+	//  Render the untextured gray box
 	glDisable(GL_TEXTURE_2D);
 	glColor4f(0.1f, 0.1f, 0.1f, 0.9f);
 	glBegin(GL_QUADS);
@@ -141,6 +140,7 @@ inline void DebugConsole::Render(int xOffset, int yOffset)
 		glVertex2i(0, m_WindowHeight / 2);
 	glEnd();
 
+	//  Render the basic line perimiter of the console
 	glColor3i(0, 0, 0);
 	glLineWidth(3);
 	glBegin(GL_LINE_STRIP);
@@ -159,9 +159,6 @@ inline void DebugConsole::Render(int xOffset, int yOffset)
 		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 		m_Font->RenderText(m_Text.c_str(), 10, m_WindowHeight / 2 - 21);
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
 }
 
 //  Instance to be utilized by anyone including this header

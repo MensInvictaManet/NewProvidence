@@ -9,6 +9,19 @@
 
 #include "WindowManager.h"
 
+void Draw2DTexturedSquare(GLuint textureID, int x, int y, int w, int h)
+{
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3i(x, y, 0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3i(x + w, y, 0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3i(x + w, y + h, 0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3i(x, y + h, 0);
+	glEnd();
+}
+
 class TextureManager
 {
 public:
@@ -38,10 +51,10 @@ public:
 			glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 			glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-			glTexCoord2f(1.0f, 0.0f); glVertex2i(x + width, y);
-			glTexCoord2f(1.0f, 1.0f); glVertex2i(x + width, y + height);
-			glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + height);
+				glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
+				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + width, y);
+				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + width, y + height);
+				glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + height);
 			glEnd();
 		}
 
@@ -55,14 +68,14 @@ public:
 			glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
 			glBegin(GL_QUADS);
-			glTexCoord2f(float(sub_x) / (float(m_Width)), (float(sub_y) / float(m_Height)));
-			glVertex3i(x, y, 0);
-			glTexCoord2f((float(sub_x + sub_w) / float(m_Width)), (float(sub_y) / float(m_Height)));
-			glVertex3i(x + sub_w, y, 0);
-			glTexCoord2f((float(sub_x + sub_w) / float(m_Width)), (float(sub_y + sub_h) / float(m_Height)));
-			glVertex3i(x + sub_w, y + sub_h, 0);
-			glTexCoord2f((float(sub_x) / float(m_Width)), (float(sub_y + sub_h) / float(m_Height)));
-			glVertex3i(x, y + sub_h, 0);
+				glTexCoord2f(float(sub_x) / (float(m_Width)), (float(sub_y) / float(m_Height)));
+				glVertex3i(x, y, 0);
+				glTexCoord2f((float(sub_x + sub_w) / float(m_Width)), (float(sub_y) / float(m_Height)));
+				glVertex3i(x + sub_w, y, 0);
+				glTexCoord2f((float(sub_x + sub_w) / float(m_Width)), (float(sub_y + sub_h) / float(m_Height)));
+				glVertex3i(x + sub_w, y + sub_h, 0);
+				glTexCoord2f((float(sub_x) / float(m_Width)), (float(sub_y + sub_h) / float(m_Height)));
+				glVertex3i(x, y + sub_h, 0);
 			glEnd();
 		}
 
@@ -98,8 +111,8 @@ public:
 	void Shutdown();
 
 private:
-	TextureManager();
-	~TextureManager();
+	TextureManager()	{}
+	~TextureManager()	{}
 
 	int FirstFreeIndex();
 
@@ -206,16 +219,6 @@ inline void TextureManager::Shutdown()
 		m_TextureList.erase(m_TextureList.begin());
 	}
 	m_TextureListByFile.clear();
-}
-
-inline TextureManager::TextureManager()
-{
-
-}
-
-inline TextureManager::~TextureManager()
-{
-
 }
 
 inline int TextureManager::FirstFreeIndex()

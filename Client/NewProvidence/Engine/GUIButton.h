@@ -4,8 +4,6 @@
 #include "InputManager.h"
 #include "FontManager.h"
 
-#include <functional>
-
 class GUIButton : public GUIObjectNode
 {
 public:
@@ -24,8 +22,8 @@ public:
 	inline void SetPressedSizeRatio(float ratio) { m_PressedSizeRatio = ratio; }
 	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("Button", templateName, 2); }
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 private:
 	GUIFunctionCallback	m_LeftClickCallback;
@@ -111,50 +109,39 @@ inline void GUIButton::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void GUIButton::Render(int xOffset, int yOffset)
+inline void GUIButton::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible)
+	if (((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
 	{
-		if (((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
+		auto pressedSqueeze = m_PressedSizeRatio;
+
+		if (m_Templated)
 		{
-			auto x = m_X + xOffset;
-			auto y = m_Y + yOffset;
-			auto pressedSqueeze = m_PressedSizeRatio;
+			auto pressedIndex = (m_Pressed ? 1 : 0);
+			pressedSqueeze = 1.0f;
 
-			if (m_Templated)
-			{
-				auto pressedIndex = (m_Pressed ? 1 : 0);
-				pressedSqueeze = 1.0f;
+			m_TemplateBox.Render(pressedIndex, x, y, m_Width, m_Height);
+		}
+		else
+		{
+			auto pressedWidthDelta = m_Pressed ? int(m_Width * (1.0f - pressedSqueeze)) : 0;
+			auto pressedHeightDelta = m_Pressed ? int(m_Height * (1.0f - pressedSqueeze)) : 0;
 
-				m_TemplateBox.Render(pressedIndex, x, y, m_Width, m_Height);
-			}
-			else
-			{
-				glEnable(GL_TEXTURE_2D);
-				glBindTexture(GL_TEXTURE_2D, m_TextureID);
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, m_TextureID);
 
-				auto pressedWidthDelta = m_Pressed ? int(m_Width * (1.0f - pressedSqueeze)) : 0;
-				auto pressedHeightDelta = m_Pressed ? int(m_Height * (1.0f - pressedSqueeze)) : 0;
-
-				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex2i(x + pressedWidthDelta, y + pressedHeightDelta);
-					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + pressedHeightDelta);
-					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + m_Height - pressedHeightDelta);
-					glTexCoord2f(0.0f, 1.0f); glVertex2i(x + pressedWidthDelta, y + m_Height - pressedHeightDelta);
-				glEnd();
-			}
-
-			//  Render the font the same way regardless of templating
-			if (m_Font != nullptr && !m_Text.empty())
-			{
-				m_Font->RenderText(m_Text.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, m_Pressed ? pressedSqueeze : 1.0f, m_Pressed ? pressedSqueeze : 1.0f);
-			}
+			glBegin(GL_QUADS);
+				glTexCoord2f(0.0f, 0.0f); glVertex2i(x + pressedWidthDelta, y + pressedHeightDelta);
+				glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + pressedHeightDelta);
+				glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width - pressedWidthDelta, y + m_Height - pressedHeightDelta);
+				glTexCoord2f(0.0f, 1.0f); glVertex2i(x + pressedWidthDelta, y + m_Height - pressedHeightDelta);
+			glEnd();
 		}
 
-		//  Pass the render call to all children
-		for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
+		//  Render the font the same way regardless of templating
+		if (m_Font != nullptr && !m_Text.empty())
+		{
+			m_Font->RenderText(m_Text.c_str(), x + m_Width / 2, y + m_Height / 2, true, true, m_Pressed ? pressedSqueeze : 1.0f, m_Pressed ? pressedSqueeze : 1.0f);
+		}
 	}
 }

@@ -19,7 +19,7 @@ public:
 	void SetText(const std::string text) { m_Text = text; }
 	void SetJustification(int justify) { m_Justification = justify; }
 
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	void TrueRender(int x = 0, int y = 0) override;
 
 private:
 	const Font* m_Font;
@@ -59,13 +59,8 @@ inline GUILabel::~GUILabel()
 	MANAGE_MEMORY_DELETE("MenuUI_Label", sizeof(GUILabel));
 }
 
-inline void GUILabel::Render(int xOffset, int yOffset)
+inline void GUILabel::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	auto x = m_X + xOffset;
-	auto y = m_Y + yOffset;
-
 	//  Render the object if we're able
 	if (!m_SetToDestroy && m_Visible && (m_Font != nullptr && !m_Text.empty()) && m_Width > 0 && m_Height > 0)
 	{
@@ -74,7 +69,4 @@ inline void GUILabel::Render(int xOffset, int yOffset)
 		else if (m_Justification == UI_JUSTIFY_LEFT)	m_Font->RenderText(m_Text.c_str(), x, y);
 		else if (m_Justification == UI_JUSTIFY_RIGHT)	m_Font->RenderText(m_Text.c_str(), x + m_Width - m_Font->GetTextWidth(m_Text.c_str()), y);
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(x, y);
 }

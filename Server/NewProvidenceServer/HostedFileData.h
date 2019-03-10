@@ -1,7 +1,6 @@
 #pragma once
 
 #include <unordered_map>
-#include <functional>
 
 enum HostedFileType { FILETYPE_MUSIC, FILETYPE_VIDEO, FILETYPE_GAMES, FILETYPE_OTHER, FILE_TYPE_COUNT };
 enum HostedFileSubtype
@@ -34,11 +33,11 @@ inline std::string GetFileTypeNameFromID(HostedFileType id)
 inline HostedFileType GetFileTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, HostedFileType> dataMap;
-	dataMap["MUSIC"] = FILETYPE_MUSIC;
-	dataMap["VIDEO"] = FILETYPE_VIDEO;
-	dataMap["GAMES"] = FILETYPE_GAMES;
-	dataMap["OTHER"] = FILETYPE_OTHER;
-	dataMap["NO TYPE"] = FILE_TYPE_COUNT;
+	dataMap["MUSIC"]	= FILETYPE_MUSIC;
+	dataMap["VIDEO"]	= FILETYPE_VIDEO;
+	dataMap["GAMES"]	= FILETYPE_GAMES;
+	dataMap["OTHER"]	= FILETYPE_OTHER;
+	dataMap["NO TYPE"]	= FILE_TYPE_COUNT;
 	return (dataMap.find(name) == dataMap.end() ? HostedFileType(-1) : dataMap[name]);
 }
 
@@ -63,16 +62,16 @@ inline std::string GetFileSubTypeNameFromID(HostedFileSubtype id)
 inline HostedFileSubtype GetFileSubTypeIDFromName(std::string name)
 {
 	std::unordered_map<std::string, HostedFileSubtype> dataMap;
-	dataMap["MUSIC: LFHHRBTRST"] = FILETYPE_MUSIC_LFHHRBTRST;
-	dataMap["MUSIC: EDM/DANCE"] = FILETYPE_MUSIC_EDM_DANCE;
-	dataMap["MUSIC: OTHER"] = FILETYPE_MUSIC_OTHER;
-	dataMap["VIDEO: TELEVISION"] = FILETYPE_VIDEO_TV;
-	dataMap["VIDEO: MOVIE"] = FILETYPE_VIDEO_MOVIE;
-	dataMap["VIDEO: PORN"] = FILETYPE_VIDEO_PORN;
-	dataMap["VIDEO: OTHER"] = FILETYPE_VIDEO_OTHER;
-	dataMap["GAMES: MISCELANEOUS"] = FILETYPE_GAMES_MISCELLANEOUS;
-	dataMap["OTHER: MISCELANEOUS"] = FILETYPE_OTHER_MISCELLANEOUS;
-	dataMap["NO SUBTYPE"] = FILE_SUBTYPE_COUNT;
+	dataMap["MUSIC: LFHHRBTRST"]	= FILETYPE_MUSIC_LFHHRBTRST;
+	dataMap["MUSIC: EDM/DANCE"]		= FILETYPE_MUSIC_EDM_DANCE;
+	dataMap["MUSIC: OTHER"]			= FILETYPE_MUSIC_OTHER;
+	dataMap["VIDEO: TELEVISION"]	= FILETYPE_VIDEO_TV;
+	dataMap["VIDEO: MOVIE"]			= FILETYPE_VIDEO_MOVIE;
+	dataMap["VIDEO: PORN"]			= FILETYPE_VIDEO_PORN;
+	dataMap["VIDEO: OTHER"]			= FILETYPE_VIDEO_OTHER;
+	dataMap["GAMES: MISCELANEOUS"]	= FILETYPE_GAMES_MISCELLANEOUS;
+	dataMap["OTHER: MISCELANEOUS"]	= FILETYPE_OTHER_MISCELLANEOUS;
+	dataMap["NO SUBTYPE"]			= FILE_SUBTYPE_COUNT;
 	return (dataMap.find(name) == dataMap.end() ? HostedFileSubtype(-1) : dataMap[name]);
 }
 

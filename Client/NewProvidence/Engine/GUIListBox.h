@@ -4,8 +4,6 @@
 #include "InputManager.h"
 #include "TimeSlice.h"
 
-#include <functional>
-
 #define LIST_BOX_SCROLL_DELAY 0.1f
 
 class GUIListBox : public GUIObjectNode
@@ -20,9 +18,10 @@ public:
 	void SetHeight(int height) override { GUIObjectNode::SetHeight(height); ItemDisplayCount = height / (EntryHeight + SpaceBetweenEntries); }
 
 	void SetItemClickCallback(const GUIFunctionCallback& callback) { m_ItemClickCallback = callback; }
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Update(void) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void Update(void) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 	void SetToDestroy(std::stack<GUIObjectNode*>& destroyList) override;
 
@@ -259,22 +258,17 @@ inline void GUIListBox::Input(int xOffset, int yOffset)
 
 inline void GUIListBox::Update(void)
 {
-	//  Render the items contained within
+	//  Update the items contained within
 	for (auto iter = m_ItemList.begin(); iter != m_ItemList.end(); ++iter)
 		(*iter)->Update();
 
 	GUIObjectNode::Update();
 }
 
-inline void GUIListBox::Render(int xOffset, int yOffset)
+inline void GUIListBox::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	auto x = m_X + xOffset;
-	auto y = m_Y + yOffset;
-
 	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && m_Width > 0 && m_Height > 0)
+	if (m_Width > 0 && m_Height > 0)
 	{
 		if ((m_TextureID != 0) || m_Templated)
 		{
@@ -322,9 +316,6 @@ inline void GUIListBox::Render(int xOffset, int yOffset)
 			TextureSelector->RenderTexture(x + m_TemplateBox.LeftSide(0)->getWidth(), y + m_TemplateBox.TopSide(0)->getHeight() + (EntryHeight + SpaceBetweenEntries) * (SelectedIndex - MovementIndex), width, EntryHeight);
 		}
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(x, y);
 }
 
 inline void GUIListBox::UpdateMover(int indexOverride)

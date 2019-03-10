@@ -8,6 +8,7 @@
 #include <vector>
 #include <assert.h>
 #include <stack>
+#include <functional>
 
 enum UI_Justifications { UI_JUSTIFY_LEFT = 0, UI_JUSTIFY_RIGHT, UI_JUSTIFY_CENTER, UI_JUSTIFICATION_COUNT };
 
@@ -26,12 +27,16 @@ public:
 
 	virtual void Input(int xOffset = 0, int yOffset = 0);
 	virtual void Update();
-	virtual void Render(int xOffset = 0, int yOffset = 0);
+	void Render(int xOffset = 0, int yOffset = 0); //  Note: Non-virtual so no one overrides this... override TrueRender instead
+	virtual void TrueRender(int xOffset = 0, int yOffset = 0);
 	virtual void Render3D();
 	virtual void SetToDestroy(std::stack<GUIObjectNode*>& destroyList);
 	virtual void Destroy();
 	virtual bool SortChild(GUIObjectNode* child);
 	virtual bool IsMouseWithin(int mX, int mY);
+
+	virtual void RenderChildren(int x, int y);
+	inline void ApplyObjectColor() const { glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]); }
 
 	bool GetClickPosition(const std::string& objectName, int& xPos, int& yPos);
 	int GetTrueX() const;
@@ -171,54 +176,61 @@ inline void GUIObjectNode::Update()
 	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Update();
 }
 
-inline void GUIObjectNode::Render(int xOffset, int yOffset)
+void GUIObjectNode::Render(int xOffset, int yOffset)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
+	//  If we're not able to render the object, return out
+	if (m_SetToDestroy || !m_Visible) return;
+
+	ApplyObjectColor();
 
 	auto x = m_X + xOffset;
 	auto y = m_Y + yOffset;
 
+	TrueRender(x, y);
+	RenderChildren(x, y);
+}
+
+
+void GUIObjectNode::TrueRender(int x, int y)
+{
 	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible)
+	if (m_Width > 0 && m_Height > 0)
 	{
-		if (m_Width > 0 && m_Height > 0)
-		{
-			if (m_TextureID != 0)
-			{
-				glBindTexture(GL_TEXTURE_2D, m_TextureID);
-
-				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex2i(x, y);
-					glTexCoord2f(1.0f, 0.0f); glVertex2i(x + m_Width, y);
-					glTexCoord2f(1.0f, 1.0f); glVertex2i(x + m_Width, y + m_Height);
-					glTexCoord2f(0.0f, 1.0f); glVertex2i(x, y + m_Height);
-				glEnd();
-			}
-			else if (m_TextureAnimation != nullptr)
-			{
-				m_TextureAnimation->Render(x, y);
-			}
-		}
-
-		//  Pass the render call to all children
-		std::vector<GUIObjectNode*> lastRenders;
-		for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
-		{
-			if ((*iter)->GetRenderLast())
-			{
-				lastRenders.push_back((*iter));
-				continue;
-			}
-			(*iter)->Render(x, y);
-		}
-		for (auto iter = lastRenders.begin(); iter != lastRenders.end(); ++iter) (*iter)->Render(x, y);
+		if (m_TextureID != 0) Draw2DTexturedSquare(m_TextureID, x, y, m_Width, m_Height);
+		else if (m_TextureAnimation != nullptr) m_TextureAnimation->Render(x, y);
 	}
+}
+
+void GUIObjectNode::RenderChildren(int x, int y)
+{
+	//  Pass the 2D render call to all children
+	std::vector<GUIObjectNode*> lastRenders;
+	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
+	{
+		if ((*iter)->GetRenderLast())
+		{
+			lastRenders.push_back((*iter));
+			continue;
+		}
+		(*iter)->Render(x, y);
+	}
+	for (auto iter = lastRenders.begin(); iter != lastRenders.end(); ++iter) (*iter)->Render(x, y);
 }
 
 inline void GUIObjectNode::Render3D()
 {
-	//  Pass the render 3D call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render3D();
+	//  Pass the 3D render call to all children
+	std::vector<GUIObjectNode*> lastRenders;
+	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
+	{
+		if ((*iter)->GetRenderLast())
+		{
+			lastRenders.push_back((*iter));
+			continue;
+		}
+		(*iter)->Render3D();
+	}
+	for (auto iter = lastRenders.begin(); iter != lastRenders.end(); ++iter) (*iter)->Render3D();
 }
 
 inline void GUIObjectNode::SetToDestroy(std::stack<GUIObjectNode*>& destroyList)

@@ -281,15 +281,6 @@ struct FileEncryptTask
 		//  Determine how many bytes to read this step
 		bytesToRead = ((FileInSize - BytesRead) > FILE_ENCRYPTION_BYTES_PER_STEP) ? FILE_ENCRYPTION_BYTES_PER_STEP : FileInSize - BytesRead;
 
-		//  If there is no more information to read, we're done encrypting
-		if (FileStreamIn.eof() || bytesToRead <= 0)
-		{
-			FileStreamIn.close();
-			FileStreamOut.close();
-			EncryptionComplete = true;
-			return true;
-		}
-
 		//  If we've gotten this far, we should grab the specified amount of data, encrypt it, and write it to the new file
 		FileStreamIn.read((char*)readArray, bytesToRead);
 		BytesRead += bytesToRead;
@@ -297,6 +288,15 @@ struct FileEncryptTask
 		FileStreamOut.write((char*)readArray, bytesToRead);
 
 		EncryptionPercentage = double(BytesRead) / double(FileInSize);
+
+		//  If there is no more information to read, we're done encrypting
+		if (FileStreamIn.eof() || (BytesRead == FileInSize))
+		{
+			FileStreamIn.close();
+			FileStreamOut.close();
+			EncryptionComplete = true;
+			return true;
+		}
 
 		return false;
 	}
@@ -360,16 +360,6 @@ struct FileDecryptTask
 		//  Determine how many bytes to read this step
 		bytesToRead = ((FileInSize - BytesRead) > FILE_ENCRYPTION_BYTES_PER_STEP) ? FILE_ENCRYPTION_BYTES_PER_STEP : FileInSize - BytesRead;
 
-		//  If there is no more information to read, we're done decrypting
-		if (FileStreamIn.eof() || bytesToRead <= 0)
-		{
-			FileStreamIn.close();
-			FileStreamOut.close();
-			if (DeleteOldFile) std::filesystem::remove(TargetFileName.c_str());
-			DecryptionComplete = true;
-			return true;
-		}
-
 		//  If we've gotten this far, we should grab the specified amount of data, decrypt it, and write it to the new file
 		FileStreamIn.read((char*)readArray, bytesToRead);
 		BytesRead += bytesToRead;
@@ -378,8 +368,8 @@ struct FileDecryptTask
 
 		DecryptionPercentage = double(BytesRead) / double(FileInSize);
 
-		//  Check once again... If there is no more information to read, we're done decrypting
-		if (FileStreamIn.eof() || BytesRead == FileInSize)
+		//  If there is no more information to read, we're done decrypting
+		if (FileStreamIn.eof() || (BytesRead == FileInSize))
 		{
 			FileStreamIn.close();
 			FileStreamOut.close();

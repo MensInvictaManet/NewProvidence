@@ -3,8 +3,6 @@
 #include "GUIObjectNode.h"
 #include "InputManager.h"
 
-#include <functional>
-
 class GUICheckbox : public GUIObjectNode
 {
 public:
@@ -16,18 +14,20 @@ public:
 
 	inline bool GetChecked() const { return m_Checked; }
 
-	inline void SetChecked(bool checked);
+	inline void SetChecked(bool checked) { if (checked != m_Checked) ToggleCheck(); }
 	inline void SetCheckTextureID(int textureID) { m_CheckTextureID = textureID; }
 	inline void SetCheckCallback(const GUIFunctionCallback& callback) { m_CheckCallback = callback; }
 	inline void SetTemplate(const char* templateName) { if (strlen(templateName) == 0) { m_Templated = false; return; } m_Templated = true;  m_TemplateBox = GUITemplatedBox("Checkbox", templateName, 2); }
 
-	void Input(int xOffset = 0, int yOffset = 0) override;
-	void Render(int xOffset = 0, int yOffset = 0) override;
+	virtual void Input(int xOffset = 0, int yOffset = 0) override;
+	virtual void TrueRender(int x = 0, int y = 0) override;
 
 private:
 	void ToggleCheck();
-	void Check();
-	void Uncheck();
+
+	inline void ToggleCheck() { m_Checked ? Uncheck() : Check(); }
+	inline void Check() { m_Checked = true; if (m_CheckCallback != nullptr) m_CheckCallback(this); }
+	inline void Uncheck() { m_Checked = false; if (m_CheckCallback != nullptr) m_CheckCallback(this); }
 
 	GLuint m_CheckTextureID;
 	GUIFunctionCallback	m_CheckCallback;
@@ -79,13 +79,6 @@ inline GUICheckbox::~GUICheckbox()
 }
 
 
-inline void GUICheckbox::SetChecked(bool checked)
-{
-	if (checked == m_Checked) return;
-	else (checked ? Check() : Uncheck());
-}
-
-
 inline void GUICheckbox::Input(int xOffset, int yOffset)
 {
 	if (m_SetToDestroy || !m_Visible) return;
@@ -107,17 +100,10 @@ inline void GUICheckbox::Input(int xOffset, int yOffset)
 	GUIObjectNode::Input(xOffset, yOffset);
 }
 
-inline void GUICheckbox::Render(int xOffset, int yOffset)
+inline void GUICheckbox::TrueRender(int x, int y)
 {
-	glColor4f(m_Color.colorValues[0], m_Color.colorValues[1], m_Color.colorValues[2], m_Color.colorValues[3]);
-
-	//  Render the object if we're able
-	if (!m_SetToDestroy && m_Visible && ((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
+	if (((m_TextureID != 0) || m_Templated) && m_Width > 0 && m_Height > 0)
 	{
-		auto x = m_X + xOffset;
-		auto y = m_Y + yOffset;
-
-
 		if (m_Templated)
 		{
 			auto checkedIndex = (m_Checked ? 1 : 0);
@@ -126,47 +112,8 @@ inline void GUICheckbox::Render(int xOffset, int yOffset)
 		}
 		else
 		{
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, m_TextureID);
-
-			glBegin(GL_QUADS);
-				glTexCoord2f(0.0f, 0.0f); glVertex3i(x, y, 0);
-				glTexCoord2f(1.0f, 0.0f); glVertex3i(x + m_Width, y, 0);
-				glTexCoord2f(1.0f, 1.0f); glVertex3i(x + m_Width, y + m_Height, 0);
-				glTexCoord2f(0.0f, 1.0f); glVertex3i(x, y + m_Height, 0);
-			glEnd();
-
-			if (m_Checked)
-			{
-				glBindTexture(GL_TEXTURE_2D, m_CheckTextureID);
-
-				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f); glVertex3i(xOffset + m_X, yOffset + m_Y, 0);
-					glTexCoord2f(1.0f, 0.0f); glVertex3i(xOffset + m_X + m_Width, yOffset + m_Y, 0);
-					glTexCoord2f(1.0f, 1.0f); glVertex3i(xOffset + m_X + m_Width, yOffset + m_Y + m_Height, 0);
-					glTexCoord2f(0.0f, 1.0f); glVertex3i(xOffset + m_X, yOffset + m_Y + m_Height, 0);
-				glEnd();
-			}
+			Draw2DTexturedSquare(m_TextureID, x, y, m_Width, m_Height);
+			if (m_Checked) Draw2DTexturedSquare(m_CheckTextureID, x, y, m_Width, m_Height);
 		}
 	}
-
-	//  Pass the render call to all children
-	for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter) (*iter)->Render(xOffset + m_X, yOffset + m_Y);
-}
-
-inline void GUICheckbox::ToggleCheck()
-{
-	m_Checked ? Uncheck() : Check();
-}
-
-inline void GUICheckbox::Check()
-{
-	m_Checked = true;
-	if (m_CheckCallback != nullptr) m_CheckCallback(this);
-}
-
-inline void GUICheckbox::Uncheck()
-{
-	m_Checked = false;
-	if (m_CheckCallback != nullptr) m_CheckCallback(this);
 }
