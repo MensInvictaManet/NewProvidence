@@ -6,6 +6,7 @@
 #include "Groundfish.h"
 #include "FileSendAndReceive.h"
 #include "HostedFileData.h"
+#include "NPSQL.h"
 
 #include <fstream>
 #include <ctime>
@@ -352,11 +353,11 @@ class Server
 {
 private:
 	int		ServerSocketHandle;
+	std::string UserDatabaseName = "UserDatabase";
 
 	std::function<void(const std::list<HostedFileData >&)> HostedFileListChangedCallback = nullptr;
 	std::function<void(std::unordered_map<UserConnection*, bool>)> UserConnectionListChangedCallback = nullptr;
 
-	std::unordered_map<std::string, UserLoginDetails> UserLoginDetailsList;
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
 
 	inline UserConnection* FindUserByUserID(std::string userID)
@@ -393,9 +394,6 @@ private:
 	void ReceiveMessages(void);
 	void PingConnectedUsers(void);
 	void AttemptUserLogin(UserConnection* user, std::string& username, std::string& password);
-
-	void LoadUserLoginDetails(void);
-	void SaveUserLoginDetails(void);
 
 	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
@@ -438,22 +436,8 @@ bool Server::Initialize(void)
 	//  Load the hosted files list
 	LoadHostedFilesData();
 
-	//  Load all user login details into an accessible list
-	LoadUserLoginDetails();
-	
-	//  Add default test users if they aren't already on the list
-	AddUserLoginDetails("Drew", "testpass");
-	AddUserLoginDetails("Charlie", "testpass");
-	AddUserLoginDetails("Emerson", "testpass");
-	AddUserLoginDetails("Bex", "testpass");
-	AddUserLoginDetails("Jason", "testpass");
-
-	//  Load the default hosted files if they aren't already loaded
-	//AddHostedFileFromUnencrypted("_FilesToHost/TestImage1.png", "Test Image 1", "DESCRIPTION 1");
-	//AddHostedFileFromUnencrypted("_FilesToHost/TestImage2.png", "Test Image 2", "DESCRIPTION 2");
-	//AddHostedFileFromUnencrypted("_FilesToHost/TestImage3.png", "Test Image 3", "DESCRIPTION 3");
-	//AddHostedFileFromUnencrypted("_FilesToHost/The Thirteenth Floor (1999 - 1080p).mp4", "The Thirteenth Floor (1999 - 1080p)", "A computer scientist running a virtual reality simulation of 1937 becomes the primary suspect when his colleague and mentor is murdered.");
-	//AddHostedFileFromUnencrypted("_FilesToHost/Purity Ring - Lofticries.mp3", "Purity Ring - Lofticries", "From the album \"Shrines\"");
+	// Open the user database
+	NPSQL::OpenUserDatabaseConnection();
 
 	return true;
 }
@@ -477,6 +461,9 @@ void Server::MainProcess(void)
 
 void Server::Shutdown(void)
 {
+	//  Close the user database connection
+	NPSQL::CloseUserDatabaseConnection();
+
 	//  Close out the server socket
 	winsockWrapper.CloseSocket(ServerSocketHandle);
 }
@@ -509,7 +496,7 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 
 	//  Check if the MD5 of the unencrypted login details already links to a user login data entry, and if so exit out
 	auto loginDataMD5 = md5(username + password);
-	if (UserLoginDetailsList.find(loginDataMD5) != UserLoginDetailsList.end()) return;
+	if (NPSQL::CheckIfUserExists(username)) return;
 
 	//  If it's a new entry, encrypt the username and password, place both encrypted arrays in a vector of unsigned chars
 	EncryptedData usernameVector = Groundfish::Encrypt(username.c_str(), int(username.length()), 0, rand() % 256);
@@ -526,9 +513,8 @@ void Server::AddUserLoginDetails(std::string username, std::string password)
 	//  Add a new notification for a welcoming message
 	AddUserNotification(loginDataMD5, "Welcome to New Providence");
 
-	//  Add the user data to the login details list, then save off the new user login details list
-	UserLoginDetailsList[loginDataMD5] = UserLoginDetails(usernameVector, passwordVector);
-	SaveUserLoginDetails();
+	//  Register the new user details to the user database
+	NPSQL::RegisterUser(username, sha256(password));
 }
 
 
@@ -883,15 +869,15 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	std::transform(username.begin(), username.end(), username.begin(), ::tolower);
 	std::transform(password.begin(), password.end(), password.begin(), ::tolower);
 
-	//  Locate the user entry in the login details list, if possible
-	auto loginDataChecksum = md5(username + password);
-
 	//  If the user does not exist, send a failure message and return out
-	if (UserLoginDetailsList.find(loginDataChecksum) == UserLoginDetailsList.end())
+	if (!NPSQL::CheckUserPassword(username, sha256(password)))
 	{
 		SendMessage_LoginResponse(LOGIN_RESPONSE_PASSWORD_INCORRECT, user);
 		return;
 	}
+
+	//  Locate the user entry in the login details list, if possible
+	auto loginDataChecksum = md5(username + password);
 
 	//  If the username given is already assigned to a connected user, send a failure message and return out
 	if (FindUserByUserID(loginDataChecksum) != nullptr)
@@ -918,68 +904,10 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
 
+
 ////////////////////////////////////////
 //	Program Functionality
 ////////////////////////////////////////
-void Server::LoadUserLoginDetails(void)
-{
-	//  Open the file as an ofstream to ensure it exists
-	std::ofstream uldFileCreate("UserLoginDetails.data", std::ios_base::binary | std::ios_base::app);
-	assert(uldFileCreate.good() && !uldFileCreate.bad());
-	uldFileCreate.close();
-
-	//  Open the file as an ifstream for reading
-	std::ifstream uldFile("UserLoginDetails.data", std::ios_base::binary);
-	assert(!uldFile.bad() && uldFile.good());
-
-	//  Get the file size by reading the beginning and end memory positions
-	auto fileSize = int(uldFile.tellg());
-	uldFile.seekg(0, std::ios::end);
-	fileSize = int(uldFile.tellg()) - fileSize;
-	uldFile.seekg(0, std::ios::beg);
-
-	while (fileSize > 0 && !uldFile.eof())
-	{
-		UserLoginDetails newEntry;
-		if (!newEntry.ReadFromFile(uldFile)) break;
-		if (uldFile.eof()) break;
-
-		//  Get the MD5 of the decrypted username and password
-		auto username = Groundfish::DecryptToString(newEntry.EncryptedUserName.data());
-		auto password = Groundfish::DecryptToString(newEntry.EncryptedPassword.data());
-		auto loginDataMD5 = md5(username + password);
-
-		UserLoginDetailsList[loginDataMD5] = newEntry;
-	}
-
-	uldFile.close();
-}
-
-void Server::SaveUserLoginDetails(void)
-{
-	std::ofstream uldFile("UserLoginDetails.data", std::ios_base::binary | std::ios_base::trunc);
-	assert(!uldFile.bad() && uldFile.good());
-
-	for (auto userIter = UserLoginDetailsList.begin(); userIter != UserLoginDetailsList.end(); ++userIter)
-	{
-		auto encryptedUsername = (*userIter).second.EncryptedUserName;
-		auto encryptedPassword = (*userIter).second.EncryptedPassword;
-		auto encryptedUsernameSize = int(encryptedUsername.size());
-		auto encryptedPasswordSize = int(encryptedPassword.size());
-
-		//  Write the size of the encrypted username, then the encrypted username itself
-		uldFile.write((const char*)&encryptedUsernameSize, sizeof(encryptedUsernameSize));
-		uldFile.write((const char*)(encryptedUsername.data()), encryptedUsername.size());
-
-		//  Write the size of the encrypted password, then the encrypted password itself
-		uldFile.write((const char*)&encryptedPasswordSize, sizeof(encryptedPasswordSize));
-		uldFile.write((const char*)(encryptedPassword.data()), encryptedPassword.size());
-	}
-
-	uldFile.close();
-}
-
-
 void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user)
 {
 	assert(fileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
@@ -989,17 +917,23 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	bool fileValid = false;
 	std::ifstream targetFile(fileToAdd, std::ios_base::binary);
 	float seconds = gameSecondsF;
-	while (targetFile.good() && targetFile.bad())
+	while (!targetFile.good() && targetFile.bad())
 	{
 		targetFile = std::ifstream(fileToAdd, std::ios_base::binary);
 		DetermineTimeSlice();
-		assert(gameSecondsF < seconds + 0.1f);
-		if (gameSecondsF > seconds + 0.1f) return;
+		assert(gameSecondsF < seconds + 0.25f);
+		if (gameSecondsF > seconds + 0.25f) return;
 	}
 	targetFile.close();
 
+	uint64_t fileSize = 0;
+	try {
+		fileSize = std::filesystem::file_size(fileToAdd);
+	}
+	catch (const std::exception& e) {
+		std::cerr << "ERROR: " << e.what() << std::endl;
+	}
 	//  Get the file size in bytes for the file
-	uint64_t fileSize = std::filesystem::file_size(fileToAdd);
 
 	//  Find the file's primary name (no directories)
 	std::string pureFileName = fileToAdd;

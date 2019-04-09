@@ -28,6 +28,9 @@
     <Filter Include="Header Files\ArcadiaEngine\Utilities">
       <UniqueIdentifier>{d4cf6b64-58c8-49c2-b854-6cca9535b982}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\ArcadiaEngine\SQLite">
+      <UniqueIdentifier>{0a6a4e13-18d0-4d0e-b204-5bab22073776}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Groundfish.h">
@@ -174,10 +177,22 @@
     <ClInclude Include="Engine\StringTools.h">
       <Filter>Header Files\ArcadiaEngine\Utilities</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\SQLWrapper.h">
+      <Filter>Header Files\ArcadiaEngine\SQLite</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\sqlite3.h">
+      <Filter>Header Files\ArcadiaEngine\SQLite</Filter>
+    </ClInclude>
+    <ClInclude Include="NPSQL.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\sqlite3.c">
+      <Filter>Header Files\ArcadiaEngine\SQLite</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
