@@ -133,6 +133,9 @@ public:
 
 	bool Connect(void);
 
+	inline bool IsFileBeingSent(void) const { return ((FileEncrypt != nullptr) || (FileSend != nullptr)); }
+	inline bool IsFileBeingReceived(void) const { return ((!FileDecryptList.empty()) || (FileReceive != nullptr)); }
+
 	void AddLatestUpload(int index, std::string upload, std::string uploader, HostedFileType type, HostedFileSubtype subtype);
 	void DetectFilesInUploadFolder(std::string folder, std::vector<std::wstring>& fileList);
 	void SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID);
@@ -185,8 +188,7 @@ void Client::DetectFilesInUploadFolder(std::string folder, std::vector<std::wstr
 
 void Client::SendFileToServer(std::string fileName, std::string filePath, std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID)
 {
-	if (FileEncrypt != nullptr) return;
-	if (FileSend != nullptr) return;
+	if (IsFileBeingSent()) return;
 
 	auto titleMD5 = md5(fileTitle);
 	auto hostedFileName = titleMD5 + ".hostedfile";

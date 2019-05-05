@@ -39,31 +39,6 @@ void AddUploadFolderItem(std::string filePath)
 	auto itemLabel = GUILabel::CreateLabel("Arial", displayName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
 	itemLabel->SetObjectName(filePath);
 	UploadFolderItemsListBox->AddItem(itemLabel);
-
-}
-
-void UpdateUploadFolderList(void)
-{
-	if (UploadFolderItemsListBox == nullptr) return;
-	UploadFolderItemsListBox->ClearItems();
-
-	std::string uploadFolder("_FilesToUpload");
-	std::vector<std::wstring> fileList;
-	Client& client = Client::GetInstance();
-	client.DetectFilesInUploadFolder(uploadFolder, fileList);
-
-	for (auto iter = fileList.begin(); iter != fileList.end(); ++iter)
-	{
-		auto shortName = ws2s(*iter).substr(uploadFolder.length() + 1, (*iter).length() - uploadFolder.length() - 1);
-
-		if (s2ws(ws2s(*iter)).compare((*iter)) != 0)
-		{
-			debugConsole->AddDebugConsoleLine("File found with unrecognized characters in File Upload folder. File ignored: " + shortName);
-			continue;
-		}
-		
-		AddUploadFolderItem(uploadFolder + "/" + shortName);
-	}
 }
 
 
@@ -194,9 +169,6 @@ void FileUploadDialogue::OpenUploadMenu()
 {
 	//  Make the upload UI visible
 	MenuUINode->SetVisible(true);
-
-	//  Run a new detection of items in the uploads folder
-	UpdateUploadFolderList();
 
 	//  Set the upload error bar back to default
 	SetUploadErrorMessage("", false);

@@ -305,9 +305,6 @@ void SetUploadMenuOpen(GUIObjectNode* button)
 	HostedFileListUINode->SetVisible(false);
 	SearchFilterUINode->SetVisible(false);
 
-	//  Run a new detection of items in the uploads folder
-	UpdateUploadFolderList();
-
 	//  Set the status bar back to default
 	SetStatusBarMessage("", false);
 }
@@ -483,11 +480,6 @@ PrimaryDialogue::~PrimaryDialogue()
 
 inline void PrimaryDialogue::Update()
 {
-	//static float progress = 0.0f;
-	//progress += 0.0001f;
-	//if (progress > 1.0f) progress = 1.0f;
-	//ProgressBarTest->SetProgress(progress);
-
 	GUIObjectNode::Update();
 
 	if (ClientConnected == CONNECTION_STATUS_CONNECTED) ClientControl.MainProcess();

@@ -46,22 +46,6 @@ struct FileUploadData
 	}
 };
 
-void UpdateTransferQueueListEntries(GUIObjectNode* object)
-{
-	if (object == nullptr) return;
-	auto listBox = (GUIListBox*)(object);
-	auto listBoxItems = listBox->GetItemList();
-	auto selectedItem = listBox->GetSelectedItem();
-
-	for (auto iter = listBoxItems.begin(); iter != listBoxItems.end(); ++iter)
-	{
-		auto cancelButton = (*iter)->GetChildByName("Cancel Button");
-		if (cancelButton == nullptr) continue;
-		auto visible = ((*iter) == selectedItem);
-		cancelButton->SetVisible(visible);
-	}
-}
-
 
 class FileTransfersDialogue : public GUIObjectNode, EventListener
 {
@@ -85,17 +69,14 @@ public:
 	void RemoveDownloadFromQueue(std::string fileTitle);
 	void RemoveUploadFromQueue(std::string fileTitle);
 
-	std::string GetDownloadByIndex(uint32_t entryIndex);
 	bool UpdateDownload(std::string downloadName, double progress, Color& barColor);
-	std::string GetUploadByIndex(uint32_t entryIndex);
 	void UpdateUpload(std::string downloadName, double progress, Color& barColor);
 
 private:
 	virtual void ReceiveEvent(EventData* eventData) override;
 
-	void AddDownloadToQueueUI(std::string fileTitle, HostedFileType fileTypeIndex, HostedFileSubtype fileSubTypeIndex);
+	void AddTransferEntryToList(GUIListBox* listbox, std::string entryTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubtypeID);
 	void RemoveDownloadFromQueueUI(std::string fileTitle);
-	void AddUploadToQueueUI(std::string fileTitle, HostedFileType fileTypeIndex, HostedFileSubtype fileSubTypeIndex);
 	void RemoveUploadFromQueueUI(std::string fileTitle);
 
 	GUIObjectNode* MenuUINode = nullptr;
@@ -162,6 +143,13 @@ FileTransfersDialogue::~FileTransfersDialogue()
 
 inline void FileTransfersDialogue::Update()
 {
+	if (!QueuedUploadsList.empty() && !Client::GetInstance().IsFileBeingSent())
+	{
+		assert(QueuedUploadsMap.find(QueuedUploadsList[0]) != QueuedUploadsMap.end());
+		auto uploadData = QueuedUploadsMap[QueuedUploadsList[0]];
+		Client::GetInstance().SendFileToServer(uploadData.FileName, uploadData.FilePath, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
+	}
+
 	GUIObjectNode::Update();
 }
 
@@ -177,7 +165,7 @@ void FileTransfersDialogue::OpenTransfersMenu()
 	MenuUINode->SetVisible(true);
 }
 
-void FileTransfersDialogue::AddDownloadToQueue(std::string fileTitle, HostedFileType fileTypeIndex, HostedFileSubtype fileSubTypeIndex)
+void FileTransfersDialogue::AddDownloadToQueue(std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID)
 {
 	auto queuedDownload = QueuedDownloadsMap.find(fileTitle);
 	if (queuedDownload != QueuedDownloadsMap.end()) return;
@@ -189,7 +177,7 @@ void FileTransfersDialogue::AddDownloadToQueue(std::string fileTitle, HostedFile
 	QueuedDownloadsMap[fileTitle] = true;
 	QueuedDownloadsList.push_back(fileTitle);
 
-	AddDownloadToQueueUI(fileTitle, fileTypeIndex, fileSubTypeIndex);
+	AddTransferEntryToList(DownloadQueueListBox, fileTitle, fileTypeID, fileSubTypeID);
 }
 
 void FileTransfersDialogue::AddUploadToQueue(FileUploadData& uploadData)
@@ -197,14 +185,11 @@ void FileTransfersDialogue::AddUploadToQueue(FileUploadData& uploadData)
 	auto queuedDownload = QueuedUploadsMap.find(uploadData.FileTitle);
 	if (queuedDownload != QueuedUploadsMap.end()) return;
 
-	if (QueuedUploadsList.empty())
-		Client::GetInstance().SendFileToServer(uploadData.FileName, uploadData.FilePath, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
-
 	//  Add an entry in the QueuedUploads map and list
 	QueuedUploadsMap[uploadData.FileTitle] = uploadData;
 	QueuedUploadsList.push_back(uploadData.FileTitle);
 
-	AddUploadToQueueUI(uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
+	AddTransferEntryToList(UploadQueueListBox, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
 }
 
 void FileTransfersDialogue::RemoveDownloadFromQueue(std::string fileTitle)
@@ -246,13 +231,6 @@ void FileTransfersDialogue::RemoveUploadFromQueue(std::string fileTitle)
 }
 
 
-std::string FileTransfersDialogue::GetDownloadByIndex(uint32_t entryIndex)
-{
-	if (entryIndex >= QueuedDownloadsList.size()) return "";
-	return QueuedDownloadsList[entryIndex];
-}
-
-
 bool FileTransfersDialogue::UpdateDownload(std::string entryName, double progress, Color& barColor)
 {
 	auto entry = DownloadQueueListBox->GetItemByName(entryName);
@@ -290,13 +268,6 @@ bool FileTransfersDialogue::UpdateDownload(std::string entryName, double progres
 }
 
 
-std::string FileTransfersDialogue::GetUploadByIndex(uint32_t entryIndex)
-{
-	if (entryIndex >= QueuedUploadsList.size()) return "";
-	return QueuedUploadsList[entryIndex];
-}
-
-
 void FileTransfersDialogue::UpdateUpload(std::string entryName, double progress, Color& barColor)
 {
 	auto entry = UploadQueueListBox->GetItemByName(entryName);
@@ -330,10 +301,6 @@ void FileTransfersDialogue::UpdateUpload(std::string entryName, double progress,
 				iter = QueuedUploadsList.erase(iter);
 				continue;
 			}
-
-			auto uploadData = QueuedUploadsMap[(*iter)];
-			Client::GetInstance().SendFileToServer(uploadData.FileName, uploadData.FilePath, uploadData.FileTitle, uploadData.FileTypeID, uploadData.FileSubTypeID);
-			debugConsole->AddDebugConsoleLine("Attempting to begin the next queued upload");
 			break;
 		}
 	}
@@ -355,39 +322,45 @@ void FileTransfersDialogue::ReceiveEvent(EventData* eventData)
 }
 
 
-void FileTransfersDialogue::AddDownloadToQueueUI(std::string fileTitle, HostedFileType fileTypeIndex, HostedFileSubtype fileSubTypeIndex)
+void FileTransfersDialogue::AddTransferEntryToList(GUIListBox* listbox, std::string entryTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubtypeID)
 {
 	auto newListing = GUIObjectNode::CreateObjectNode("");
-	newListing->SetObjectName(fileTitle);
+	newListing->SetObjectName(entryTitle);
 
-	auto newListingFileType = GetFileTypeIconFromID(fileTypeIndex);
-	newListingFileType->SetPosition(6, 8);
-	newListingFileType->SetDimensions(20, 20);
-	newListing->AddChild(newListingFileType);
+	auto fileTypeIcon = GetFileTypeIconFromID(fileTypeID);
+	fileTypeIcon->SetPosition(6, 6);
+	fileTypeIcon->SetDimensions(20, 20);
+	newListing->AddChild(fileTypeIcon);
 
-	auto newListingFileSubType = GetFileSubTypeIconFromID(fileSubTypeIndex);
-	newListingFileSubType->SetPosition(26, 8);
-	newListingFileSubType->SetDimensions(20, 20);
-	newListing->AddChild(newListingFileSubType);
+	auto fileSubtypeIcon = GetFileSubTypeIconFromID(fileSubtypeID);
+	fileSubtypeIcon->SetPosition(26, 6);
+	fileSubtypeIcon->SetDimensions(20, 20);
+	newListing->AddChild(fileSubtypeIcon);
 
-	auto newListingName = GUILabel::CreateLabel("Arial-12-White", fileTitle.c_str(), 64, 8, 300, 20, UI_JUSTIFY_LEFT);
-	newListing->AddChild(newListingName);
+	auto fileTitleLabel = GUILabel::CreateLabel("Arial-12-White", entryTitle.c_str(), 64, 8, 300, 20, UI_JUSTIFY_LEFT);
+	fileTitleLabel->SetObjectName("FileTitle");
+	newListing->AddChild(fileTitleLabel);
 
-	auto newListingProgress = GUIProgressBar::CreateTemplatedProgressBar("Standard", 690, 4, 300, 24);
-	newListingProgress->SetObjectName("ProgressBar");
-	newListingProgress->SetVisible(false);
-	newListingProgress->SetFont("Arial");
-	newListingProgress->SetShowStringWhenComplete(true, "COMPLETE");
-	newListing->AddChild(newListingProgress);
+	auto fileStatusLabel = GUILabel::CreateLabel("Arial-12-White", "QUEUED", 460, 8, 300, 20, UI_JUSTIFY_LEFT);
+	fileStatusLabel->SetObjectName("FileStatus");
+	fileStatusLabel->SetVisible(true);
+	newListing->AddChild(fileStatusLabel);
 
-	auto newListingCancelButton = GUIButton::CreateTemplatedButton("Standard", 880, 4, 100, 24);
-	newListingCancelButton->SetObjectName("CancelButton");
-	newListingCancelButton->SetFont("Arial-12");
-	newListingCancelButton->SetText("Cancel");
-	newListingCancelButton->SetVisible(false);
-	newListing->AddChild(newListingCancelButton);
+	auto fileProgressBar = GUIProgressBar::CreateTemplatedProgressBar("Standard", 600, 4, 280, 24);
+	fileProgressBar->SetObjectName("ProgressBar");
+	fileProgressBar->SetFont("Arial");
+	fileProgressBar->SetShowStringWhenComplete(true, "COMPLETE");
+	fileProgressBar->SetVisible(false);
+	newListing->AddChild(fileProgressBar);
 
-	DownloadQueueListBox->AddItem(newListing);
+	//auto fileCancelButton = GUIButton::CreateTemplatedButton("Standard", 890, 4, 80, 24);
+	//fileCancelButton->SetObjectName("CancelButton");
+	//fileCancelButton->SetFont("Arial");
+	//fileCancelButton->SetText("Cancel");
+	//fileCancelButton->SetVisible(true);
+	//newListing->AddChild(fileCancelButton);
+
+	listbox->AddItem(newListing);
 }
 
 
@@ -396,44 +369,11 @@ void FileTransfersDialogue::RemoveDownloadFromQueueUI(std::string fileTitle)
 	auto listing = DownloadQueueListBox->GetItemByName(fileTitle);
 	if (listing == nullptr) return;
 
+	auto cancelButton = listing->GetChildByName("CancelButton");
+	if (cancelButton) cancelButton->SetVisible(false);
+
 	listing->SetObjectName("");
 	//DownloadQueueListBox->RemoveItem(listing);
-}
-
-
-void FileTransfersDialogue::AddUploadToQueueUI(std::string fileTitle, HostedFileType fileTypeIndex, HostedFileSubtype fileSubTypeIndex)
-{
-	auto newListing = GUIObjectNode::CreateObjectNode("");
-	newListing->SetObjectName(fileTitle);
-
-	auto newListingFileType = GetFileTypeIconFromID(fileTypeIndex);
-	newListingFileType->SetPosition(6, 8);
-	newListingFileType->SetDimensions(20, 20);
-	newListing->AddChild(newListingFileType);
-
-	auto newListingFileSubType = GetFileSubTypeIconFromID(fileSubTypeIndex);
-	newListingFileSubType->SetPosition(26, 8);
-	newListingFileSubType->SetDimensions(20, 20);
-	newListing->AddChild(newListingFileSubType);
-
-	auto newListingName = GUILabel::CreateLabel("Arial-12-White", fileTitle.c_str(), 64, 8, 300, 20, UI_JUSTIFY_LEFT);
-	newListing->AddChild(newListingName);
-
-	auto newListingProgress = GUIProgressBar::CreateTemplatedProgressBar("Standard", 690, 4, 300, 24);
-	newListingProgress->SetObjectName("ProgressBar");
-	newListingProgress->SetVisible(false);
-	newListingProgress->SetFont("Arial");
-	newListingProgress->SetShowStringWhenComplete(true, "COMPLETE");
-	newListing->AddChild(newListingProgress);
-
-	auto newListingCancelButton = GUIButton::CreateTemplatedButton("Standard", 880, 4, 100, 24);
-	newListingCancelButton->SetObjectName("CancelButton");
-	newListingCancelButton->SetFont("Arial-12");
-	newListingCancelButton->SetText("Cancel");
-	newListingCancelButton->SetVisible(false);
-	newListing->AddChild(newListingCancelButton);
-
-	UploadQueueListBox->AddItem(newListing);
 }
 
 
@@ -458,13 +398,11 @@ void FileTransfersDialogue::LoadTransfersMenuUI()
 	currentDownloadsLabel->SetColorBytes(160, 160, 160, 255);
 	MenuUINode->AddChild(currentDownloadsLabel);
 
-	DownloadQueueListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 70, 1000, 300, 414, 0, 18, 18, 18, 18, 18, 24, 2);
+	DownloadQueueListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 70, 1000, 300, 982, 0, 18, 18, 18, 18, 18, 24, 2);
 	DownloadQueueListBox->SetColorBytes(87, 28, 87, 255);
-	DownloadQueueListBox->SetItemClickCallback(UpdateTransferQueueListEntries);
 	MenuUINode->AddChild(DownloadQueueListBox);
 
-	UploadQueueListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 400, 1000, 300, 414, 0, 18, 18, 18, 18, 18, 24, 2);
+	UploadQueueListBox = GUIListBox::CreateTemplatedListBox("Standard", 32, 400, 1000, 300, 982, 0, 18, 18, 18, 18, 18, 24, 2);
 	UploadQueueListBox->SetColorBytes(87, 28, 87, 255);
-	UploadQueueListBox->SetItemClickCallback(UpdateTransferQueueListEntries);
 	MenuUINode->AddChild(UploadQueueListBox);
 }
