@@ -19,25 +19,6 @@ constexpr auto LATEST_UPLOADS_SENT_COUNT	= 20;
 constexpr auto PING_INTERVAL_TIME			= 5.0;
 constexpr auto PINGS_BEFORE_DISCONNECT		= 30;
 
-std::list<HostedFileData> HostedFileDataList;
-
-
-inline bool HostedFileExists(std::string checksum) {
-	for (auto iter = HostedFileDataList.begin(); iter != HostedFileDataList.end(); ++iter)
-		if ((*iter).FileTitleChecksum.compare(checksum) == 0)
-			return true;
-	return false;
-}
-
-
-inline std::list<HostedFileData>::iterator GetHostedFileIterByTitleChecksum(std::string checksum) {
-	for (auto iter = HostedFileDataList.begin(); iter != HostedFileDataList.end(); ++iter)
-		if ((*iter).FileTitleChecksum.compare(checksum) == 0)
-			return iter;
-	return HostedFileDataList.end();
-}
-
-
 struct UserLoginDetails
 {
 	EncryptedData EncryptedUserName;
@@ -97,7 +78,7 @@ struct UserLoginDetails
 
 bool CompareUploadsByTimeAdded(const HostedFileData& first, const HostedFileData& second)
 {
-	auto comparison = first.FileUploadTime.compare(second.FileUploadTime);
+	auto comparison = second.FileUploadTime.compare(first.FileUploadTime);
 	return (comparison == 1);
 }
 
@@ -205,10 +186,10 @@ void SendMessage_InboxAndNotifications(UserConnection* user)
 }
 
 
-void SendMessage_HostedFileList(std::list<HostedFileData>& hostedFileDataList, UserConnection* user, int startIndex = 0, EncryptedData encryptedUsername = EncryptedData(), HostedFileType type = FILE_TYPE_COUNT, HostedFileSubtype subtype = FILE_SUBTYPE_COUNT)
+void SendMessage_HostedFileList(UserConnection* user, int startIndex = 0, EncryptedData encryptedUsername = EncryptedData(), HostedFileType type = FILE_TYPE_COUNT, HostedFileSubtype subtype = FILE_SUBTYPE_COUNT)
 {
 	//  Message composition:
-	//  - (1 byte) unsigned char reprenting the message ID
+	//  - (1 byte) unsigned char representing the message ID
 	//  - (2 bytes) unsigned short representing the starting index
 	//  - (2 bytes) unsigned short representing the list size (max 20)
 	//  - (1440 bytes) (1 + 1 + 1 + 49 + 1 + 19) x [list max (20)]
@@ -218,9 +199,11 @@ void SendMessage_HostedFileList(std::list<HostedFileData>& hostedFileDataList, U
 	winsockWrapper.ClearBuffer(0);
 	winsockWrapper.WriteChar(MESSAGE_ID_HOSTED_FILE_LIST, 0);
 
-	//  Find out the index range we're going to send.
-	auto endIndex = std::min(int(hostedFileDataList.size() - 1), startIndex + LATEST_UPLOADS_SENT_COUNT - 1);
-	auto listSize = std::max(0, endIndex - startIndex + 1);
+	//  Grab the file data list and find out the list size we're going to send.
+	std::list<HostedFileData> hostedFileDataList;
+	NPSQL::GetHostedFileList(hostedFileDataList, startIndex, LATEST_UPLOADS_SENT_COUNT);
+	hostedFileDataList.sort(CompareUploadsByTimeAdded);
+	auto listSize = hostedFileDataList.size();
 
 	//  Determine if we have enough uploads by the given user to fill the list size. If not, decrement the list size
 	if ((encryptedUsername.size() != 0) || (type != FILE_TYPE_COUNT) || (subtype != FILE_SUBTYPE_COUNT))
@@ -355,7 +338,7 @@ private:
 	int		ServerSocketHandle;
 	std::string UserDatabaseName = "UserDatabase";
 
-	std::function<void(const std::list<HostedFileData >&)> HostedFileListChangedCallback = nullptr;
+	std::function<void()> HostedFileListChangedCallback = nullptr;
 	std::function<void(std::unordered_map<UserConnection*, bool>)> UserConnectionListChangedCallback = nullptr;
 
 	std::unordered_map<UserConnection*, bool> UserConnectionsList;
@@ -374,10 +357,9 @@ public:
 
 	~Server() {}
 
-	inline void SetHostedFileListChangedCallback(const std::function<void(const std::list<HostedFileData>& hostedFileDataList)>& callback) { HostedFileListChangedCallback = callback; }
+	inline void SetHostedFileListChangedCallback(const std::function<void()>& callback) { HostedFileListChangedCallback = callback; }
 	inline void SetUserConnectionListChangedCallback(const std::function<void(std::unordered_map<UserConnection*, bool>)>& callback) { UserConnectionListChangedCallback = callback; }
-	inline const std::list<HostedFileData>& GetHostedFileDataList() const { return HostedFileDataList; }
-
+	
 	bool Initialize(void);
 	void MainProcess(void);
 	void Shutdown(void);
@@ -397,8 +379,6 @@ private:
 
 	void AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription, int32_t fileTypeID, int32_t fileSubTypeID, UserConnection* user);
 	void AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fileTitle, std::string fileDescription);
-	void SaveHostedFileList();
-	void LoadHostedFilesData(void);
 	void SendOutHostedFileList(void);
 
 	void ContinueFileTransfers(void);
@@ -433,11 +413,11 @@ bool Server::Initialize(void)
 	(void) _wmkdir(L"_UserNotifications");
 	(void) _wmkdir(L"_HostedFiles");
 
-	//  Load the hosted files list
-	LoadHostedFilesData();
-
-	// Open the user database
+	// Open the user and file database connections, and ensure we have the primary tables
 	NPSQL::OpenUserDatabaseConnection();
+	NPSQL::OpenFileDatabaseConnection();
+	NPSQL::CreateUserTable();
+	NPSQL::CreateFileTable();
 
 	return true;
 }
@@ -461,8 +441,9 @@ void Server::MainProcess(void)
 
 void Server::Shutdown(void)
 {
-	//  Close the user database connection
+	//  Close the user and file database connections
 	NPSQL::CloseUserDatabaseConnection();
+	NPSQL::CloseFileDatabaseConnection();
 
 	//  Close out the server socket
 	winsockWrapper.CloseSocket(ServerSocketHandle);
@@ -472,18 +453,15 @@ void Server::Shutdown(void)
 void Server::DeleteHostedFile(std::string fileChecksum)
 {
 	//  If the file does not exist, exit out
-	auto iter = GetHostedFileIterByTitleChecksum(fileChecksum);
-	assert(iter != HostedFileDataList.end());
-	if (iter == HostedFileDataList.end()) return;
+	if (NPSQL::CheckIfFileExists(fileChecksum) == false) return;
 
 	//  Delete the file from the _HostedFiles folder
-	auto hostedFileName = "_HostedFiles/" + (*iter).FileTitleChecksum + ".hostedfile";
+	auto hostedFileName = "_HostedFiles/" + fileChecksum + ".hostedfile";
 	std::remove(hostedFileName.c_str());
 
 	//  Updated the Hosted File Data List
-	HostedFileDataList.erase(iter);
-	SaveHostedFileList();
-	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback(GetHostedFileDataList());
+	NPSQL::RemoveFile(fileChecksum);
+	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback();
 	SendOutHostedFileList();
 }
 
@@ -650,7 +628,7 @@ void Server::ReceiveMessages(void)
 				auto startingIndex = int(winsockWrapper.ReadUnsignedShort(0));
 
 				//  Send a hosted file data list with the given filters
-				SendMessage_HostedFileList(HostedFileDataList, user, startingIndex, encryptedUsernameVec, type, subtype);
+				SendMessage_HostedFileList(user, startingIndex, encryptedUsernameVec, type, subtype);
 			}
 			break;
 
@@ -659,9 +637,8 @@ void Server::ReceiveMessages(void)
 				auto fileNameLength = winsockWrapper.ReadInt(0);
 				auto fileTitle = std::string((char*)winsockWrapper.ReadChars(0, fileNameLength), fileNameLength);
 
-				auto hostedFileIdentifier = md5(fileTitle);
-				auto hostedFileIter = GetHostedFileIterByTitleChecksum(hostedFileIdentifier);
-				if (hostedFileIter == HostedFileDataList.end())
+				HostedFileData fileData;
+				if (NPSQL::GetFileData(md5(fileTitle), fileData) == false)
 				{
 					//  The file could not be found.
 					SendMessage_FileRequestFailed(fileTitle, "The specified file was not found.", user);
@@ -675,8 +652,7 @@ void Server::ReceiveMessages(void)
 				}
 				else
 				{
-					auto hostedFileData = (*hostedFileIter);
-					BeginFileTransfer(hostedFileData, user);
+					BeginFileTransfer(fileData, user);
 					break;
 				}
 			}
@@ -697,9 +673,7 @@ void Server::ReceiveMessages(void)
 				assert(decryptedFileTitle.length() <= UPLOAD_TITLE_MAX_LENGTH);
 
 				//  Determine whether a file with that title already exists in the hosted file list
-				auto fileTitleMD5 = md5(decryptedFileTitle);
-				auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
-				if (fileDataIter != HostedFileDataList.end())
+				if (NPSQL::CheckIfFileExists(md5(decryptedFileTitle)))
 				{
 					SendMessage_FileSendInitFailed("A file with that title already exists on the server. Try again.", user);
 					return;
@@ -899,7 +873,7 @@ void Server::AttemptUserLogin(UserConnection* user, std::string& username, std::
 	ReadUserInbox(user);
 	ReadUserNotifications(user);
 	SendMessage_InboxAndNotifications(user);
-	SendMessage_HostedFileList(HostedFileDataList, user);
+	SendMessage_HostedFileList(user);
 
 	if (UserConnectionListChangedCallback != nullptr) UserConnectionListChangedCallback(UserConnectionsList);
 }
@@ -941,9 +915,7 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 
 	//  If the file already exists in the Hosted File Data List, return out
 	auto fileTitleMD5 = md5(fileTitle);
-	auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
-	assert(fileDataIter == HostedFileDataList.end());
-	if (fileDataIter != HostedFileDataList.end()) return;
+	if (NPSQL::CheckIfFileExists(md5(fileTitle))) return;
 
 	//  Add the hosted file data to the hosted file data list, then save the hosted file data list
 	HostedFileData newFile;
@@ -957,17 +929,15 @@ void Server::AddHostedFileFromEncrypted(std::string fileToAdd, std::string fileT
 	newFile.FileType = HostedFileType(fileTypeID);
 	newFile.FileSubType = HostedFileSubtype(fileSubTypeID);
 
-	HostedFileDataList.push_back(newFile);
-	HostedFileDataList.sort(CompareUploadsByTimeAdded);
-	SaveHostedFileList();
-	HostedFileListChangedCallback(HostedFileDataList);
-
 	//  If the file is not already in /_HostedFiles then move it in
 	auto hostedFileName = "./_HostedFiles/" + fileTitleMD5 + ".hostedfile";
 	std::ifstream uldFile(hostedFileName);
 	auto fileExists = (!uldFile.bad() && uldFile.good());
 	uldFile.close();
 	if (!fileExists) std::rename(fileToAdd.c_str(), hostedFileName.c_str());
+
+	NPSQL::AddFileData(newFile);
+	if (HostedFileListChangedCallback != nullptr) HostedFileListChangedCallback();
 
 	SendOutHostedFileList();
 }
@@ -1000,7 +970,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 
 	//  If the file already exists in the Hosted File Data List, return out
 	auto fileTitleMD5 = md5(fileTitle);
-	if (HostedFileExists(fileTitleMD5)) return;
+	if (NPSQL::CheckIfFileExists(fileTitleMD5)) return;
 
 	//  Add the hosted file data to the hosted file data list, then save the hosted file data list
 	HostedFileData newFile;
@@ -1011,9 +981,7 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	newFile.EncryptedUploader = Groundfish::Encrypt("SERVER", strlen("SERVER"), 0, rand() % 256);
 	newFile.FileSize = fileSize;
 	newFile.FileUploadTime = GetCurrentTimeString();
-	HostedFileDataList.push_back(newFile);
-	HostedFileDataList.sort(CompareUploadsByTimeAdded);
-	SaveHostedFileList();
+	NPSQL::AddFileData(newFile);
 
 	//  If the file is not already in /_HostedFiles then encrypt it and move it
 	auto hostedFileName = "./_HostedFiles/" + fileTitleMD5 + ".hostedfile";
@@ -1023,57 +991,6 @@ void Server::AddHostedFileFromUnencrypted(std::string fileToAdd, std::string fil
 	if (!fileExists) Groundfish::EncryptAndMoveFile(fileToAdd, hostedFileName);
 
 	SendOutHostedFileList();
-}
-
-
-void Server::SaveHostedFileList()
-{
-	//  Open the file as an ofstream to ensure it exists
-	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::binary | std::ios_base::app);
-	assert(hfFileCreate.good() && !hfFileCreate.bad());
-	hfFileCreate.close();
-
-	//  Open the file as an ifstream for reading
-	std::ofstream hfFile("HostedFiles.data", std::ios_base::binary | std::ios_base::trunc);
-	assert(!hfFile.bad() && hfFile.good());
-
-	//  Write the data for all hosted files
-	for (auto iter = HostedFileDataList.begin(); iter != HostedFileDataList.end(); ++iter)
-		(*iter).WriteToFile(hfFile);
-
-	hfFile.close();
-}
-
-
-void Server::LoadHostedFilesData(void)
-{
-	//  Open the file as an ofstream to ensure it exists
-	std::ofstream hfFileCreate("HostedFiles.data", std::ios_base::binary | std::ios_base::app);
-	assert(hfFileCreate.good() && !hfFileCreate.bad());
-	hfFileCreate.close();
-
-	//  Open the file as an ifstream for reading
-	std::ifstream hfFile("HostedFiles.data", std::ios_base::binary);
-	assert(!hfFile.bad() && hfFile.good());
-
-	//  Get the file size by reading the beginning and end memory positions
-	auto fileSize = int(hfFile.tellg());
-	hfFile.seekg(0, std::ios::end);
-	fileSize = int(hfFile.tellg()) - fileSize;
-	hfFile.seekg(0, std::ios::beg);
-
-	//  Read the data for all hosted files
-	while (fileSize > 0 && !hfFile.eof())
-	{
-		HostedFileData newEntry;
-		if (!newEntry.ReadFromFile(hfFile)) break;
-		if (hfFile.eof()) break;
-
-		HostedFileDataList.push_back(newEntry);
-		HostedFileDataList.sort(CompareUploadsByTimeAdded);
-	}
-
-	hfFile.close();
 }
 
 
@@ -1087,7 +1004,7 @@ void Server::SendOutHostedFileList(void)
 		//  If the user isn't logged in yet, skip over them. They'll get an update when they log in
 		if (user->UserStatus == UserConnection::USER_STATUS_CONNECTED) continue;
 
-		SendMessage_HostedFileList(HostedFileDataList, user);
+		SendMessage_HostedFileList(user);
 	}
 }
 
@@ -1151,14 +1068,12 @@ void Server::BeginFileTransfer(HostedFileData& fileData, UserConnection* user)
 
 void Server::UpdateFileTransferPercentage(bool download, UserConnection* user)
 {
-	auto title = (download ? user->UserFileSendTask->GetFileTitle() : user->UserFileReceiveTask->GetFileTitle());
+	auto fileTitle = (download ? user->UserFileSendTask->GetFileTitle() : user->UserFileReceiveTask->GetFileTitle());
 	auto percentComplete = (download ? user->UserFileSendTask->GetPercentageComplete() : user->UserFileReceiveTask->GetPercentageComplete());
 	auto transferSpeed = (download ? user->UserFileSendTask->GetEstimatedTransferSpeed() : user->UserFileReceiveTask->GetEstimatedTransferSpeed());
 
-	auto fileTitleMD5 = md5(title);
-	auto fileDataIter = GetHostedFileIterByTitleChecksum(fileTitleMD5);
-	if (fileDataIter == HostedFileDataList.end()) return;
-	auto fileData = (*fileDataIter);
+	HostedFileData fileData;
+	NPSQL::GetFileData(md5(fileTitle), fileData);
 	
 	//  Update the user and the UI user list
 	user->UserStatus = download ? UserConnection::USER_STATUS_DOWNLOADING : UserConnection::USER_STATUS_UPLOADING;

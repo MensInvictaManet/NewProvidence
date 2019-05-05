@@ -34,7 +34,7 @@ public:
 	bool InsertIntoTable(std::string dbName, std::string tableName, std::string columnList, std::string entries);
 	bool UpdateInTable(std::string dbName, std::string tableName, std::string setCommand, std::string filter);
 	bool DeleteInTable(std::string dbName, std::string tableName, std::string filter);
-	bool SelectFromTable(std::string dbName, std::string selection, std::string tableName, std::string filter, SQLSelectData& selectData);
+	bool SelectFromTable(std::string dbName, std::string selection, std::string tableName, std::string filter, SQLSelectData& selectData, std::string identifier);
 };
 
 //  Instance to be utilized by anyone including this header
@@ -70,7 +70,7 @@ bool SQLWrapper::CreateDatabaseTable(std::string dbName, std::string tableName, 
 
 bool SQLWrapper::InsertIntoTable(std::string dbName, std::string tableName, std::string columnList, std::string entries)
 {
-	auto commandString = "INSERT INTO " + tableName + " (" + columnList + ") VALUES " + entries + ";";
+	auto commandString = "INSERT INTO " + tableName + " (" + columnList + ") VALUES (" + entries + ");";
 
 	char* errorMessage = 0;
 	auto errorCode = sqlite3_exec(DatabaseMap[dbName], commandString.c_str(), SQLErrorCallback, 0, &errorMessage);
@@ -112,22 +112,22 @@ bool SQLWrapper::DeleteInTable(std::string dbName, std::string tableName, std::s
 }
 
 
-bool SQLWrapper::SelectFromTable(std::string dbName, std::string selection, std::string tableName, std::string filter, SQLSelectData& selectData)
+bool SQLWrapper::SelectFromTable(std::string dbName, std::string selection, std::string tableName, std::string filter, SQLSelectData& selectData, std::string identifier)
 {
-	auto commandString = "SELECT " + selection + " FROM '" + tableName + "' " + filter;
+	auto commandString = "SELECT " + selection + " FROM " + tableName + " " + filter;
 
 	static SQLSelectData selectDataPassIn;
 	selectDataPassIn.clear();
-	auto lambda = [](void *NotUsed, int argc, char **argv, char **azColName) {
+	auto lambda = [](void* identifier, int argc, char **argv, char **azColName) {
 		//  Get the username
-		auto username = "";
-		for (auto i = 0; i < argc; ++i) if (strcmp(azColName[i], "USERNAME") == 0) { username = argv[i]; break; }
-		for (auto i = 0; i < argc; i++) selectDataPassIn[username][azColName[i]] =  argv[i];
+		auto idColumn = "";
+		for (auto i = 0; i < argc; ++i) if (strcmp(azColName[i], ((std::string*)identifier)->c_str()) == 0) { idColumn = argv[i]; break; }
+		for (auto i = 0; i < argc; i++) selectDataPassIn[idColumn][azColName[i]] =  argv[i];
 		return 0;
 	};
 
 	char* errorMessage = 0;
-	auto errorCode = sqlite3_exec(DatabaseMap[dbName], commandString.c_str(), lambda, 0, &errorMessage);
+	auto errorCode = sqlite3_exec(DatabaseMap[dbName], commandString.c_str(), lambda, &identifier, &errorMessage);
 	if (errorCode != SQLITE_OK) {
 		fprintf(stderr, "SQL error: %s\n", errorMessage);
 		sqlite3_free(errorMessage);

@@ -145,7 +145,6 @@ inline int CompareEncryptedData(EncryptedData& vec1, EncryptedData& vec2, bool c
 
 struct HostedFileData
 {
-
 	std::string FileTitleChecksum;
 	EncryptedData EncryptedFileName;
 	EncryptedData EncryptedFileTitle;
@@ -169,119 +168,86 @@ struct HostedFileData
 		FileSubType = FILETYPE_OTHER_MISCELLANEOUS;
 	}
 
-	void WriteToFile(std::ofstream& outFile)
+	inline bool IsIdentical(HostedFileData& other)
 	{
-		//  Write the checksum length
-		int checksumSize = FileTitleChecksum.length();
-		outFile.write((char*)&checksumSize, sizeof(checksumSize));
-
-		//  Write the checksum
-		outFile.write(FileTitleChecksum.c_str(), checksumSize);
-
-		//  Write the encrypted file name length
-		int efnSize = EncryptedFileName.size();
-		outFile.write((char*)&efnSize, sizeof(efnSize));
-
-		//  Write the encrypted file name
-		outFile.write((char*)EncryptedFileName.data(), efnSize);
-
-		//  Write the encrypted file title length
-		int eftSize = EncryptedFileTitle.size();
-		outFile.write((char*)&eftSize, sizeof(eftSize));
-
-		//  Write the encrypted file title
-		outFile.write((char*)EncryptedFileTitle.data(), eftSize);
-
-		//  Write the encrypted file description length
-		int efdSize = EncryptedFileDescription.size();
-		outFile.write((char*)&efdSize, sizeof(efdSize));
-
-		//  Write the encrypted file description
-		outFile.write((char*)EncryptedFileDescription.data(), efdSize);
-
-		//  Write the encrypted file uploader length
-		int efuSize = EncryptedUploader.size();
-		outFile.write((char*)&efuSize, sizeof(efuSize));
-
-		//  Write the encrypted file uploader
-		outFile.write((char*)EncryptedUploader.data(), efuSize);
-
-		//  Write the file size
-		outFile.write((char*)&FileSize, sizeof(FileSize));
-
-		//  Write the file upload time string size
-		int uploadTimeLength = int(FileUploadTime.length());
-		outFile.write((char*)(&uploadTimeLength), sizeof(uploadTimeLength));
-
-		//  Write the file upload time string
-		outFile.write((char*)FileUploadTime.c_str(), uploadTimeLength);
-
-		//  Write the file type and sub-type
-		outFile.write((char*)&FileType, sizeof(FileType));
-		outFile.write((char*)&FileSubType, sizeof(FileSubType));
-
+		if (FileTitleChecksum.compare(other.FileTitleChecksum) != 0) return false;
+		if (strcmp((char*)(EncryptedFileName.data()), (char*)(other.EncryptedFileName.data())) != 0) return false;
+		if (strcmp((char*)(EncryptedFileTitle.data()), (char*)(other.EncryptedFileTitle.data())) != 0) return false;
+		if (strcmp((char*)(EncryptedFileDescription.data()), (char*)(other.EncryptedFileDescription.data())) != 0) return false;
+		if (strcmp((char*)(EncryptedUploader.data()), (char*)(other.EncryptedUploader.data())) != 0) return false;
+		if (FileSize != other.FileSize) return false;
+		if (FileUploadTime.compare(other.FileUploadTime) != 0) return false;
+		if (FileType != other.FileType) return false;
+		if (FileSubType != other.FileSubType) return false;
+		return true;
 	}
 
-	bool ReadFromFile(std::ifstream& inFile)
+	inline int hexCharToDecimal(char digit) { if (digit >= '0' && digit <= '9') return int(digit) - int('0'); else return int(digit) - int('a') + 10; }
+
+	inline int hexStringToDecimal(std::string hex, int digits)
 	{
-		//  Read the checksum length
-		int checksumSize;
-		inFile.read((char*)&checksumSize, sizeof(checksumSize));
-		if (inFile.eof()) return false;
+		int num = 0;
+		for (auto i = 0; i < digits; ++i) num += (int(std::pow(16, digits - i - 1)) * hexCharToDecimal(hex[i]));
+		return num;
+	}
 
-		//  Read the checksum
-		char readInData[512];
-		inFile.read(readInData, checksumSize);
-		FileTitleChecksum = std::string(readInData, checksumSize);
+	inline void LoadFileNameFromString(std::string str) {
+		if ((str.size() & 1) != 0) { return; }
+		EncryptedFileName.clear();
+		str = str.substr(2, str.size() - 2);
+		while (str.size() > 0) { EncryptedFileName.push_back((unsigned char)(hexStringToDecimal(str, 2))); str = str.substr(2, str.size() - 2); }
+	}
 
-		//  Read the encrypted file name length
-		int efnSize;
-		inFile.read((char*)&efnSize, sizeof(efnSize));
+	inline void LoadFileTitleFromString(std::string str) {
+		if ((str.size() & 1) != 0) { return; }
+		EncryptedFileTitle.clear();
+		str = str.substr(2, str.size() - 2);
+		while (str.size() > 0) { EncryptedFileTitle.push_back((unsigned char)(hexStringToDecimal(str, 2))); str = str.substr(2, str.size() - 2); }
+	}
 
-		//  Read the encrypted file name
-		inFile.read(readInData, efnSize);
-		for (auto i = 0; i < efnSize; ++i) EncryptedFileName.push_back((unsigned char)readInData[i]);
+	inline void LoadFileDescFromString(std::string str) {
+		if ((str.size() & 1) != 0) { return; }
+		EncryptedFileDescription.clear();
+		str = str.substr(2, str.size() - 2);
+		while (str.size() > 0) { EncryptedFileDescription.push_back((unsigned char)(hexStringToDecimal(str, 2))); str = str.substr(2, str.size() - 2); }
+	}
 
-		//  Read the encrypted file title length
-		int eftSize;
-		inFile.read((char*)&eftSize, sizeof(eftSize));
+	inline void LoadUploaderFromString(std::string str) {
+		if ((str.size() & 1) != 0) { return; }
+		EncryptedUploader.clear();
+		str = str.substr(2, str.size() - 2);
+		while (str.size() > 0) { EncryptedUploader.push_back((unsigned char)(hexStringToDecimal(str, 2))); str = str.substr(2, str.size() - 2); }
+	}
 
-		//  Read the encrypted file title
-		inFile.read(readInData, eftSize);
-		for (auto i = 0; i < eftSize; ++i) EncryptedFileTitle.push_back((unsigned char)readInData[i]);
+	inline std::string getFileNameString()
+	{
+		auto toHex = [](int x) { std::ostringstream oss; oss << std::hex << x; auto zero = (oss.str().length() == 1); return (zero ? "0" : "") + oss.str(); };
+		std::string str = "0x";
+		for (size_t i = 0; i < EncryptedFileName.size(); ++i) { str += toHex(int(EncryptedFileName[i])); }
+		return str;
+	}
 
-		//  Read the encrypted file description length
-		int efdSize;
-		inFile.read((char*)&efdSize, sizeof(efdSize));
+	inline std::string getFileTitleString()
+	{
+		auto toHex = [](int x) { std::ostringstream oss; oss << std::hex << x; auto zero = (oss.str().length() == 1); return (zero ? "0" : "") + oss.str(); };
+		std::string str = "0x";
+		for (size_t i = 0; i < EncryptedFileTitle.size(); ++i) { str += toHex(int(EncryptedFileTitle[i])); }
+		return str;
+	}
 
-		//  Read the encrypted file name
-		inFile.read(readInData, efdSize);
-		for (auto i = 0; i < efdSize; ++i) EncryptedFileDescription.push_back((unsigned char)readInData[i]);
+	inline std::string getFileDescString()
+	{
+		auto toHex = [](int x) { std::ostringstream oss; oss << std::hex << x; auto zero = (oss.str().length() == 1); return (zero ? "0" : "") + oss.str(); };
+		std::string str = "0x";
+		for (size_t i = 0; i < EncryptedFileDescription.size(); ++i) { str += toHex(int(EncryptedFileDescription[i])); }
+		return str;
+	}
 
-		//  Read the encrypted file uploader length
-		int efuSize;
-		inFile.read((char*)&efuSize, sizeof(efuSize));
-
-		//  Read the encrypted file uploader
-		inFile.read(readInData, efuSize);
-		for (auto i = 0; i < efuSize; ++i) EncryptedUploader.push_back((unsigned char)readInData[i]);
-
-		//  Read the file size
-		inFile.read((char*)&FileSize, sizeof(FileSize));
-
-		//  Read the file upload time length
-		int futLength;
-		inFile.read((char*)&futLength, sizeof(futLength));
-
-		//  Read the encrypted file uploader
-		inFile.read(readInData, futLength);
-		FileUploadTime.clear();
-		for (auto i = 0; i < futLength; ++i) FileUploadTime += readInData[i];
-
-		//  Read the file type and sub-type
-		inFile.read((char*)&FileType, sizeof(FileType));
-		inFile.read((char*)&FileSubType, sizeof(FileSubType));
-
-		return true;
+	inline std::string getFileUploaderString()
+	{
+		auto toHex = [](int x) { std::ostringstream oss; oss << std::hex << x; auto zero = (oss.str().length() == 1); return (zero ? "0" : "") + oss.str(); };
+		std::string str = "0x";
+		for (size_t i = 0; i < EncryptedUploader.size(); ++i) { str += toHex(int(EncryptedUploader[i])); }
+		return str;
 	}
 };

@@ -39,13 +39,16 @@ void DeleteHostedFile(GUIObjectNode* fileDeleteButton)
 	ServerControl.DeleteHostedFile(fileChecksum);
 }
 
-void UpdateHostedFileList(const std::list<HostedFileData>& hostedFileDataList)
+void UpdateHostedFileList()
 {
+	std::list<HostedFileData> dataList;
+	NPSQL::GetHostedFileList(dataList, 0, 100);
+	dataList.sort(CompareUploadsByTimeAdded);
+
 	//  Clear the hosted file list and rebuild it using the most recent data
 	HostedFileListBox->ClearItems();
-	for (auto iter = hostedFileDataList.begin(); iter != hostedFileDataList.end(); ++iter)
+	for (HostedFileData fileData : dataList)
 	{
-		auto fileData = (*iter);
 		auto newFileDataEntry = GUIObjectNode::CreateObjectNode("");
 
 		//  Create the file identifier label
@@ -183,7 +186,7 @@ void PrimaryDialogue::InitializeServer()
 {
 	assert(ServerControl.Initialize());
 
-	UpdateHostedFileList(ServerControl.GetHostedFileDataList());
+	UpdateHostedFileList();
 }
 
 
