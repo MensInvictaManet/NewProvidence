@@ -30,49 +30,6 @@ struct UserLoginDetails
 		EncryptedPassword.clear();
 	}
 	UserLoginDetails(EncryptedData username, EncryptedData password) : EncryptedUserName(username), EncryptedPassword(password) {}
-
-	void WriteToFile(std::ofstream& outFile)
-	{
-		//  Write the username data length
-		int usernameSize = EncryptedUserName.size();
-		outFile.write((char*)&usernameSize, sizeof(usernameSize));
-
-		//  Write the username data
-		outFile.write((char*)EncryptedUserName.data(), usernameSize);
-
-		//  Write the password data length
-		int passwordSize = EncryptedUserName.size();
-		outFile.write((char*)&passwordSize, sizeof(passwordSize));
-
-		//  Write the password data
-		outFile.write((char*)EncryptedPassword.data(), passwordSize);
-	}
-
-	bool ReadFromFile(std::ifstream& inFile)
-	{
-		//  Read the username length
-		int usernameSize;
-		inFile.read((char*)&usernameSize, sizeof(usernameSize));
-		if (inFile.eof()) return false;
-
-		//  Read the username data
-		char readInData[512];
-		inFile.read(readInData, usernameSize);
-		EncryptedUserName.clear();
-		for (auto i = 0; i < usernameSize; ++i) EncryptedUserName.push_back((unsigned char)readInData[i]);
-
-		//  Read the password length
-		int passwordSize;
-		inFile.read((char*)&passwordSize, sizeof(passwordSize));
-		if (inFile.eof()) return false;
-
-		//  Read the username data
-		inFile.read(readInData, passwordSize);
-		EncryptedPassword.clear();
-		for (auto i = 0; i < passwordSize; ++i) EncryptedPassword.push_back((unsigned char)readInData[i]);
-
-		return true;
-	}
 };
 
 
