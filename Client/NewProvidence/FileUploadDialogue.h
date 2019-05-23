@@ -15,7 +15,6 @@
 #include "Client.h"
 #include <string>
 
-GUIListBox* UploadFolderItemsListBox = nullptr;
 GUILabel* UploadFileNameLabel = nullptr;
 GUIEditBox* UploadFileTitleEditBox = nullptr;
 GUIDropDown* UploadFileTypeDropDown = nullptr;
@@ -24,22 +23,6 @@ std::string SelectedUploadFileName = "";
 
 GUIObjectNode* UploadErrorBG = nullptr;
 GUILabel* UploadErrorLabel = nullptr;
-
-void AddUploadFolderItem(std::string filePath)
-{
-	if (UploadFolderItemsListBox == nullptr) return;
-
-	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
-	auto entryY = 12;
-	auto entryH = UploadFolderItemsListBox->GetEntryHeight();
-	auto entryW = UploadFolderItemsListBox->GetWidth();
-
-	auto displayName = getFilenameFromPath(filePath);
-
-	auto itemLabel = GUILabel::CreateLabel("Arial", displayName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
-	itemLabel->SetObjectName(filePath);
-	UploadFolderItemsListBox->AddItem(itemLabel);
-}
 
 
 void UpdateUploadSubTypeList(GUIObjectNode* object)
@@ -136,9 +119,11 @@ public:
 
 private:
 	void LoadUploadErrorUI();
+	void AddUploadFolderItem(std::string filePath);
 
 	GUIObjectNode* MenuUINode = nullptr;
 	GUIObjectNode* UploadErrorNode = nullptr;
+	GUIListBox* UploadFolderItemsListBox = nullptr;
 };
 
 
@@ -292,4 +277,21 @@ void FileUploadDialogue::LoadUploadErrorUI()
 	UploadErrorLabel->SetJustification(UI_JUSTIFY_CENTER);
 	UploadErrorNode->AddChild(UploadErrorLabel);
 	SetUploadErrorMessage("", false);
+}
+
+
+void FileUploadDialogue::AddUploadFolderItem(std::string filePath)
+{
+	if (UploadFolderItemsListBox == nullptr) return;
+
+	auto entryX = UploadFolderItemsListBox->GetWidth() / 2;
+	auto entryY = 12;
+	auto entryH = UploadFolderItemsListBox->GetEntryHeight();
+	auto entryW = UploadFolderItemsListBox->GetWidth();
+
+	auto displayName = getFilenameFromPath(filePath);
+
+	auto itemLabel = GUILabel::CreateLabel("Arial", displayName.c_str(), entryX, entryY, entryW, entryH, UI_JUSTIFY_CENTER);
+	itemLabel->SetObjectName(filePath);
+	UploadFolderItemsListBox->AddItem(itemLabel);
 }

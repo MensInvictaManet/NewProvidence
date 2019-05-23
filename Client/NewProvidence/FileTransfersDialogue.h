@@ -11,19 +11,13 @@
 
 struct FileUploadData
 {
-	std::string FileName;
-	std::string FilePath;
-	std::string FileTitle;
-	HostedFileType FileTypeID;
-	HostedFileSubtype FileSubTypeID;
+	std::string FileName = "";
+	std::string FilePath = "";
+	std::string FileTitle = "";
+	HostedFileType FileTypeID = FILE_TYPE_COUNT;
+	HostedFileSubtype FileSubTypeID = FILE_SUBTYPE_COUNT;
 
-	FileUploadData() :
-		FileName(""),
-		FilePath(""),
-		FileTitle(""),
-		FileTypeID(FILE_TYPE_COUNT),
-		FileSubTypeID(FILE_SUBTYPE_COUNT)
-	{}
+	FileUploadData() {}
 
 	FileUploadData(std::string fileName, std::string filePath, std::string fileTitle, HostedFileType fileTypeID, HostedFileSubtype fileSubTypeID) :
 		FileName(fileName),
